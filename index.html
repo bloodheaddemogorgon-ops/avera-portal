@@ -113,11 +113,18 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .table-wrap{overflow-x:auto}
 .student-table{width:100%;border-collapse:collapse;text-align:left}
 .grade-summary-table{min-width:1180px}
-.grade-summary-table th,.grade-summary-table td{padding:9px 10px;text-align:center;vertical-align:middle}
+.grade-summary-table th,.grade-summary-table td{padding:9px 10px;border:1px solid #e6e6e6;text-align:center;vertical-align:middle}
 .grade-summary-table th{white-space:normal}
+.grade-summary-table th{background-color:#f5f5f5}
 .grade-summary-table .summary-index{width:38px;text-align:right}
 .grade-summary-table .summary-learner{text-align:left;min-width:230px}
 .grade-summary-table .summary-average{font-weight:700;background:var(--soft)}
+.grade-descriptor{display:block;margin-top:3px;color:var(--muted);font-size:.72rem;font-weight:600;line-height:1.35}
+.grade-interpretation{margin:14px 0 0;padding:12px 16px;border-radius:10px;background:var(--field);color:var(--muted);font-size:.8rem}
+.grade-interpretation ul{display:grid;gap:4px;margin:0;padding-left:20px}
+.grade-interpretation a{text-decoration:none;color:#464feb}
+.grade-interpretation a:hover{text-decoration:underline}
+.grade-interpretation-sources{margin:10px 0 0}
 .grade-summary-controls{display:flex;align-items:center;gap:10px}
 .grade-summary-controls label{margin:0;font-size:.8rem}
 .grade-summary-controls select{min-height:38px;padding:7px 30px 7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);font:inherit}
@@ -153,6 +160,47 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .reading-assessment-controls .form-field{width:min(100%,240px);margin:0}
 .reading-assessment-controls .field-hint{margin:0 0 8px}
 .reading-assessed-date{display:block;margin-top:6px;color:var(--muted);font-size:.76rem}
+.philiri-layout{display:grid;gap:16px;margin-bottom:24px}
+.philiri-controls,.philiri-toolbar,.philiri-filter-row{display:flex;align-items:end;flex-wrap:wrap;gap:12px}
+.philiri-controls .form-field,.philiri-filter-row .form-field{min-width:min(100%,190px);flex:1}
+.philiri-controls .form-field label,.philiri-filter-row .form-field label{margin-top:0}
+.philiri-controls input,.philiri-controls select,.philiri-filter-row input,.philiri-filter-row select,.philiri-assessment-grid input,.philiri-assessment-grid select{width:100%;min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);font:inherit}
+.philiri-tabs{display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line)}
+.philiri-tab{padding:10px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);font:inherit;font-weight:700;cursor:pointer}
+.philiri-tab[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--accent)}
+.philiri-panel{display:grid;gap:14px}
+.philiri-card{padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:var(--shadow)}
+.philiri-card h2{margin:0 0 12px;font-size:1.05rem}
+.philiri-card h3{margin:18px 0 10px;font-size:.95rem}
+.philiri-assessment-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px}
+.philiri-assessment-grid .form-field label{margin-top:0}
+.philiri-computed{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+.philiri-computed span{padding:8px 11px;border-radius:9px;background:var(--soft);font-size:.85rem;font-weight:700}
+.philiri-level{display:inline-block;padding:4px 9px;border-radius:999px;font-size:.78rem;font-weight:700}
+.philiri-level-independent{background:#dcfae6;color:#16803c}
+.philiri-level-instructional{background:#fef0c7;color:#b54708}
+.philiri-level-frustration{background:#fee4e2;color:#b42318}
+.philiri-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.philiri-metric{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.philiri-metric span{display:block;color:var(--muted);font-size:.8rem}
+.philiri-metric strong{display:block;margin-top:5px;font-size:1.45rem}
+.philiri-chart{display:grid;gap:8px}
+.philiri-chart-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,3fr) auto;align-items:center;gap:9px;font-size:.8rem}
+.philiri-chart-track{height:14px;overflow:hidden;border-radius:999px;background:var(--field)}
+.philiri-chart-fill{height:100%;border-radius:inherit}
+.philiri-cutoff-table{width:100%;min-width:480px;border-collapse:collapse}
+.philiri-cutoff-table th,.philiri-cutoff-table td{padding:9px;border:1px solid var(--line);text-align:left}
+.philiri-cutoff-table th{background:var(--field)}
+.philiri-cutoff-table input{width:110px;max-width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);font:inherit}
+.philiri-status{min-height:1.5em}
+.philiri-print-header{display:none}
+.philiri-print-only{display:none}
+@media (max-width:760px){
+  .philiri-card{padding:14px}
+  .philiri-controls,.philiri-filter-row{align-items:stretch;flex-direction:column}
+  .philiri-controls .form-field,.philiri-filter-row .form-field{width:100%;min-width:0}
+  .philiri-chart-row{grid-template-columns:minmax(90px,1fr) minmax(90px,2fr) auto}
+}
 .teacher-profile-card{display:flex;align-items:center;gap:22px;padding:24px}
 .teacher-profile-avatar{display:grid;width:112px;height:112px;flex:none;place-items:center;overflow:hidden;border:1px solid var(--line);border-radius:50%;background:var(--soft);color:var(--accent);font-size:2rem;font-weight:700}
 .teacher-profile-avatar img{width:100%;height:100%;object-fit:cover}
@@ -185,6 +233,15 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .parent-reading-card{padding:20px 22px;margin-bottom:18px;scroll-margin-top:18px}
 .parent-reading-card h2{margin:0;font-size:1.05rem}
 .parent-reading-card>.field-hint{margin:3px 0 12px}
+.parent-philiri-results{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+.parent-philiri-results h3{margin:0;font-size:.98rem}
+.parent-philiri-results>.field-hint{margin:4px 0 12px}
+.parent-philiri-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.parent-philiri-result{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--field)}
+.parent-philiri-result h4{margin:0 0 5px;font-size:.9rem}
+.parent-philiri-result p{margin:5px 0;color:var(--muted);font-size:.84rem;overflow-wrap:anywhere}
+.parent-philiri-result strong{color:var(--ink)}
+.parent-philiri-empty{color:var(--muted);font-size:.88rem}
 .parent-reading-trend{margin:0 0 20px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--field)}
 .parent-reading-trend h3{margin:0;font-size:.98rem}
 .parent-reading-trend>p{margin:4px 0 12px;color:var(--muted);font-size:.82rem}
@@ -268,11 +325,20 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .parent-grade-table{width:100%;min-width:620px;border-collapse:collapse}
 .parent-grade-table th,.parent-grade-table td{padding:11px 18px;border-bottom:1px solid var(--line);text-align:left}
 .parent-grade-table thead th{background:var(--field);font-size:.82rem;white-space:nowrap}
+#parentGradeRecords .parent-grade-table th,#parentGradeRecords .parent-grade-table td{border:1px solid #e6e6e6}
+#parentGradeRecords .parent-grade-table thead th{background-color:#f5f5f5}
 .parent-grade-table tbody th{min-width:180px;font-weight:600}
 .parent-grade-table td{font-variant-numeric:tabular-nums}
 .parent-grade-table .parent-grade-general{font-weight:700}
 .parent-grade-table .parent-grade-overall{background:var(--soft);font-weight:700}
 .parent-grade-table tfoot th,.parent-grade-table tfoot td{border-top:2px solid var(--line);border-bottom:0;font-weight:700}
+#parentGradeRecords .parent-grade-table tfoot th,#parentGradeRecords .parent-grade-table tfoot td{border:1px solid #e6e6e6;font-weight:700}
+:root[data-theme="dark"] .grade-summary-table th,:root[data-theme="dark"] #parentGradeRecords .parent-grade-table thead th{background-color:var(--field)}
+:root[data-theme="dark"] .grade-summary-table th,:root[data-theme="dark"] .grade-summary-table td,:root[data-theme="dark"] #parentGradeRecords .parent-grade-table th,:root[data-theme="dark"] #parentGradeRecords .parent-grade-table td{border-color:var(--line)}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .grade-summary-table th,:root:not([data-theme="light"]) #parentGradeRecords .parent-grade-table thead th{background-color:var(--field)}
+  :root:not([data-theme="light"]) .grade-summary-table th,:root:not([data-theme="light"]) .grade-summary-table td,:root:not([data-theme="light"]) #parentGradeRecords .parent-grade-table th,:root:not([data-theme="light"]) #parentGradeRecords .parent-grade-table td{border-color:var(--line)}
+}
 .parent-note{padding:12px 14px;border-radius:10px;background:var(--soft);color:var(--muted);font-size:.85rem}
 .attendance-refresh{padding:7px 11px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);font:inherit;font-size:.82rem;font-weight:600;cursor:pointer}
 .attendance-refresh:disabled{opacity:.65;cursor:wait}
@@ -296,6 +362,9 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .attendance-day-select{width:48px;min-height:32px;padding:3px;border:1px solid var(--line);border-radius:5px;background:var(--field);color:var(--ink);font:inherit;font-size:.68rem}
 .attendance-day-select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
 .attendance-reason-input{display:block;width:140px;max-width:100%;margin:4px auto 0;padding:4px 6px;border:1px solid var(--line);border-radius:5px;background:var(--field);color:var(--ink);font:inherit;font-size:.68rem}
+.drag-scroll-wrap{overflow-x:auto;cursor:grab;touch-action:pan-y}
+.drag-scroll-wrap.is-dragging{cursor:grabbing;user-select:none;-webkit-user-select:none}
+.drag-scroll-hint{margin:10px 16px 0;color:var(--muted);font-size:.78rem}
 .attendance-legend{margin:0;padding:0 18px 14px;color:var(--muted);font-size:.82rem}
 .attendance-month-controls{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px}
 .attendance-month-controls .form-field{min-width:180px}
@@ -309,7 +378,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .attendance-summary-table .attendance-summary-total{font-weight:700;background:var(--field)}
 .attendance-summary-table thead th{position:sticky;top:0;z-index:1;background:var(--card)}
 .attendance-summary-table th:first-child,.attendance-summary-table td:first-child{position:sticky;left:0;width:48px;min-width:48px;max-width:48px;background:var(--card);z-index:2}
-.attendance-summary-table th:nth-child(2),.attendance-summary-table td:nth-child(2){position:sticky;left:48px;width:210px;min-width:210px;max-width:210px;background:var(--card);z-index:2}
+.attendance-summary-table th:nth-child(2),.attendance-summary-table td:nth-child(2){position:sticky;left:48px;width:210px;min-width:210px;max-width:210px;overflow:hidden;text-overflow:ellipsis;background:var(--card);z-index:2}
 .attendance-summary-table thead th:first-child,.attendance-summary-table thead th:nth-child(2){z-index:3}
 .attendance-summary-table tbody td:first-child,.attendance-summary-table tbody td:nth-child(2){box-shadow:1px 0 var(--line)}
 .attendance-summary-table thead th:not(:first-child):not(:nth-child(2)){min-width:94px}
@@ -320,6 +389,64 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .attendance-daily-totals td:first-child{position:sticky;left:0;z-index:1;background:var(--field)}
 .attendance-remark-select{width:100%;min-width:155px;padding:5px 7px;border:1px solid var(--line);border-radius:5px;background:var(--field);color:var(--ink);font:inherit;font-size:.7rem}
 .attendance-status-date{width:100%;min-width:140px;margin-top:4px;padding:4px 5px;border:1px solid var(--line);border-radius:5px;background:var(--field);color:var(--ink);font:inherit;font-size:.7rem}
+.rma-period-tabs,.rma-view-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+.rma-period-tab,.rma-view-tab{min-height:42px;padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--muted);font:inherit;font-weight:600;cursor:pointer}
+.rma-period-tab[aria-selected="true"],.rma-view-tab[aria-selected="true"]{border-color:var(--accent);background:var(--soft);color:var(--accent)}
+.rma-export-actions{display:flex;flex-wrap:wrap;gap:8px}
+.rma-export-actions .btn{width:auto;margin:0;padding:9px 12px;font-size:.84rem}
+.rma-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 18px}
+.rma-stat{min-width:0;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.rma-stat span{display:block;color:var(--muted);font-size:.8rem;font-weight:600}
+.rma-stat strong{display:block;margin-top:5px;font-size:1.35rem;overflow-wrap:anywhere}
+.rma-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 18px}
+.rma-chart-wide{grid-column:1/-1}
+.rma-chart-card{min-width:0;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.rma-chart-card h2{margin:0;font-size:1rem}
+.rma-chart-card p{margin:4px 0 0;color:var(--muted);font-size:.82rem}
+.rma-chart-card>label{display:block;margin:10px 0 4px;font-size:.82rem}
+.rma-chart-card>select{min-height:38px;max-width:100%;padding:7px 30px 7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--field);color:var(--ink);font:inherit}
+.rma-chart{display:block;width:100%;height:auto;margin-top:12px;overflow:visible}
+.rma-chart text{fill:var(--ink);font-family:inherit;font-size:12px}
+.rma-entry-table{min-width:0}
+.rma-entry-table .rma-learner-name{font-weight:700}
+.rma-entry-table .rma-entry-action{text-align:right}
+.rma-entry-table .rma-add-score{width:auto;min-width:120px;margin:0;padding:8px 12px}
+.rma-entry-table .rma-result-row td{padding:0 18px 14px 36px;border-bottom:1px solid var(--line);color:var(--muted);font-size:.85rem}
+.rma-result-summary{padding:10px 12px;border-left:3px solid var(--accent);background:var(--field);line-height:1.55}
+.rma-result-summary strong{color:var(--ink)}
+.rma-entry-controls{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--field)}
+.rma-entry-controls .form-field{min-width:180px;margin:0}
+.rma-entry-controls select{min-height:40px;padding:7px 30px 7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font:inherit}
+.rma-entry-table th,.rma-entry-table td{min-width:0}
+.rma-entry-table td{padding:14px 18px}
+.rma-assessment-dialog{width:min(960px,calc(100% - 28px))}
+.rma-assessment-form{max-height:calc(92vh - 82px);overflow-y:auto}
+.rma-assessment-meta{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin:10px 0 14px}
+.rma-assessment-meta .form-field{width:min(100%,240px);margin:0}
+.rma-assessment-help{margin:8px 0 14px;color:var(--muted);font-size:.86rem;line-height:1.5}
+.rma-assessment-legacy{margin:8px 0;padding:10px 12px;border-radius:9px;background:var(--soft);color:var(--muted);font-size:.84rem}
+.rma-item-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;margin:10px 0}
+.rma-item-group{margin:14px 0}
+.rma-item-group h3{margin:12px 0 7px;font-size:.9rem}
+.rma-item-field{display:flex;min-width:0;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field)}
+.rma-item-field input[type="checkbox"]{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+.rma-item-field select{min-width:132px;min-height:38px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+.rma-item-field label{margin:0;color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer}
+.rma-item-partial{display:block;color:var(--muted);font-size:.74rem;font-weight:400}
+.rma-assessment-preview{margin:14px 0;padding:12px 14px;border-radius:10px;background:var(--soft);font-weight:700}
+.rma-narrative-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:12px 0}
+.rma-narrative-grid label{display:block;margin-bottom:4px;color:var(--muted);font-size:.78rem;font-weight:700}
+.rma-narrative-grid textarea{min-width:0!important;min-height:72px;resize:vertical}
+.rma-detail-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin:12px 0}
+.rma-detail-summary div{padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);font-size:.8rem}
+.rma-detail-summary strong{display:block}
+.rma-domain-table{width:100%;border-collapse:collapse}
+.rma-domain-table th,.rma-domain-table td{padding:9px 11px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.rma-domain-table th{color:var(--muted);font-size:.76rem;text-transform:uppercase}
+.rma-template-note{margin:8px 0 14px;color:var(--muted);font-size:.84rem;line-height:1.6}
+.rma-legacy-result{color:var(--muted);font-size:.8rem}
+.rma-analysis{margin:14px 0 0;color:var(--muted);line-height:1.6}
+.rma-section-title{margin:22px 0 10px;font-size:1.1rem}
 .parent-link-select{min-width:190px;max-width:280px}
 .student-table th,.student-table td{padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:top}
 .student-table th{color:var(--muted);font-size:.76rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
@@ -383,6 +510,9 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   .topbar-profile-label{display:none}
   .student-table th,.student-table td{padding:12px}
   .reading-chart-grid{grid-template-columns:1fr}
+  .rma-chart-grid{grid-template-columns:1fr}
+  .rma-chart-wide{grid-column:auto}
+  .rma-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .reading-subtabs{grid-template-columns:1fr}
   .parent-overview{grid-template-columns:1fr}
   .parent-detail-grid{grid-template-columns:1fr}
@@ -408,6 +538,30 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   #studentTable th:nth-child(3),#studentTable td:nth-child(3){display:none}
   .form-actions{flex-direction:column-reverse}
   .form-actions .btn{width:100%}
+}
+@media print{
+  body.rma-printing *{visibility:hidden!important}
+  body.rma-printing #rmaPage,body.rma-printing #rmaPage *{visibility:visible!important}
+  body.rma-printing #rmaPage[hidden]{display:block!important}
+  body.rma-printing #rmaPage{position:absolute;inset:0;width:100%;padding:0;background:#fff;color:#111}
+  body.rma-printing .rma-export-actions,body.rma-printing .rma-period-tabs,body.rma-printing .rma-view-tabs,body.rma-printing #rmaEntryPanel,body.rma-printing #rmaNotice{display:none!important}
+  body.rma-printing .rma-chart-grid{grid-template-columns:1fr 1fr}
+  body.rma-printing .rma-chart-card,body.rma-printing .data-card{break-inside:avoid;box-shadow:none}
+  body.rma-printing .table-wrap{overflow:visible}
+  body.rma-printing .student-table{min-width:0;width:100%;font-size:8pt}
+  body.rma-printing .student-table th,body.rma-printing .student-table td{padding:4px;white-space:normal}
+}
+@media print{
+  body.philiri-printing *{visibility:hidden!important}
+  body.philiri-printing #readingProgressPage,body.philiri-printing #readingProgressPage *{visibility:visible!important}
+  body.philiri-printing #readingProgressPage{display:block!important}
+  body.philiri-printing #philIriPanel,body.philiri-printing #philIriPanel *{visibility:visible!important}
+  body.philiri-printing #philIriPanel{display:block!important;position:absolute;inset:0;width:100%;padding:0;background:#fff;color:#111}
+  body.philiri-printing #philIriPanel .philiri-tabs,body.philiri-printing #philIriPanel .philiri-toolbar,body.philiri-printing #philIriPanel .philiri-controls,body.philiri-printing #philIriPanel .philiri-filter-row,body.philiri-printing #philIriPanel .btn,body.philiri-printing #philIriPanel input,body.philiri-printing #philIriPanel select{display:none!important}
+  body.philiri-printing #philIriPanel .philiri-print-header{display:block!important}
+  body.philiri-printing #philIriPanel .philiri-card{break-inside:avoid;box-shadow:none}
+  body.philiri-printing #philIriPanel .philiri-print-only{display:block!important}
+  body.philiri-printing #philIriRecordPanel>.philiri-card:not(.philiri-print-only),body.philiri-printing #philIriRecordNotice{display:none!important}
 }
 </style>
 </head>
@@ -478,6 +632,9 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
           </button>
           <button class="nav-link" id="navReadingProgress" type="button">
             <span class="nav-icon" aria-hidden="true">▥</span>Reading Progress
+          </button>
+          <button class="nav-link" id="navRma" type="button">
+            <span class="nav-icon" aria-hidden="true">∑</span>RMA
           </button>
           <button class="nav-link" id="navTeacherProfile" type="button">
             <span class="nav-icon" aria-hidden="true">◉</span>Teacher Profile
@@ -571,7 +728,8 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
               </div>
               <div class="data-card">
                 <div class="data-card-header"><h2 id="attendanceMonthTitle">Monthly attendance record</h2><span class="student-count" id="attendanceCount">Loading students...</span></div>
-                <div class="table-wrap">
+                <p class="drag-scroll-hint">Drag the table left or right to browse attendance dates.</p>
+                <div class="table-wrap drag-scroll-wrap">
                   <table class="student-table attendance-table" id="attendanceTable">
                     <thead id="attendanceHead"></thead>
                     <tbody id="attendanceRows"></tbody>
@@ -588,7 +746,8 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
               <div class="data-card">
                 <div class="data-card-header"><h2>Summary Of Attendance</h2><button class="attendance-refresh" id="refreshAttendanceSummary" type="button">Refresh</button></div>
                 <p class="attendance-summary-range" id="attendanceSummaryRange">Totals are calculated from saved attendance records.</p>
-                <div class="table-wrap">
+                <p class="drag-scroll-hint">Drag the table left or right to view all attendance totals.</p>
+                <div class="table-wrap drag-scroll-wrap">
                   <table class="student-table attendance-summary-table">
                     <thead id="attendanceSummaryHead"></thead>
                     <tbody id="attendanceSummaryRows"></tbody>
@@ -637,7 +796,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
                     <div class="grade-field"><label for="gradeMapeh">MAPEH (average)</label><output id="gradeMapeh" for="gradeMusicAndArts gradePhysicalEducationAndHealth">—</output></div>
                     <div class="grade-field"><label for="gradeMusicAndArts">Music and Arts</label><input id="gradeMusicAndArts" name="musicAndArts" type="number" min="0" max="100" step="0.01" inputmode="decimal"></div>
                     <div class="grade-field"><label for="gradePhysicalEducationAndHealth">Physical Education and Health</label><input id="gradePhysicalEducationAndHealth" name="physicalEducationAndHealth" type="number" min="0" max="100" step="0.01" inputmode="decimal"></div>
-                    <div class="grade-field"><label for="gradeGeneralAverage">General Average</label><output id="gradeGeneralAverage" aria-live="polite">—</output></div>
+                    <div class="grade-field"><label for="gradeGeneralAverage">General Average</label><output id="gradeGeneralAverage" aria-live="polite">—</output><small class="grade-descriptor" id="gradeGeneralAverageDescriptor" hidden></small></div>
                   </div>
                 </fieldset>
                 <div class="grade-actions">
@@ -645,6 +804,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
                   <button class="btn" id="saveGrades" type="submit" disabled>Save Grades</button>
                 </div>
               </div>
+              <div class="grade-interpretation" id="gradeInterpretation"></div>
             </form>
             <p class="notice" id="gradeNotice" role="status" aria-live="polite"></p>
           </section>
@@ -663,20 +823,141 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
                   <span class="student-count" id="gradeSummaryCount">Loading grades...</span>
                 </div>
               </div>
-              <div class="table-wrap">
+              <p class="drag-scroll-hint">Drag the table left or right to view all subjects and averages.</p>
+              <div class="table-wrap drag-scroll-wrap">
                 <table class="student-table grade-summary-table" id="gradeSummaryTable">
                   <thead id="gradeSummaryHead"></thead>
                   <tbody id="gradeSummaryRows"></tbody>
                 </table>
                 <div class="empty-state" id="gradeSummaryEmpty" hidden><h3>No students in this class</h3><p>Add or import students before viewing the grade summary.</p></div>
               </div>
+              <div class="grade-interpretation" id="gradeSummaryInterpretation"></div>
             </div>
             <p class="notice" id="gradeSummaryNotice" role="status" aria-live="polite"></p>
           </section>
           <section id="readingProgressPage" aria-labelledby="readingProgressTitle" hidden>
             <div class="page-heading">
-              <div><h1 id="readingProgressTitle">Reading Progress</h1><p>Review reports and record assessments for each reading period.</p></div>
+              <div><h1 id="readingProgressTitle">Reading Progress</h1><p>Record PHIL-IRI screening and individualized assessments, track interventions, and review class and school reading profiles.</p></div>
             </div>
+            <section id="philIriPanel" class="philiri-layout" aria-label="PHIL-IRI management">
+              <div class="philiri-card">
+                <div class="philiri-print-header"><h1>PHIL-IRI Reading Profile</h1><p id="philIriPrintMeta"></p></div>
+                <div class="philiri-controls">
+                  <div class="form-field"><label for="philIriPeriod">Assessment cycle</label><select id="philIriPeriod"><option>BOSY</option><option>MOSY</option><option>EOSY</option></select></div>
+                  <div class="form-field"><label for="philIriType">Assessment type</label><select id="philIriType"><option>Pretest</option><option>Posttest</option></select></div>
+                  <div class="philiri-toolbar">
+                    <button class="btn ghost" id="philIriExportClass" type="button">Export Class Excel</button>
+                    <button class="btn ghost" id="philIriExportStudent" type="button">Learner Report Excel</button>
+                    <button class="btn ghost" id="philIriExportSchool" type="button">School Report Excel</button>
+                    <button class="btn" id="philIriPrint" type="button">Print / Save PDF</button>
+                  </div>
+                </div>
+              </div>
+              <div class="philiri-tabs" role="tablist" aria-label="PHIL-IRI pages">
+                <button class="philiri-tab" id="philIriRecordTab" type="button" role="tab" aria-controls="philIriRecordPanel" aria-selected="true">Assessment Entry</button>
+                <button class="philiri-tab" id="philIriClassTab" type="button" role="tab" aria-controls="philIriClassPanel" aria-selected="false">Class Profile & Reports</button>
+                <button class="philiri-tab" id="philIriSettingsTab" type="button" role="tab" aria-controls="philIriSettingsPanel" aria-selected="false">GST Cutoff Settings</button>
+                <button class="philiri-tab" id="philIriSchoolTab" type="button" role="tab" aria-controls="philIriSchoolPanel" aria-selected="false">School Consolidated</button>
+              </div>
+              <section id="philIriRecordPanel" class="philiri-panel" role="tabpanel" aria-labelledby="philIriRecordTab">
+                <div class="philiri-card">
+                  <h2>Assessment information</h2>
+                  <div class="philiri-assessment-grid">
+                    <div class="form-field"><label for="philIriLearnerSearch">Search learner by name or LRN</label><input id="philIriLearnerSearch" type="search" autocomplete="off" placeholder="Type a name or LRN"></div>
+                    <div class="form-field"><label for="philIriLearner">Learner</label><select id="philIriLearner"></select></div>
+                    <div class="form-field"><label for="philIriLanguage">Language</label><select id="philIriLanguage"><option>English</option><option>Filipino</option></select></div>
+                    <div class="form-field"><label for="philIriDate">Assessment date</label><input id="philIriDate" type="date"></div>
+                    <div class="form-field"><label for="philIriAssessor">Assessor / teacher</label><input id="philIriAssessor" maxlength="120" autocomplete="name"></div>
+                  </div>
+                  <p class="field-hint">Class grade, section, school information, and configured GST cutoff are applied automatically from the Teacher Profile and cutoff settings.</p>
+                  <div id="philIriExistingResult" class="field-hint" aria-live="polite"></div>
+                </div>
+                <div class="philiri-card">
+                  <h2>Group Screening Test (GST)</h2>
+                  <p>Enter the learner's GST result. The configured grade-and-language passing score determines whether individualized assessment is required.</p>
+                  <div class="philiri-assessment-grid">
+                    <div class="form-field"><label for="philIriGstScore">GST score</label><input id="philIriGstScore" type="number" min="0" step="1" inputmode="numeric"></div>
+                    <div class="form-field"><label for="philIriGstTotal">Total items</label><input id="philIriGstTotal" type="number" min="1" step="1" inputmode="numeric"></div>
+                  </div>
+                  <div class="philiri-computed" id="philIriGstPreview" aria-live="polite"></div>
+                  <button class="btn" id="philIriSaveGst" type="button">Save GST Results</button>
+                </div>
+                <div class="philiri-card" id="philIriIndividualCard" hidden>
+                  <h2>Individualized Assessment</h2>
+                  <p id="philIriIndividualReason"></p>
+                  <div class="philiri-assessment-grid">
+                    <div class="form-field"><label for="philIriMode">Assessment mode</label><select id="philIriMode"><option>Oral Reading</option><option>Silent Reading</option></select></div>
+                    <div class="form-field"><label for="philIriPassage">Reading passage used</label><input id="philIriPassage" maxlength="500"></div>
+                    <div class="form-field"><label for="philIriWords">Total words read</label><input id="philIriWords" type="number" min="1" step="1" inputmode="numeric"></div>
+                    <div class="form-field"><label for="philIriMiscues">Miscues / error count</label><input id="philIriMiscues" type="number" min="0" step="1" inputmode="numeric"></div>
+                    <div class="form-field"><label for="philIriSeconds">Time in seconds</label><input id="philIriSeconds" type="number" min="1" step="1" inputmode="numeric"></div>
+                    <div class="form-field"><label for="philIriCorrectAnswers">Comprehension correct answers</label><input id="philIriCorrectAnswers" type="number" min="0" step="1" inputmode="numeric"></div>
+                    <div class="form-field"><label for="philIriQuestions">Comprehension total questions</label><input id="philIriQuestions" type="number" min="1" step="1" inputmode="numeric"></div>
+                  </div>
+                  <div class="philiri-computed" id="philIriIndividualPreview" aria-live="polite"></div>
+                  <h3>Intervention tracking</h3>
+                  <div class="philiri-assessment-grid">
+                    <div class="form-field"><label for="philIriDifficulty">Reading difficulty observed</label><input id="philIriDifficulty" maxlength="1000"></div>
+                    <div class="form-field"><label for="philIriIntervention">Recommended intervention</label><select id="philIriIntervention"></select></div>
+                    <div class="form-field"><label for="philIriInterventionStart">Intervention start date</label><input id="philIriInterventionStart" type="date"></div>
+                    <div class="form-field"><label for="philIriInterventionEnd">Intervention end date</label><input id="philIriInterventionEnd" type="date"></div>
+                    <div class="form-field"><label for="philIriProgressNotes">Progress notes</label><input id="philIriProgressNotes" maxlength="2000"></div>
+                    <div class="form-field"><label for="philIriRemarks">Teacher remarks</label><input id="philIriRemarks" maxlength="2000"></div>
+                  </div>
+                  <button class="btn" id="philIriSaveIndividual" type="button">Save Individualized Assessment</button>
+                </div>
+                <article class="philiri-card philiri-print-only" id="philIriIndividualPrint" hidden></article>
+                <p class="notice philiri-status" id="philIriRecordNotice" role="status" aria-live="polite"></p>
+              </section>
+              <section id="philIriClassPanel" class="philiri-panel" role="tabpanel" aria-labelledby="philIriClassTab" hidden>
+                <div class="philiri-card">
+                  <h2>Class reading profile</h2>
+                  <div class="philiri-filter-row">
+                    <div class="form-field"><label for="philIriClassSearch">Search learner by name or LRN</label><input id="philIriClassSearch" type="search"></div>
+                    <div class="form-field"><label for="philIriGradeFilter">Grade</label><select id="philIriGradeFilter"><option value="">All grades</option><option>Grade 4</option><option>Grade 5</option><option>Grade 6</option></select></div>
+                    <div class="form-field"><label for="philIriSectionFilter">Section</label><select id="philIriSectionFilter"><option value="">All sections</option></select></div>
+                    <div class="form-field"><label for="philIriLevelFilter">Reading level</label><select id="philIriLevelFilter"><option value="">All levels</option><option>Independent</option><option>Instructional</option><option>Frustration</option></select></div>
+                  </div>
+                  <div class="philiri-metrics">
+                    <div class="philiri-metric"><span>Total learners assessed</span><strong id="philIriAssessedMetric">—</strong></div>
+                    <div class="philiri-metric"><span>Independent readers</span><strong id="philIriIndependentMetric">—</strong></div>
+                    <div class="philiri-metric"><span>Instructional readers</span><strong id="philIriInstructionalMetric">—</strong></div>
+                    <div class="philiri-metric"><span>Frustration readers</span><strong id="philIriFrustrationMetric">—</strong></div>
+                  </div>
+                  <h3>Reading levels by language</h3><div class="philiri-chart" id="philIriClassChart"></div>
+                  <h3>Pretest vs Posttest and intervention effectiveness</h3>
+                  <div class="table-wrap"><table class="student-table" id="philIriComparisonTable"><thead><tr><th>Learner</th><th>Language</th><th>Pretest level</th><th>Posttest level</th><th>Intervention</th><th>Progress</th></tr></thead><tbody id="philIriComparisonRows"></tbody></table></div>
+                  <h3>Assessment results</h3>
+                  <div class="table-wrap"><table class="student-table" id="philIriClassTable"><thead><tr><th>Learner</th><th>Grade / Section</th><th>Language</th><th>GST</th><th>Oral Reading</th><th>Silent Reading</th><th>Intervention</th></tr></thead><tbody id="philIriClassRows"></tbody></table></div>
+                </div>
+                <p class="notice philiri-status" id="philIriClassNotice" role="status" aria-live="polite"></p>
+              </section>
+              <section id="philIriSettingsPanel" class="philiri-panel" role="tabpanel" aria-labelledby="philIriSettingsTab" hidden>
+                <div class="philiri-card">
+                  <h2>GST passing scores</h2>
+                  <p>Configure raw GST passing scores separately for Grade 4, Grade 5, and Grade 6 in English and Filipino. These values control automatic pass/fail and individualized-assessment eligibility for this class.</p>
+                  <div class="table-wrap"><table class="philiri-cutoff-table"><thead><tr><th>Grade</th><th>English passing score</th><th>Filipino passing score</th></tr></thead><tbody id="philIriCutoffRows"></tbody></table></div>
+                  <button class="btn" id="philIriSaveCutoffs" type="button">Save GST Cutoffs</button>
+                  <p class="notice philiri-status" id="philIriSettingsNotice" role="status" aria-live="polite"></p>
+                </div>
+              </section>
+              <section id="philIriSchoolPanel" class="philiri-panel" role="tabpanel" aria-labelledby="philIriSchoolTab" hidden>
+                <div class="philiri-card">
+                  <h2>School consolidated profile</h2>
+                  <p id="philIriSchoolDescription">This report combines Grades 4–6 classes with the same School ID as this teacher profile.</p>
+                  <div class="philiri-metrics">
+                    <div class="philiri-metric"><span>Total learners assessed</span><strong id="philIriSchoolAssessedMetric">—</strong></div>
+                    <div class="philiri-metric"><span>Independent readers</span><strong id="philIriSchoolIndependentMetric">—</strong></div>
+                    <div class="philiri-metric"><span>Instructional readers</span><strong id="philIriSchoolInstructionalMetric">—</strong></div>
+                    <div class="philiri-metric"><span>Frustration readers</span><strong id="philIriSchoolFrustrationMetric">—</strong></div>
+                  </div>
+                  <h3>Reading level per grade and section</h3><div class="philiri-chart" id="philIriSchoolChart"></div>
+                  <div class="table-wrap"><table class="student-table" id="philIriSchoolTable"><thead><tr><th>Grade</th><th>Section</th><th>Language</th><th>Independent</th><th>Instructional</th><th>Frustration</th></tr></thead><tbody id="philIriSchoolRows"></tbody></table></div>
+                </div>
+                <p class="notice philiri-status" id="philIriSchoolNotice" role="status" aria-live="polite"></p>
+              </section>
+            </section>
+            <div class="page-heading"><div><h2>Legacy reading progress</h2><p>Existing BOSY, MOSY, and EOSY reading-level history remains available below.</p></div></div>
             <div class="reading-subtabs" aria-label="Reading progress sections">
               <section class="reading-tab-group" data-tab-kind="report" aria-labelledby="readingReportGroupTitle">
                 <h2 id="readingReportGroupTitle">Reading Reports</h2>
@@ -734,6 +1015,67 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
               </div>
             </section>
             <p class="notice" id="readingNotice" role="status" aria-live="polite"></p>
+          </section>
+          <section id="rmaPage" aria-labelledby="rmaTitle" hidden>
+            <div class="page-heading">
+              <div><h1 id="rmaTitle">RMA (Rapid Mathematics Assessment)</h1><p>Record BOSY, MOSY, and EOSY math results, review mastery, and track learner progress.</p></div>
+              <div class="rma-export-actions">
+                <button class="btn ghost" id="rmaExportXlsx" type="button">Export Excel</button>
+                <button class="btn ghost" id="rmaExportCsv" type="button">Export CSV</button>
+                <button class="btn" id="rmaPrint" type="button">Print / Save PDF</button>
+              </div>
+            </div>
+            <div class="rma-period-tabs" role="tablist" aria-label="RMA assessment cycles">
+              <button class="rma-period-tab" id="rmaBosyTab" type="button" role="tab" aria-controls="rmaReportPanel" aria-selected="true" data-period="BOSY">BOSY (Baseline)</button>
+              <button class="rma-period-tab" id="rmaMosyTab" type="button" role="tab" aria-controls="rmaReportPanel" aria-selected="false" data-period="MOSY">MOSY (Midline)</button>
+              <button class="rma-period-tab" id="rmaEosyTab" type="button" role="tab" aria-controls="rmaReportPanel" aria-selected="false" data-period="EOSY">EOSY (Endline)</button>
+            </div>
+            <div class="rma-view-tabs" role="tablist" aria-label="RMA views">
+              <button class="rma-view-tab" id="rmaReportTab" type="button" role="tab" aria-controls="rmaReportPanel" aria-selected="true">Assessment Report</button>
+              <button class="rma-view-tab" id="rmaRecordTab" type="button" role="tab" aria-controls="rmaEntryPanel" aria-selected="false">Record Assessment</button>
+            </div>
+            <p class="rma-analysis">Template scoring: total score is the sum of weighted item points (items may be worth 1, 2, or 3 points); percentage score = total score ÷ the selected grade-level maximum (Grade 4: 13, Grade 5: 32, Grade 6: 50) × 100. Levelling uses the template’s grade-specific raw-score cutoffs. Content and cognitive domain benchmarks are met at 75% or higher. A learner is counted as assessed only when an assessment date is entered.</p>
+            <section id="rmaReportPanel" role="tabpanel" aria-labelledby="rmaReportTab">
+              <div class="rma-stat-grid">
+                <article class="rma-stat"><span>Total Number of Learners Assessed</span><strong id="rmaAssessedCount">—</strong></article>
+                <article class="rma-stat"><span>Class Average Score</span><strong id="rmaClassAverage">—</strong></article>
+                <article class="rma-stat"><span>Highest Score</span><strong id="rmaHighestScore">—</strong></article>
+                <article class="rma-stat"><span>Lowest Score</span><strong id="rmaLowestScore">—</strong></article>
+              </div>
+              <div class="rma-chart-grid">
+                <article class="rma-chart-card"><h2>Class Mastery Distribution</h2><p id="rmaMasteryCaption">Learner count by mastery level</p><div id="rmaMasteryChart"></div></article>
+                <article class="rma-chart-card"><h2>Trend Analysis</h2><p>Average percentage score across assessment cycles</p><div id="rmaTrendChart"></div></article>
+                <article class="rma-chart-card rma-chart-wide"><h2>Learner Progress Chart</h2><label for="rmaLearnerSelect">Learner</label><select id="rmaLearnerSelect"></select><p>Percentage scores across BOSY, MOSY, and EOSY</p><div id="rmaLearnerChart"></div></article>
+              </div>
+              <p class="rma-analysis" id="rmaClassAnalysis"></p>
+              <h2 class="rma-section-title">Content and Cognitive Domain Benchmarks</h2>
+              <div class="data-card">
+                <div class="table-wrap">
+                  <table class="rma-domain-table">
+                    <thead><tr><th>Domain</th><th>Average Score</th><th>Learners Meeting 75%</th><th>Learners Assessed</th><th>Benchmark Rate</th></tr></thead>
+                    <tbody id="rmaDomainRows"></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+            <section id="rmaEntryPanel" role="tabpanel" aria-labelledby="rmaRecordTab" hidden>
+              <div class="data-card">
+                <div class="data-card-header"><h2 id="rmaEntryTitle">Record BOSY Assessment</h2><span class="student-count" id="rmaEntryCount">Loading learners...</span></div>
+                <p class="reading-instructions">Select Add Score beside a learner to open their assessment form. Mark only the items answered correctly; the template’s weighted points are applied automatically. Enter the assessment date so the learner is counted and results can be calculated.</p>
+                <div class="rma-entry-controls">
+                  <div class="form-field"><label for="rmaGradeSelect">Grade level for this scoresheet</label><select id="rmaGradeSelect"><option value="Grade 4">Grade 4 (13 points)</option><option value="Grade 5">Grade 5 (32 points)</option><option value="Grade 6">Grade 6 (50 points)</option></select></div>
+                  <span class="field-hint" id="rmaGradeInstructions">Select the items answered correctly for each learner.</span>
+                </div>
+                <div class="table-wrap">
+                  <table class="student-table rma-entry-table">
+                    <thead><tr><th>Learner Name</th><th>Action</th></tr></thead>
+                    <tbody id="rmaEntryRows"></tbody>
+                  </table>
+                  <div class="empty-state" id="rmaEntryEmpty" hidden><h3>No learners to assess</h3><p>Add students to the class roster first.</p><button class="btn" id="rmaAddStudent" type="button">Go to Student List</button></div>
+                </div>
+              </div>
+            </section>
+            <p class="notice" id="rmaNotice" role="status" aria-live="polite"></p>
           </section>
           <section id="teacherProfilePage" aria-labelledby="teacherProfileTitle" hidden>
             <div class="page-heading">
@@ -874,6 +1216,12 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
                   </div>
                 </div>
                 <div class="parent-reading-grid" id="parentReadingProgress"></div>
+                <div class="parent-philiri-results">
+                  <h3>PHIL-IRI assessment results</h3>
+                  <p class="field-hint">Results shared by the teacher for Group Screening Tests and individualized oral or silent reading assessments.</p>
+                  <div class="parent-philiri-list" id="parentPhilIriProgress"></div>
+                  <p class="parent-philiri-empty" id="parentPhilIriEmpty" hidden>No PHIL-IRI assessments have been recorded yet.</p>
+                </div>
               </section>
               <div class="data-card parent-record-card" id="parentGradesSection" hidden>
                 <div class="data-card-header"><h2>Term Grades</h2></div>
@@ -887,6 +1235,29 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     </div>
   </div>
 </main>
+<dialog class="dialog rma-assessment-dialog" id="rmaAssessmentDialog" aria-labelledby="rmaAssessmentTitle">
+  <div class="dialog-header">
+    <div><h2 id="rmaAssessmentTitle">Record RMA assessment</h2><p id="rmaAssessmentSubtitle"></p></div>
+    <button class="dialog-close" id="closeRmaAssessment" type="button" aria-label="Close assessment form">×</button>
+  </div>
+  <form class="student-form rma-assessment-form" id="rmaAssessmentForm">
+    <div class="rma-assessment-meta">
+      <div class="form-field"><label for="rmaAssessmentDate">Date of assessment</label><input id="rmaAssessmentDate" class="rma-entry-input" data-field="assessedDate" type="date"></div>
+      <span class="field-hint" id="rmaAssessmentAge"></span>
+    </div>
+    <p class="rma-assessment-legacy" id="rmaAssessmentLegacyNote" hidden></p>
+    <p class="rma-assessment-help">Select only the items this learner answered correctly. Each selected item earns its full point value; unselected items earn zero. Partial scores saved previously are preserved unless you change that item's checkbox.</p>
+    <div id="rmaAssessmentItems"></div>
+    <div class="rma-assessment-preview" id="rmaAssessmentPreview" aria-live="polite"></div>
+    <div class="rma-detail-summary" id="rmaAssessmentDomains"></div>
+    <div class="rma-narrative-grid" id="rmaAssessmentNarrative"></div>
+    <p class="notice error" id="rmaAssessmentError" role="alert"></p>
+    <div class="form-actions">
+      <button class="btn ghost" id="cancelRmaAssessment" type="button">Cancel</button>
+      <button class="btn" id="saveRmaAssessment" type="button">Save Assessment</button>
+    </div>
+  </form>
+</dialog>
 <dialog class="dialog" id="studentDialog" aria-labelledby="studentDialogTitle">
   <div class="dialog-header"><div><h2 id="studentDialogTitle">Add Student</h2><p>Enter the learner's information below.</p></div><button class="dialog-close" id="closeStudentDialog" type="button" aria-label="Close form">×</button></div>
   <form class="student-form" id="studentForm">
@@ -923,7 +1294,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   </form>
   <form class="student-form" id="confirmClearRosterForm" hidden>
     <p id="clearRosterConfirmationText"></p>
-    <p class="field-hint">This cannot be undone. Student profiles, grades, attendance, and reading assessments for this class will be removed. Parent accounts and class settings will remain.</p>
+    <p class="field-hint">This cannot be undone. Student profiles, grades, attendance, reading, and RMA assessments for this class will be removed. Parent accounts and class settings will remain.</p>
     <p class="notice error" id="confirmClearRosterError" role="alert"></p>
     <div class="form-actions"><button class="btn ghost" id="cancelConfirmedClearRoster" type="button">Cancel</button><button class="btn ghost danger" id="confirmClearRoster" type="submit">Delete all students</button></div>
   </form>
@@ -949,6 +1320,22 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   var readingAttempt=1;
   var readingRequestId=0;
   var readingDirty=false;
+  var philIriData=null;
+  var philIriComparisonData=null;
+  var philIriSettings=null;
+  var philIriSchoolData=null;
+  var philIriRequestId=0;
+  var philIriAutosaveTimer=null;
+  var philIriSaving=false;
+  var rmaData=null;
+  var rmaProfile=null;
+  var rmaPeriod="BOSY";
+  var rmaGradeLevel="Grade 5";
+  var rmaEditingStudentId="";
+  var rmaView="report";
+  var rmaDirty=false;
+  var rmaSaving=false;
+  var rmaRequestId=0;
   var teacherProfileDirty=false;
   var teacherPasswordDirty=false;
   var activeGradeSelection={studentId:"",term:"Term 1"};
@@ -1618,6 +2005,43 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     }
   }
 
+  function enableTableDragScroll(tableWrap){
+    var dragState=null;
+    tableWrap.addEventListener("pointerdown",function(event){
+      if(event.pointerType!=="mouse"||!event.isPrimary||event.button!==0)return;
+      if(event.target.closest("button,input,select,textarea,a,[contenteditable='true']"))return;
+      dragState={
+        pointerId:event.pointerId,
+        startX:event.clientX,
+        startScrollLeft:tableWrap.scrollLeft,
+        dragging:false
+      };
+      event.preventDefault();
+    });
+    tableWrap.addEventListener("pointermove",function(event){
+      if(!dragState||event.pointerId!==dragState.pointerId)return;
+      var distance=event.clientX-dragState.startX;
+      if(!dragState.dragging&&Math.abs(distance)<5)return;
+      if(!dragState.dragging){
+        dragState.dragging=true;
+        tableWrap.classList.add("is-dragging");
+        tableWrap.setPointerCapture(event.pointerId);
+      }
+      tableWrap.scrollLeft=dragState.startScrollLeft-distance;
+      event.preventDefault();
+    });
+    function endDrag(event){
+      if(!dragState||event.pointerId!==dragState.pointerId)return;
+      dragState=null;
+      tableWrap.classList.remove("is-dragging");
+      if(tableWrap.hasPointerCapture(event.pointerId)){
+        tableWrap.releasePointerCapture(event.pointerId);
+      }
+    }
+    tableWrap.addEventListener("pointerup",endDrag);
+    tableWrap.addEventListener("pointercancel",endDrag);
+  }
+
   function selectedAttendanceMonth(){
     return $("attendanceYear").value+"-"+String($("attendanceMonth").value).padStart(2,"0");
   }
@@ -1696,9 +2120,10 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       $("attendanceSummaryEmpty").hidden=result.students.length>0;
       result.students.forEach(function(student,index){
         var row=document.createElement("tr");
-        [String(index+1),student.name].forEach(function(value){
+        [String(index+1),student.name].forEach(function(value,cellIndex){
           var cell=document.createElement("td");
           cell.textContent=value;
+          if(cellIndex===1)cell.title=value;
           row.appendChild(cell);
         });
         result.months.forEach(function(month){
@@ -1750,6 +2175,52 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     else loadAttendance();
   }
 
+  function getGradeInterpretation(grade){
+    if(typeof grade!=="number"||!Number.isFinite(grade)||grade<0||grade>100)return null;
+    if(grade>=90)return{label:"Advancing",range:"90–100",description:"Exceeds expectations."};
+    if(grade>=85)return{label:"Benchmarking",range:"85–89",description:"Meets expectations."};
+    if(grade>=80)return{label:"Connecting",range:"80–84",description:"Approaching expectations."};
+    if(grade>=75)return{label:"Developing",range:"75–79",description:"Beginning to meet expectations."};
+    return{label:"Emerging",range:"Below 75",description:"Needs significant support to meet expectations."};
+  }
+
+  function createGradeInterpretationNote(){
+    var note=document.createElement("div");
+    note.className="grade-interpretation";
+    var list=document.createElement("ul");
+    [
+      ["Advancing","90–100","Exceeds expectations."],
+      ["Benchmarking","85–89","Meets expectations."],
+      ["Connecting","80–84","Approaching expectations."],
+      ["Developing","75–79","Beginning to meet expectations."],
+      ["Emerging","Below 75","Needs significant support to meet expectations."]
+    ].forEach(function(item){
+      var entry=document.createElement("li");
+      entry.textContent=item[0]+" ("+item[1]+") — "+item[2];
+      list.append(entry);
+    });
+    var sources=document.createElement("p");
+    sources.className="grade-interpretation-sources";
+    sources.append("References: ");
+    [
+      ["toolism.app","https://toolism.app/blog/deped-grading-system-2026"],
+      ["DepEd Order No. 015, s. 2026","https://deped.gov.ph/do-015-s-2026-revised-guidelines-on-classroom-assessment-grading-system-and-awards-and-recognition-for-the-k-to-12-basic-education-program/"]
+    ].forEach(function(source,index){
+      if(index)sources.append(" · ");
+      var link=document.createElement("a");
+      link.href=source[1];
+      link.target="_blank";
+      link.rel="noopener noreferrer";
+      link.textContent=source[0];
+      sources.append(link);
+    });
+    note.append(list,sources);
+    return note;
+  }
+
+  $("gradeInterpretation").append(createGradeInterpretationNote());
+  $("gradeSummaryInterpretation").append(createGradeInterpretationNote());
+
   function updateMapehAverage(){
     var music=$("gradeMusicAndArts").value;
     var physicalEducation=$("gradePhysicalEducationAndHealth").value;
@@ -1757,6 +2228,9 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       ?(Number(music)+Number(physicalEducation))/2
       :null;
     $("gradeMapeh").textContent=mapeh===null?"—":mapeh.toFixed(2);
+    var descriptor=$("gradeGeneralAverageDescriptor");
+    descriptor.hidden=true;
+    descriptor.textContent="";
     var generalAverageKeys=[
       "filipino","english","mathematics","science","aralingPanlipunan","gmrc","eppTle"
     ];
@@ -1768,7 +2242,13 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       return;
     }
     var total=generalGrades.reduce(function(sum,grade){return sum+Number(grade)},mapeh);
-    $("gradeGeneralAverage").textContent=(total/8).toFixed(2);
+    var generalAverage=Number((total/8).toFixed(2));
+    $("gradeGeneralAverage").textContent=generalAverage.toFixed(2);
+    var interpretation=getGradeInterpretation(generalAverage);
+    if(interpretation){
+      descriptor.textContent=interpretation.label+" ("+interpretation.range+") — "+interpretation.description;
+      descriptor.hidden=false;
+    }
   }
 
   function clearGradeInputs(){
@@ -1891,14 +2371,17 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   function showDashboardPage(page){
     var showReading=page==="reading";
     var leavingReading=!$("readingProgressPage").hidden&&!showReading;
+    var showRma=page==="rma";
+    var leavingRma=!$("rmaPage").hidden&&!showRma;
     var showAttendance=page==="attendance";
     var leavingAttendance=!$("attendancePage").hidden&&!showAttendance;
     var leavingProfile=!$("teacherProfilePage").hidden&&page!=="profile";
     var showSettings=page==="settings";
-    if((leavingReading&&readingDirty||leavingAttendance&&attendanceDirty
+    if((leavingReading&&readingDirty||leavingRma&&rmaDirty||leavingAttendance&&attendanceDirty
       ||leavingProfile&&(teacherProfileDirty||teacherPasswordDirty))
       &&!window.confirm("Discard unsaved changes?"))return;
     if((page==="reading"&&!$("readingProgressPage").hidden)
+      ||(showRma&&!$("rmaPage").hidden)
       ||(showAttendance&&!$("attendancePage").hidden)
       ||(page==="profile"&&!$("teacherProfilePage").hidden)
       ||(showSettings&&!$("settingsPage").hidden))return;
@@ -1906,21 +2389,23 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     var showGrades=page==="grades";
     var showSummary=page==="summary";
     if(!showReading)readingDirty=false;
+    if(!showRma)rmaDirty=false;
     if(!showAttendance)attendanceDirty=false;
     if(page!=="profile"){
       teacherProfileDirty=false;
       teacherPasswordDirty=false;
       $("teacherPasswordForm").reset();
     }
-    $("studentsPage").hidden=showAttendance||showGrades||showSummary||showReading||page==="profile"||showSettings;
+    $("studentsPage").hidden=showAttendance||showGrades||showSummary||showReading||showRma||page==="profile"||showSettings;
     $("attendancePage").hidden=!showAttendance;
     $("termGradesPage").hidden=!showGrades;
     $("gradeSummaryPage").hidden=!showSummary;
     $("readingProgressPage").hidden=!showReading;
+    $("rmaPage").hidden=!showRma;
     var showProfile=page==="profile";
     $("teacherProfilePage").hidden=!showProfile;
     $("settingsPage").hidden=!showSettings;
-    [["navStudents",!showAttendance&&!showGrades&&!showSummary&&!showReading&&!showProfile&&!showSettings],["navAttendance",showAttendance],["navTermGrades",showGrades],["navGradeSummary",showSummary],["navReadingProgress",showReading],["navTeacherProfile",showProfile],["navSettings",showSettings]]
+    [["navStudents",!showAttendance&&!showGrades&&!showSummary&&!showReading&&!showRma&&!showProfile&&!showSettings],["navAttendance",showAttendance],["navTermGrades",showGrades],["navGradeSummary",showSummary],["navReadingProgress",showReading],["navRma",showRma],["navTeacherProfile",showProfile],["navSettings",showSettings]]
       .forEach(function(entry){
         if(entry[1])$(entry[0]).setAttribute("aria-current","page");
         else $(entry[0]).removeAttribute("aria-current");
@@ -1930,7 +2415,12 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     if(showGrades)loadGradeStudents();
     else if(showAttendance)loadAttendance();
     else if(showSummary)loadGradeSummary();
-    else if(showReading)loadReadingProgress();
+    else if(showReading){
+      loadReadingProgress();
+      loadPhilIriSettings();
+      loadPhilIriReports();
+    }
+    else if(showRma)loadRma();
     else if(showProfile){
       $("teacherProfileTitle").focus({preventScroll:true});
       loadTeacherProfile();
@@ -2010,12 +2500,710 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       });
       var coreGrades=columns.slice(0,8).map(function(column){return student.grades[term][column[0]]});
       var average=coreGrades.every(function(grade){return typeof grade==="number"})
-        ?(Math.round(coreGrades.reduce(function(total,grade){return total+grade},0)/coreGrades.length)).toFixed(2)
-        :"—";
-      appendTextCell(row,average);
+        ?Math.round(coreGrades.reduce(function(total,grade){return total+grade},0)/coreGrades.length)
+        :null;
+      appendTextCell(row,average===null?"—":average.toFixed(2));
       row.lastElementChild.classList.add("summary-average");
+      var interpretation=average===null?null:getGradeInterpretation(average);
+      if(interpretation){
+        var descriptor=document.createElement("small");
+        descriptor.className="grade-descriptor";
+        descriptor.textContent=interpretation.label+" ("+interpretation.range+") — "+interpretation.description;
+        row.lastElementChild.append(descriptor);
+      }
       $("gradeSummaryRows").appendChild(row);
     });
+  }
+
+  function philIriSelectedStudent(){
+    if(!philIriData)return null;
+    return philIriData.students.find(function(student){return student.id===$("philIriLearner").value})||null;
+  }
+
+  function philIriSelectedReading(){
+    var student=philIriSelectedStudent();
+    return student?student.reading[$("philIriLanguage").value]||{}:null;
+  }
+
+  function philIriClassCutoff(grade,language){
+    var cutoffs=philIriSettings&&philIriSettings.cutoffs;
+    var value=cutoffs&&cutoffs[grade]&&cutoffs[grade][language];
+    return typeof value==="number"&&Number.isFinite(value)?value:null;
+  }
+
+  function philIriLevelFor(student,language){
+    var entry=student&&student.reading&&student.reading[language];
+    if(!entry)return"";
+    var details=entry.data&&entry.data.individualized||{};
+    return details["Oral Reading"]&&details["Oral Reading"].readingLevel
+      ||details["Silent Reading"]&&details["Silent Reading"].readingLevel
+      ||entry.readingLevel||"";
+  }
+
+  function renderPhilIriLearners(){
+    if(!philIriData)return;
+    var query=$("philIriLearnerSearch").value.trim().toLowerCase();
+    var previous=$("philIriLearner").value;
+    var students=philIriData.students.filter(function(student){
+      return !query||student.name.toLowerCase().includes(query)||student.lrn.toLowerCase().includes(query);
+    });
+    $("philIriLearner").replaceChildren();
+    students.forEach(function(student){
+      $("philIriLearner").add(new Option(student.name+" — "+student.lrn,student.id));
+    });
+    if(students.some(function(student){return student.id===previous}))$("philIriLearner").value=previous;
+    if(!students.length){
+      $("philIriLearner").add(new Option(query?"No matching learners":"No learners in this class",""));
+    }
+    updatePhilIriEntry();
+  }
+
+  function updatePhilIriGstPreview(){
+    var scoreText=$("philIriGstScore").value;
+    var totalText=$("philIriGstTotal").value;
+    var preview=$("philIriGstPreview");
+    preview.replaceChildren();
+    var grade=philIriData&&philIriData.profile.grade||"";
+    var cutoff=philIriClassCutoff(grade,$("philIriLanguage").value);
+    if(cutoff===null){
+      preview.textContent="Configure the "+(grade||"class")+" GST cutoff in GST Cutoff Settings before recording results.";
+      $("philIriIndividualCard").hidden=true;
+      return;
+    }
+    var cutoffLabel=document.createElement("span");
+    cutoffLabel.textContent="Passing score: "+cutoff;
+    preview.append(cutoffLabel);
+    var score=Number(scoreText),total=Number(totalText);
+    if(scoreText===""||totalText===""||!Number.isFinite(score)||!Number.isFinite(total)||total<=0||score<0||score>total){
+      $("philIriIndividualCard").hidden=true;
+      return;
+    }
+    var percentage=document.createElement("span");
+    percentage.textContent="GST percentage: "+(score/total*100).toFixed(2)+"%";
+    var pass=document.createElement("span");
+    var passed=score>=cutoff;
+    pass.textContent=passed?"Passed GST":"Failed GST — Individualized Assessment required";
+    preview.append(percentage,pass);
+    $("philIriIndividualCard").hidden=passed;
+    $("philIriIndividualReason").textContent=passed
+      ?"The learner passed the configured GST cutoff."
+      :"The learner did not reach the configured GST passing score and must receive an individualized assessment.";
+  }
+
+  function updatePhilIriIndividualPreview(){
+    var values={
+      words:Number($("philIriWords").value),
+      miscues:Number($("philIriMiscues").value),
+      seconds:Number($("philIriSeconds").value),
+      correct:Number($("philIriCorrectAnswers").value),
+      questions:Number($("philIriQuestions").value)
+    };
+    var raw=[$("philIriWords").value,$("philIriMiscues").value,$("philIriSeconds").value,
+      $("philIriCorrectAnswers").value,$("philIriQuestions").value];
+    var preview=$("philIriIndividualPreview");
+    preview.replaceChildren();
+    if(raw.some(function(value){return value===""})||values.words<1||values.miscues>values.words
+      ||values.seconds<1||values.questions<1||values.correct>values.questions)return;
+    var accuracy=(values.words-values.miscues)/values.words*100;
+    var comprehension=values.correct/values.questions*100;
+    var wpm=values.words/(values.seconds/60);
+    var mode=$("philIriMode").value;
+    var level=mode==="Silent Reading"
+      ?comprehension>=80?"Independent":comprehension<=58?"Frustration":"Instructional"
+      :accuracy>=97&&comprehension>=80?"Independent":accuracy<=89||comprehension<=58?"Frustration":"Instructional";
+    [
+      "WPM: "+wpm.toFixed(2),
+      "Accuracy: "+accuracy.toFixed(2)+"%",
+      "Comprehension: "+comprehension.toFixed(2)+"%",
+      "Reading level: "+level
+    ].forEach(function(text){
+      var item=document.createElement("span");
+      item.textContent=text;
+      preview.append(item);
+    });
+    if(!$("philIriIntervention").value){
+      $("philIriIntervention").value=level==="Frustration"?"One-on-One Reading"
+        :level==="Instructional"?"Guided Reading":"Home Reading Program";
+    }
+  }
+
+  function loadPhilIriEntry(){
+    var student=philIriSelectedStudent();
+    var entry=philIriSelectedReading();
+    var data=entry&&entry.data||{};
+    var gst=data.gst||{};
+    var mode=$("philIriMode").value;
+    var individualized=data.individualized&&data.individualized[mode]||{};
+    $("philIriGstScore").value=gst.score===undefined?"":gst.score;
+    $("philIriGstTotal").value=gst.totalItems===undefined?"":gst.totalItems;
+    $("philIriPassage").value=individualized.passage||"";
+    $("philIriWords").value=individualized.totalWords===undefined?"":individualized.totalWords;
+    $("philIriMiscues").value=individualized.miscues===undefined?"":individualized.miscues;
+    $("philIriSeconds").value=individualized.timeSeconds===undefined?"":individualized.timeSeconds;
+    $("philIriCorrectAnswers").value=individualized.correctAnswers===undefined?"":individualized.correctAnswers;
+    $("philIriQuestions").value=individualized.totalQuestions===undefined?"":individualized.totalQuestions;
+    var intervention=data.intervention||individualized;
+    $("philIriDifficulty").value=intervention.difficultyObserved||"";
+    $("philIriIntervention").value=intervention.recommendedIntervention||"";
+    $("philIriInterventionStart").value=intervention.interventionStartDate||"";
+    $("philIriInterventionEnd").value=intervention.interventionEndDate||"";
+    $("philIriProgressNotes").value=intervention.progressNotes||"";
+    $("philIriRemarks").value=intervention.teacherRemarks||"";
+    $("philIriRecordNotice").textContent="";
+    $("philIriExistingResult").textContent=entry&&entry.assessedDate
+      ?"Saved "+($("philIriType").value||"")+" on "+entry.assessedDate
+        +(data.assessor?" by "+data.assessor:"")+"."
+      :student?"No "+$("philIriType").value.toLowerCase()+" results saved for this learner and language yet."
+        :"Select a learner to record an assessment.";
+    updatePhilIriGstPreview();
+    updatePhilIriIndividualPreview();
+  }
+
+  async function loadPhilIriSettings(){
+    $("philIriSettingsNotice").textContent="";
+    try{
+      var result=await api("/api/phil-iri/settings");
+      philIriSettings=result;
+      var rows=$("philIriCutoffRows");
+      rows.replaceChildren();
+      result.grades.forEach(function(grade){
+        var row=document.createElement("tr");
+        var label=document.createElement("th");
+        label.scope="row";
+        label.textContent=grade;
+        row.append(label);
+        result.languages.forEach(function(language){
+          var cell=document.createElement("td");
+          var input=document.createElement("input");
+          input.type="number";
+          input.min="0";
+          input.step="1";
+          input.max="10000";
+          input.inputMode="numeric";
+          input.setAttribute("aria-label",grade+" "+language+" GST passing score");
+          input.dataset.grade=grade;
+          input.dataset.language=language;
+          input.value=result.cutoffs[grade][language];
+          cell.append(input);
+          row.append(cell);
+        });
+        rows.append(row);
+      });
+      var intervention=$("philIriIntervention");
+      var selectedIntervention=intervention.value;
+      intervention.replaceChildren(new Option("Select intervention",""));
+      result.interventions.forEach(function(value){intervention.add(new Option(value,value))});
+      if(result.interventions.includes(selectedIntervention))intervention.value=selectedIntervention;
+      if(currentUser&&currentUser.name&&!$("philIriAssessor").value)$("philIriAssessor").value=currentUser.name;
+      if(!$("philIriDate").value)$("philIriDate").value=new Date().toISOString().slice(0,10);
+      $("philIriSchoolDescription").textContent=result.profile.schoolId
+        ?"School ID "+result.profile.schoolId+" · "+(result.profile.schoolName||"School name not set")+". Results are combined only across classes with this School ID."
+        :"Add your School ID to Teacher Profile to unlock school consolidated reports.";
+      if(philIriData)updatePhilIriGstPreview();
+    }catch(error){
+      $("philIriSettingsNotice").textContent=error.message;
+      $("philIriSettingsNotice").classList.add("error");
+    }
+  }
+
+  async function savePhilIriCutoffs(){
+    var cutoffs={};
+    var inputs=$("philIriCutoffRows").querySelectorAll("input");
+    var invalid=Array.from(inputs).find(function(input){return input.value===""||!Number.isInteger(Number(input.value))});
+    if(invalid){
+      $("philIriSettingsNotice").textContent="Enter a whole-number GST passing score for each grade and language.";
+      $("philIriSettingsNotice").classList.add("error");
+      invalid.focus();
+      return;
+    }
+    inputs.forEach(function(input){
+      cutoffs[input.dataset.grade]=cutoffs[input.dataset.grade]||{};
+      cutoffs[input.dataset.grade][input.dataset.language]=Number(input.value);
+    });
+    var button=$("philIriSaveCutoffs");
+    button.disabled=true;
+    button.textContent="Saving...";
+    $("philIriSettingsNotice").textContent="";
+    $("philIriSettingsNotice").classList.remove("error");
+    try{
+      await api("/api/phil-iri/settings",{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({cutoffs:cutoffs})
+      });
+      $("philIriSettingsNotice").textContent="GST cutoff settings saved for this class.";
+      await loadPhilIriSettings();
+      if(philIriData)updatePhilIriGstPreview();
+    }catch(error){
+      $("philIriSettingsNotice").textContent=error.message;
+      $("philIriSettingsNotice").classList.add("error");
+    }finally{
+      button.disabled=false;
+      button.textContent="Save GST Cutoffs";
+    }
+  }
+
+  var READING_LANGUAGES_LOCAL=["English","Filipino"];
+  function philIriPreferredLevel(student){
+    var levels=READING_LANGUAGES_LOCAL.map(function(language){return philIriLevelFor(student,language)})
+      .filter(Boolean);
+    return levels.includes("Frustration")?"Frustration"
+      :levels.includes("Instructional")?"Instructional"
+        :levels.includes("Independent")?"Independent":"";
+  }
+
+  function philIriRenderMetrics(students,prefix){
+    var assessed=students.filter(function(student){
+      return READING_LANGUAGES_LOCAL.some(function(language){
+        var data=student.reading[language]&&student.reading[language].data;
+        return data&&(data.gst||data.individualized);
+      });
+    });
+    var counts={Independent:0,Instructional:0,Frustration:0};
+    assessed.forEach(function(student){
+      var level=philIriPreferredLevel(student);
+      if(level)counts[level]+=1;
+    });
+    $(prefix+"AssessedMetric").textContent=String(assessed.length);
+    $(prefix+"IndependentMetric").textContent=String(counts.Independent);
+    $(prefix+"InstructionalMetric").textContent=String(counts.Instructional);
+    $(prefix+"FrustrationMetric").textContent=String(counts.Frustration);
+    return counts;
+  }
+
+  function philIriRenderChart(containerId,students,groupByClass){
+    var container=$(containerId);
+    container.replaceChildren();
+    var groups=new Map();
+    students.forEach(function(student){
+      READING_LANGUAGES_LOCAL.forEach(function(language){
+        var level=philIriLevelFor(student,language);
+        if(!level)return;
+        var key=groupByClass
+          ?student.grade+" · "+student.section+" · "+language
+          :language;
+        var counts=groups.get(key)||{Independent:0,Instructional:0,Frustration:0};
+        counts[level]=(counts[level]||0)+1;
+        groups.set(key,counts);
+      });
+    });
+    var colors={Independent:"#16803c",Instructional:"#eab308",Frustration:"#b42318"};
+    if(!groups.size){
+      container.textContent="No individualized reading results are available yet.";
+      return;
+    }
+    groups.forEach(function(counts,label){
+      var total=counts.Independent+counts.Instructional+counts.Frustration;
+      ["Independent","Instructional","Frustration"].forEach(function(level){
+        var row=document.createElement("div");
+        row.className="philiri-chart-row";
+        var name=document.createElement("span");
+        name.textContent=label+" · "+level;
+        var track=document.createElement("span");
+        track.className="philiri-chart-track";
+        var fill=document.createElement("span");
+        fill.className="philiri-chart-fill";
+        fill.style.display="block";
+        fill.style.width=(total?counts[level]/total*100:0)+"%";
+        fill.style.background=colors[level];
+        track.append(fill);
+        var count=document.createElement("strong");
+        count.textContent=String(counts[level]||0)+" / "+total;
+        row.append(name,track,count);
+        container.append(row);
+      });
+    });
+  }
+
+  function philIriResultText(student,language,mode){
+    var reading=student.reading[language]||{};
+    var individual=reading.data&&reading.data.individualized&&reading.data.individualized[mode]||{};
+    return individual.readingLevel||"Not assessed";
+  }
+
+  function renderPhilIriClassReport(){
+    if(!philIriData)return;
+    var search=$("philIriClassSearch").value.trim().toLowerCase();
+    var gradeFilter=$("philIriGradeFilter").value;
+    var sectionFilter=$("philIriSectionFilter").value;
+    var levelFilter=$("philIriLevelFilter").value;
+    var students=philIriData.students.filter(function(student){
+      var matchesSearch=!search||student.name.toLowerCase().includes(search)||student.lrn.toLowerCase().includes(search);
+      var level=philIriPreferredLevel(student);
+      return matchesSearch&&(!gradeFilter||student.grade===gradeFilter)
+        &&(!sectionFilter||student.section===sectionFilter)&&(!levelFilter||level===levelFilter);
+    });
+    var section=$("philIriSectionFilter");
+    var previous=section.value;
+    var sections=Array.from(new Set(philIriData.students.map(function(student){return student.section}).filter(Boolean))).sort();
+    section.replaceChildren(new Option("All sections",""));
+    sections.forEach(function(value){section.add(new Option(value,value))});
+    if(sections.includes(previous))section.value=previous;
+    philIriRenderMetrics(students,"philIri");
+    philIriRenderChart("philIriClassChart",students,false);
+    var rows=$("philIriClassRows");
+    rows.replaceChildren();
+    students.forEach(function(student){
+      READING_LANGUAGES_LOCAL.forEach(function(language){
+        var result=student.reading[language]||{};
+        var data=result.data||{};
+        var gst=data.gst||{};
+        var oral=data.individualized&&data.individualized["Oral Reading"]||{};
+        var silent=data.individualized&&data.individualized["Silent Reading"]||{};
+        var row=document.createElement("tr");
+        [
+          student.name+" · "+student.lrn,
+          student.grade+" · "+student.section,
+          language,
+          gst.score===undefined?"—":gst.score+"/"+gst.totalItems+" ("+gst.percentageScore+"%) "+(gst.passed?"Passed":"Individualized required"),
+          oral.readingLevel||"Not assessed",
+          silent.readingLevel||"Not assessed",
+          (data.intervention&&data.intervention.recommendedIntervention)||"—"
+        ].forEach(function(text){appendTextCell(row,text)});
+        [4,5].forEach(function(index){
+          var cell=row.cells[index];
+          var level=index===4?oral.readingLevel:silent.readingLevel;
+          if(level){
+            var badge=document.createElement("span");
+            badge.className="philiri-level philiri-level-"+level.toLowerCase();
+            badge.textContent=level;
+            cell.replaceChildren(badge);
+          }
+        });
+        rows.append(row);
+      });
+    });
+    var comparisonRows=$("philIriComparisonRows");
+    comparisonRows.replaceChildren();
+    if(!philIriComparisonData){
+      $("philIriClassNotice").textContent="Loading the Pretest/Posttest comparison...";
+      return;
+    }
+    $("philIriClassNotice").textContent="";
+    var pretest=philIriData.assessmentType==="Pretest"?philIriData:philIriComparisonData;
+    var posttest=philIriData.assessmentType==="Posttest"?philIriData:philIriComparisonData;
+    students.forEach(function(student){
+      READING_LANGUAGES_LOCAL.forEach(function(language){
+        var preStudent=pretest.students.find(function(candidate){return candidate.id===student.id});
+        var postStudent=posttest.students.find(function(candidate){return candidate.id===student.id});
+        var preLevel=philIriLevelFor(preStudent,language)||"Not assessed";
+        var postLevel=philIriLevelFor(postStudent,language)||"Not assessed";
+        var preRank=PHILIRI_LEVEL_ORDER[preLevel];
+        var postRank=PHILIRI_LEVEL_ORDER[postLevel];
+        var progress=preRank===undefined||postRank===undefined?"Insufficient results"
+          :postRank>preRank?"Improved":postRank===preRank?"Maintained":"Needs follow-up";
+        var postReading=postStudent&&postStudent.reading[language];
+        var preReading=preStudent&&preStudent.reading[language];
+        var intervention=postReading&&postReading.data&&postReading.data.intervention
+          ||preReading&&preReading.data&&preReading.data.intervention||{};
+        var row=document.createElement("tr");
+        [student.name+" · "+student.lrn,language,preLevel,postLevel,
+          intervention.recommendedIntervention||"—",progress]
+          .forEach(function(text){appendTextCell(row,text)});
+        comparisonRows.append(row);
+      });
+    });
+  }
+
+  var PHILIRI_LEVEL_ORDER={Frustration:0,Instructional:1,Independent:2};
+
+  async function loadPhilIriReports(){
+    var requestId=++philIriRequestId;
+    $("philIriClassNotice").textContent="";
+    $("philIriClassNotice").classList.remove("error");
+    try{
+      var period=$("philIriPeriod").value;
+      var type=$("philIriType").value;
+      var query="?period="+encodeURIComponent(period)+"&assessmentType="+encodeURIComponent(type);
+      var current=await api("/api/phil-iri/assessments"+query);
+      var otherQuery="?period="+encodeURIComponent(period)+"&assessmentType="+encodeURIComponent(type==="Pretest"?"Posttest":"Pretest");
+      var other=await api("/api/phil-iri/assessments"+otherQuery);
+      if(requestId!==philIriRequestId)return;
+      if(current.assessmentType!==type||current.period!==period)throw new Error("The server returned PHIL-IRI results for a different assessment.");
+      philIriData=current;
+      philIriComparisonData=other;
+      $("philIriPrintMeta").textContent=[current.profile.schoolName,current.profile.schoolId,current.profile.schoolYear,
+        current.profile.grade,current.profile.section,period,type].filter(Boolean).join(" · ");
+      if(!philIriSettings)await loadPhilIriSettings();
+      renderPhilIriLearners();
+      renderPhilIriClassReport();
+    }catch(error){
+      if(requestId!==philIriRequestId)return;
+      $("philIriRecordNotice").textContent=error.message;
+      $("philIriRecordNotice").classList.add("error");
+      $("philIriClassNotice").textContent=error.message;
+      $("philIriClassNotice").classList.add("error");
+    }
+  }
+
+  async function loadPhilIriSchoolReport(){
+    $("philIriSchoolNotice").textContent="";
+    $("philIriSchoolNotice").classList.remove("error");
+    try{
+      var query="?scope=school&period="+encodeURIComponent($("philIriPeriod").value)
+        +"&assessmentType="+encodeURIComponent($("philIriType").value);
+      var report=await api("/api/phil-iri/assessments"+query);
+      philIriSchoolData=report;
+      philIriRenderMetrics(report.students,"philIriSchool");
+      philIriRenderChart("philIriSchoolChart",report.students,true);
+      var grouped=new Map();
+      report.students.forEach(function(student){
+        READING_LANGUAGES_LOCAL.forEach(function(language){
+          var level=philIriLevelFor(student,language);
+          if(!level)return;
+          var key=[student.grade,student.section,language].join("\u0000");
+          var counts=grouped.get(key)||{Independent:0,Instructional:0,Frustration:0};
+          counts[level]+=1;
+          grouped.set(key,counts);
+        });
+      });
+      var rows=$("philIriSchoolRows");
+      rows.replaceChildren();
+      grouped.forEach(function(counts,key){
+        var row=document.createElement("tr");
+        [key.split("\u0000")[0],key.split("\u0000")[1],key.split("\u0000")[2],
+          counts.Independent,counts.Instructional,counts.Frustration]
+          .forEach(function(value){appendTextCell(row,String(value))});
+        rows.append(row);
+      });
+    }catch(error){
+      $("philIriSchoolNotice").textContent=error.message;
+      $("philIriSchoolNotice").classList.add("error");
+    }
+  }
+
+  function updatePhilIriEntry(){
+    if(!philIriData)return;
+    var student=philIriSelectedStudent();
+    var entry=philIriSelectedReading();
+    var data=entry&&entry.data||{};
+    $("philIriDate").value=data.assessedDate||$("philIriDate").value||new Date().toISOString().slice(0,10);
+    $("philIriAssessor").value=data.assessor||$("philIriAssessor").value||currentUser&&currentUser.name||"";
+    $("philIriExistingResult").textContent=entry&&entry.assessedDate
+      ?"Saved "+$("philIriType").value+" on "+entry.assessedDate+(data.assessor?" by "+data.assessor:"")+"."
+      :student?"No "+$("philIriType").value.toLowerCase()+" results saved for this learner and language yet."
+        :"Select a learner to record an assessment.";
+    loadPhilIriEntry();
+  }
+
+  function schedulePhilIriAutosave(stage){
+    if(philIriAutosaveTimer)window.clearTimeout(philIriAutosaveTimer);
+    var required=stage==="GST"
+      ?$("philIriGstScore").value!==""&&$("philIriGstTotal").value!==""
+      :$("philIriWords").value!==""&&$("philIriMiscues").value!==""&&$("philIriSeconds").value!==""
+        &&$("philIriCorrectAnswers").value!==""&&$("philIriQuestions").value!=="";
+    if(!required)return;
+    $("philIriRecordNotice").classList.remove("error");
+    $("philIriRecordNotice").textContent="Changes will save automatically...";
+    var body=philIriAssessmentPayload(stage);
+    philIriAutosaveTimer=window.setTimeout(function(){savePhilIriAssessment(stage,true,body)},1000);
+  }
+
+  function philIriAssessmentPayload(stage){
+    var student=philIriSelectedStudent();
+    if(!student)return null;
+    var body={
+      studentId:student.id,
+      period:$("philIriPeriod").value,
+      assessmentType:$("philIriType").value,
+      language:$("philIriLanguage").value,
+      stage:stage,
+      assessedDate:$("philIriDate").value,
+      assessor:$("philIriAssessor").value
+    };
+    if(stage==="GST"){
+      body.gstScore=Number($("philIriGstScore").value);
+      body.gstTotalItems=Number($("philIriGstTotal").value);
+    }else{
+      body.readingMode=$("philIriMode").value;
+      body.passage=$("philIriPassage").value;
+      body.totalWords=Number($("philIriWords").value);
+      body.miscues=Number($("philIriMiscues").value);
+      body.timeSeconds=Number($("philIriSeconds").value);
+      body.correctAnswers=Number($("philIriCorrectAnswers").value);
+      body.totalQuestions=Number($("philIriQuestions").value);
+      body.difficultyObserved=$("philIriDifficulty").value;
+      body.recommendedIntervention=$("philIriIntervention").value;
+      body.interventionStartDate=$("philIriInterventionStart").value;
+      body.interventionEndDate=$("philIriInterventionEnd").value;
+      body.progressNotes=$("philIriProgressNotes").value;
+      body.teacherRemarks=$("philIriRemarks").value;
+    }
+    return body;
+  }
+
+  async function savePhilIriAssessment(stage,autoSave,bodyOverride){
+    if(philIriSaving){
+      if(autoSave)window.setTimeout(function(){savePhilIriAssessment(stage,true,bodyOverride)},500);
+      return;
+    }
+    var body=bodyOverride||philIriAssessmentPayload(stage);
+    if(!body){
+      if(!autoSave)$("philIriRecordNotice").textContent="Select a learner from your class roster.";
+      return;
+    }
+    if(!autoSave&&philIriAutosaveTimer){
+      window.clearTimeout(philIriAutosaveTimer);
+      philIriAutosaveTimer=null;
+    }
+    philIriSaving=true;
+    var button=stage==="GST"?$("philIriSaveGst"):$("philIriSaveIndividual");
+    $("philIriSaveGst").disabled=true;
+    $("philIriSaveIndividual").disabled=true;
+    if(!autoSave)button.textContent="Saving...";
+    $("philIriRecordNotice").textContent=autoSave?"Saving assessment changes...":"";
+    $("philIriRecordNotice").classList.remove("error");
+    try{
+      var saved=await api("/api/phil-iri/assessments",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(body)
+      });
+      if(philIriData&&philIriData.period===saved.period&&philIriData.assessmentType===saved.assessmentType){
+        var savedStudent=philIriData.students.find(function(entry){return entry.id===saved.studentId});
+        if(savedStudent){
+          var result=savedStudent.reading[saved.language]||{};
+          result.data=saved.data;
+          result.readingLevel=saved.readingLevel;
+          result.assessedDate=saved.data.assessedDate;
+          savedStudent.reading[saved.language]=result;
+        }
+      }
+      var currentContext=body.period===$("philIriPeriod").value&&body.assessmentType===$("philIriType").value
+        &&body.language===$("philIriLanguage").value&&body.studentId===$("philIriLearner").value;
+      if(currentContext){
+        $("philIriExistingResult").textContent="Saved "+saved.assessmentType+" on "+saved.data.assessedDate+" by "+saved.data.assessor+".";
+        $("philIriRecordNotice").textContent=autoSave?"Assessment auto-saved.":"Assessment saved.";
+        updatePhilIriGstPreview();
+        updatePhilIriIndividualPreview();
+      }
+      renderPhilIriClassReport();
+    }catch(error){
+      var stillCurrent=body.period===$("philIriPeriod").value&&body.assessmentType===$("philIriType").value
+        &&body.language===$("philIriLanguage").value&&body.studentId===$("philIriLearner").value;
+      if(stillCurrent){
+        $("philIriRecordNotice").textContent=error.message;
+        $("philIriRecordNotice").classList.add("error");
+      }
+    }finally{
+      philIriSaving=false;
+      $("philIriSaveGst").disabled=false;
+      $("philIriSaveIndividual").disabled=false;
+      if(!autoSave)button.textContent=stage==="GST"?"Save GST Results":"Save Individualized Assessment";
+    }
+  }
+
+  function setPhilIriTab(tabId){
+    ["philIriRecordTab","philIriClassTab","philIriSettingsTab","philIriSchoolTab"].forEach(function(id){
+      $(id).setAttribute("aria-selected",String(id===tabId));
+      var panelId=$(id).getAttribute("aria-controls");
+      $(panelId).hidden=id!==tabId;
+    });
+    if(tabId==="philIriClassTab")loadPhilIriReports();
+    if(tabId==="philIriSettingsTab")loadPhilIriSettings();
+    if(tabId==="philIriSchoolTab")loadPhilIriSchoolReport();
+  }
+
+  async function downloadPhilIriReport(scope,studentId){
+    var params=new URLSearchParams({
+      scope:scope,
+      period:$("philIriPeriod").value,
+      assessmentType:$("philIriType").value,
+    });
+    if(studentId)params.set("studentId",studentId);
+    var status=scope==="school"?$("philIriSchoolNotice"):scope==="class"?$("philIriClassNotice"):$("philIriRecordNotice");
+    var button=scope==="school"?$("philIriExportSchool"):scope==="class"?$("philIriExportClass"):$("philIriExportStudent");
+    button.disabled=true;
+    status.textContent="";
+    status.classList.remove("error");
+    try{
+      var response=await fetch("/api/phil-iri/export?"+params.toString());
+      if(!response.ok){
+        var errorResult=await response.json();
+        throw new Error(errorResult.error||"Unable to export PHIL-IRI results.");
+      }
+
+      var objectUrl=URL.createObjectURL(await response.blob());
+      var link=document.createElement("a");
+      link.href=objectUrl;
+      link.download="PHIL-IRI_"+scope+"_"+params.get("period")+"_"+params.get("assessmentType")+".xlsx";
+      link.style.display="none";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(function(){URL.revokeObjectURL(objectUrl)},1000);
+      status.textContent="PHIL-IRI Excel report download started.";
+    }catch(error){
+      status.textContent=error.message;
+      status.classList.add("error");
+    }finally{
+      button.disabled=false;
+    }
+  }
+
+  function renderPhilIriIndividualPrint(){
+    var student=philIriSelectedStudent();
+    var entry=philIriSelectedReading();
+    var report=$("philIriIndividualPrint");
+    report.replaceChildren();
+    var heading=document.createElement("h2");
+    heading.textContent=student?student.name+" — Individual Learner Report":"Individual Learner Report";
+    report.append(heading);
+    if(!student||!entry||!entry.assessedDate){
+      var empty=document.createElement("p");
+      empty.textContent="No saved PHIL-IRI results are available for the selected learner, cycle, assessment type, and language.";
+      report.append(empty);
+      return;
+    }
+    var summary=document.createElement("p");
+    summary.textContent=[student.lrn,student.grade,student.section,$("philIriLanguage").value,
+      $("philIriPeriod").value,$("philIriType").value,entry.assessedDate,
+      entry.data.assessor&&"Assessor: "+entry.data.assessor].filter(Boolean).join(" · ");
+    report.append(summary);
+    var data=entry.data||{};
+    var gst=data.gst||{};
+    var gstHeading=document.createElement("h3");
+    gstHeading.textContent="Group Screening Test";
+    var gstResult=document.createElement("p");
+    gstResult.textContent=gst.score===undefined?"No GST result saved."
+      :"Score: "+gst.score+"/"+gst.totalItems+" ("+gst.percentageScore+"%) · Passing score: "+gst.passingScore
+        +" · "+(gst.passed?"Passed":"Failed — individualized assessment required");
+    report.append(gstHeading,gstResult);
+    ["Oral Reading","Silent Reading"].forEach(function(mode){
+      var result=data.individualized&&data.individualized[mode];
+      if(!result)return;
+      var modeHeading=document.createElement("h3");
+      modeHeading.textContent=mode;
+      var modeResult=document.createElement("p");
+      modeResult.textContent=[
+        "Passage: "+(result.passage||"Not recorded"),
+        "WPM: "+result.wordsPerMinute,
+        "Accuracy: "+result.accuracyPercentage+"%",
+        "Comprehension: "+result.comprehensionPercentage+"%",
+        "Level: "+result.readingLevel
+      ].join(" · ");
+      report.append(modeHeading,modeResult);
+    });
+    var intervention=data.intervention||{};
+    var notes=document.createElement("p");
+    notes.textContent=[
+      "Difficulty: "+(intervention.difficultyObserved||"Not recorded"),
+      "Intervention: "+(intervention.recommendedIntervention||"Not recorded"),
+      "Intervention dates: "+[intervention.interventionStartDate,intervention.interventionEndDate].filter(Boolean).join(" to "),
+      "Progress: "+(intervention.progressNotes||"Not recorded"),
+      "Remarks: "+(intervention.teacherRemarks||"Not recorded")
+    ].join(" · ");
+    report.append(notes);
+  }
+
+  function printPhilIriReport(){
+    if($("philIriRecordTab").getAttribute("aria-selected")==="true"){
+      renderPhilIriIndividualPrint();
+      $("philIriIndividualPrint").hidden=false;
+    }
+    $("readingProgressPage").hidden=false;
+    document.body.classList.add("philiri-printing");
+    window.print();
   }
 
   function renderReadingChart(containerId,language,period,students){
@@ -2516,6 +3704,75 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       reading.append(card);
     });
 
+    var philIriResults=$("parentPhilIriProgress");
+    philIriResults.replaceChildren();
+    var philIriResultCount=0;
+    parentPortalData.readingPeriods.forEach(function(period){
+      ["Pretest","Posttest"].forEach(function(assessmentType){
+        parentPortalData.readingLanguages.forEach(function(language){
+          var result=learner.philIri&&learner.philIri[period]
+            &&learner.philIri[period][assessmentType]
+            &&learner.philIri[period][assessmentType][language];
+          if(!result)return;
+          philIriResultCount+=1;
+          var card=document.createElement("article");
+          card.className="parent-philiri-result";
+          var heading=document.createElement("h4");
+          heading.textContent=period+" "+assessmentType+" · "+language;
+          var assessed=document.createElement("p");
+          assessed.textContent=result.assessedDate?"Assessed "+formatReadingDate(result.assessedDate):"Assessment date not recorded";
+          card.append(heading,assessed);
+          var gst=result.gst;
+          if(gst){
+            var gstLine=document.createElement("p");
+            gstLine.append("GST: ");
+            var gstDescription=gst.score+"/"+gst.totalItems+" ("+gst.percentageScore+"%) · "
+              +(gst.passed?"Passed":"Individualized assessment required");
+            gstLine.append(document.createTextNode(gstDescription));
+            card.append(gstLine);
+          }
+          ["Oral Reading","Silent Reading"].forEach(function(mode){
+            var individual=result.individualized&&result.individualized[mode];
+            if(!individual)return;
+            var readingLine=document.createElement("p");
+            readingLine.append(document.createElement("strong"));
+            readingLine.lastChild.textContent=mode+": ";
+            readingLine.append(document.createTextNode(
+              individual.readingLevel+" · "+individual.wordsPerMinute+" WPM · "
+                +individual.accuracyPercentage+"% accuracy · "+individual.comprehensionPercentage+"% comprehension"
+            ));
+            if(individual.passage){
+              readingLine.append(document.createTextNode(" · Passage: "+individual.passage));
+            }
+            card.append(readingLine);
+          });
+          var intervention=result.intervention||{};
+          var interventionParts=[];
+          if(intervention.recommendedIntervention)interventionParts.push(intervention.recommendedIntervention);
+          var interventionDates=[intervention.interventionStartDate,intervention.interventionEndDate].filter(Boolean);
+          if(interventionDates.length)interventionParts.push("Dates: "+interventionDates.join(" to "));
+          if(intervention.difficultyObserved)interventionParts.push("Difficulty: "+intervention.difficultyObserved);
+          if(interventionParts.length){
+            var interventionLine=document.createElement("p");
+            interventionLine.textContent="Intervention: "+interventionParts.join(" · ");
+            card.append(interventionLine);
+          }
+          if(intervention.progressNotes){
+            var progressLine=document.createElement("p");
+            progressLine.textContent="Progress: "+intervention.progressNotes;
+            card.append(progressLine);
+          }
+          if(intervention.teacherRemarks){
+            var remarksLine=document.createElement("p");
+            remarksLine.textContent="Teacher remarks: "+intervention.teacherRemarks;
+            card.append(remarksLine);
+          }
+          philIriResults.append(card);
+        });
+      });
+    });
+    $("parentPhilIriEmpty").hidden=philIriResultCount!==0;
+
     var attendanceBody=$("parentAttendanceRecords");
     attendanceBody.replaceChildren();
     $("parentAttendanceEmpty").hidden=learner.attendance.length!==0;
@@ -2599,9 +3856,17 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     });
     var overallAverageCell=document.createElement("td");
     overallAverageCell.className="parent-grade-overall";
-    overallAverageCell.textContent=completeOverallAverage
-      ?(allCoreGrades.reduce(function(total,value){return total+value},0)/allCoreGrades.length).toFixed(2)
-      :"—";
+    var overallAverage=completeOverallAverage
+      ?Number((allCoreGrades.reduce(function(total,value){return total+value},0)/allCoreGrades.length).toFixed(2))
+      :null;
+    overallAverageCell.append(overallAverage===null?"—":overallAverage.toFixed(2));
+    var overallInterpretation=overallAverage===null?null:getGradeInterpretation(overallAverage);
+    if(overallInterpretation){
+      var overallDescriptor=document.createElement("small");
+      overallDescriptor.className="grade-descriptor";
+      overallDescriptor.textContent=overallInterpretation.label+" ("+overallInterpretation.range+") — "+overallInterpretation.description;
+      overallAverageCell.append(overallDescriptor);
+    }
     generalAverageRow.append(overallAverageCell);
     var footer=document.createElement("tfoot");
     footer.append(generalAverageRow);
@@ -2609,7 +3874,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     var tableWrap=document.createElement("div");
     tableWrap.className="table-wrap";
     tableWrap.append(table);
-    gradeRecords.append(tableWrap);
+    gradeRecords.append(tableWrap,createGradeInterpretationNote());
     parentSelectedLearnerIndex=index;
     $("parentLearnerRecords").hidden=false;
   }
@@ -2629,12 +3894,13 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     $("sideRole").textContent=user.role==="teacher"?"Teacher":"Parent";
     $("menuToggle").hidden=false;
     $("teacherSidebarNav").hidden=user.role!=="teacher";
-    $("parentSidebarNav").hidden=user.role!=="parent";
+    $("parentSidebarNav").hidden=true;
     $("navStudents").hidden=user.role!=="teacher";
     $("navAttendance").hidden=user.role!=="teacher";
     $("navTermGrades").hidden=user.role!=="teacher";
     $("navGradeSummary").hidden=user.role!=="teacher";
     $("navReadingProgress").hidden=user.role!=="teacher";
+    $("navRma").hidden=user.role!=="teacher";
     $("navTeacherProfile").hidden=user.role!=="teacher";
     $("navSettings").hidden=user.role!=="teacher";
     $("studentsPage").hidden=user.role!=="teacher";
@@ -2642,6 +3908,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
     $("termGradesPage").hidden=true;
     $("gradeSummaryPage").hidden=true;
     $("readingProgressPage").hidden=true;
+    $("rmaPage").hidden=true;
     $("teacherProfilePage").hidden=true;
     $("settingsPage").hidden=true;
     $("parentPage").hidden=user.role==="teacher";
@@ -2688,6 +3955,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
         $("parentClassroom").textContent=parentPortal.classroomNumber||"Not available";
         $("parentTeacher").textContent=parentPortal.teacherName||"Not available";
         parentPortalData=parentPortal;
+        $("parentSidebarNav").hidden=parentPortal.learners.length===0;
         $("parentChildrenCount").textContent=parentPortal.learners.length+" linked "+(parentPortal.learners.length===1?"learner":"learners");
         $("parentLearnerPicker").replaceChildren();
         parentPortal.learners.forEach(function(learner,index){
@@ -2703,6 +3971,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
           };
         }
       }catch(error){
+        $("parentSidebarNav").hidden=true;
         $("parentClassroom").textContent="Unavailable";
         $("parentTeacher").textContent="Unavailable";
         $("parentChildrenCount").textContent="Unable to load";
@@ -2749,6 +4018,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   $("navTermGrades").onclick=function(){showDashboardPage("grades")};
   $("navGradeSummary").onclick=function(){showDashboardPage("summary")};
   $("navReadingProgress").onclick=function(){showDashboardPage("reading")};
+  $("navRma").onclick=function(){showDashboardPage("rma")};
   $("navTeacherProfile").onclick=function(){showDashboardPage("profile")};
   $("navSettings").onclick=function(){showDashboardPage("settings")};
   $("appearanceSetting").onchange=function(){
@@ -2801,6 +4071,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
         throw new Error("Restart the portal server to load attendance records.");
       }
       parentPortalData=updatedPortal;
+      $("parentSidebarNav").hidden=parentPortalData.learners.length===0;
       $("parentWelcomeMessage").textContent="Welcome, "+parentPortalData.parentName+". Your class and linked learner information is here.";
       $("parentClassroom").textContent=parentPortalData.classroomNumber||"Not available";
       $("parentTeacher").textContent=parentPortalData.teacherName||"Not available";
@@ -2924,7 +4195,11 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   };
   $("downloadSF2").onclick=async function(){
     var month=selectedAttendanceMonth();
-    if(attendanceDirty&&!window.confirm("Unsaved changes will not be included in the downloaded SF2. Continue with the last saved attendance?"))return;
+    if(attendanceDirty){
+      if(!window.confirm("Save your unsaved attendance changes before downloading the SF2?"))return;
+      await $("saveAttendance").onclick();
+      if(attendanceDirty)return;
+    }
     var button=this;
     button.disabled=true;
     button.textContent="Preparing SF2...";
@@ -2940,8 +4215,10 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
         var errorResult=await response.json();
         throw new Error(errorResult.error||"Unable to download the selected month's SF2.");
       }
-      var filenameMonths=["January","February","March","April","May","June","July","August","September","October","November","December"];
-      var filename="SF2_"+filenameMonths[Number(month.slice(5,7))-1]+"_"+month.slice(0,4)+".xlsx";
+      var disposition=response.headers.get("content-disposition")||"";
+      var filenameMatch=disposition.match(/filename="([^"]+)"/i);
+      if(!filenameMatch)throw new Error("The server did not provide an SF2 filename.");
+      var filename=filenameMatch[1];
       var objectUrl=URL.createObjectURL(await response.blob());
       var link=document.createElement("a");
       link.href=objectUrl;
@@ -3042,6 +4319,690 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       button.textContent="Save Attendance";
     }
   };
+  function formatRmaPercentage(value){
+    return typeof value==="number"&&Number.isFinite(value)?value.toFixed(2)+"%":"Data Not Yet Available";
+  }
+
+  function createRmaSvgElement(name,attributes,text){
+    var element=document.createElementNS("http://www.w3.org/2000/svg",name);
+    Object.keys(attributes||{}).forEach(function(attribute){
+      element.setAttribute(attribute,attributes[attribute]);
+    });
+    if(text!==undefined)element.textContent=text;
+    return element;
+  }
+
+  function renderRmaMasteryChart(students,period){
+    var container=$("rmaMasteryChart");
+    container.replaceChildren();
+    var levels=rmaData.template.grades[0].masteryBands.map(function(band){return band.level});
+    var colors=["#287a54","#3478b8","#4d8f78","#d18a1f","#bd4e44"];
+    var counts=levels.map(function(level){
+      return students.filter(function(student){
+        var assessment=student.assessments[period];
+        return assessment.scoringMethod==="template"&&assessment.masteryLevel===level;
+      }).length;
+    });
+    var chart=createRmaSvgElement("svg",{viewBox:"0 0 640 230",class:"rma-chart",role:"img","aria-label":"Class mastery distribution"});
+    chart.append(createRmaSvgElement("title",{},"Class mastery distribution for "+period));
+    var maxCount=Math.max(1,...counts);
+    levels.forEach(function(level,index){
+      var y=35+index*46;
+      chart.append(
+        createRmaSvgElement("text",{x:2,y:y+16},level),
+        createRmaSvgElement("rect",{x:178,y:y,width:390*counts[index]/maxCount,height:24,rx:5,fill:colors[index]}),
+        createRmaSvgElement("text",{x:580,y:y+17,"font-weight":"700"},String(counts[index]))
+      );
+    });
+    if(counts.every(function(count){return count===0})){
+      chart.append(createRmaSvgElement("text",{x:320,y:220,"text-anchor":"middle"},"No scored learners in this cycle yet."));
+    }
+    container.append(chart);
+  }
+
+  function renderRmaTrendChart(){
+    var container=$("rmaTrendChart");
+    container.replaceChildren();
+    var cycles=rmaData.periods.map(function(period){
+      var values=rmaData.students.map(function(student){return student.assessments[period].percentageScore})
+        .filter(function(value,index){return typeof value==="number"
+          &&rmaData.students[index].assessments[period].scoringMethod==="template"});
+      return {period:period,average:values.length
+        ?values.reduce(function(total,value){return total+value},0)/values.length
+        :null};
+    });
+    var chart=createRmaSvgElement("svg",{viewBox:"0 0 640 230",class:"rma-chart",role:"img","aria-label":"Average RMA score trend"});
+    chart.append(createRmaSvgElement("title",{},"Average percentage score by assessment cycle"));
+    var left=56,right=610,top=22,bottom=174;
+    [0,25,50,75,100].forEach(function(value){
+      var y=bottom-(bottom-top)*value/100;
+      chart.append(
+        createRmaSvgElement("line",{x1:left,y1:y,x2:right,y2:y,stroke:"var(--line)"}),
+        createRmaSvgElement("text",{x:left-9,y:y+4,"text-anchor":"end"},String(value))
+      );
+    });
+    var points=cycles.map(function(cycle,index){
+      return {x:left+(right-left)*index/Math.max(1,cycles.length-1),y:cycle.average===null
+        ?null:bottom-(bottom-top)*cycle.average/100,cycle:cycle};
+    });
+    for(var index=1;index<points.length;index++){
+      if(points[index-1].y===null||points[index].y===null)continue;
+      chart.append(createRmaSvgElement("line",{
+        x1:points[index-1].x,y1:points[index-1].y,x2:points[index].x,y2:points[index].y,
+        stroke:"var(--accent)","stroke-width":3
+      }));
+    }
+    points.forEach(function(point){
+      chart.append(createRmaSvgElement("text",{x:point.x,y:202,"text-anchor":"middle"},point.cycle.period));
+      if(point.y!==null){
+        chart.append(
+          createRmaSvgElement("circle",{cx:point.x,cy:point.y,r:6,fill:"var(--accent)"}),
+          createRmaSvgElement("text",{x:point.x,y:point.y-11,"text-anchor":"middle","font-weight":"700"},point.cycle.average.toFixed(1)+"%")
+        );
+      }
+    });
+    if(points.every(function(point){return point.y===null})){
+      chart.append(createRmaSvgElement("text",{x:320,y:220,"text-anchor":"middle"},"Class trend will appear after scores are recorded."));
+    }
+    container.append(chart);
+  }
+
+  function renderRmaLearnerChart(){
+    var students=rmaData?rmaData.students:[];
+    var selector=$("rmaLearnerSelect");
+    var selectedId=selector.value;
+    selector.replaceChildren();
+    students.forEach(function(student){
+      selector.add(new Option(student.name,student.id));
+    });
+    if(students.some(function(student){return student.id===selectedId}))selector.value=selectedId;
+    var student=students.find(function(entry){return entry.id===selector.value});
+    var container=$("rmaLearnerChart");
+    container.replaceChildren();
+    var chart=createRmaSvgElement("svg",{viewBox:"0 0 640 230",class:"rma-chart",role:"img",
+      "aria-label":student?"RMA progress for "+student.name:"Learner RMA progress"});
+    chart.append(createRmaSvgElement("title",{},student?"RMA progress for "+student.name:"Learner RMA progress"));
+    var left=56,right=610,top=22,bottom=174;
+    [0,25,50,75,100].forEach(function(value){
+      var y=bottom-(bottom-top)*value/100;
+      chart.append(
+        createRmaSvgElement("line",{x1:left,y1:y,x2:right,y2:y,stroke:"var(--line)"}),
+        createRmaSvgElement("text",{x:left-9,y:y+4,"text-anchor":"end"},String(value))
+      );
+    });
+    if(student){
+      var points=rmaData.periods.map(function(period,index){
+        var assessment=student.assessments[period];
+        return {
+          x:left+(right-left)*index/Math.max(1,rmaData.periods.length-1),
+          y:assessment.scoringMethod==="template"&&typeof assessment.percentageScore==="number"
+            ?bottom-(bottom-top)*assessment.percentageScore/100:null,
+          period:period,
+          assessment:assessment
+        };
+      });
+      for(var index=1;index<points.length;index++){
+        if(points[index-1].y===null||points[index].y===null)continue;
+        chart.append(createRmaSvgElement("line",{
+          x1:points[index-1].x,y1:points[index-1].y,x2:points[index].x,y2:points[index].y,
+          stroke:"var(--accent)","stroke-width":3
+        }));
+      }
+      points.forEach(function(point){
+        chart.append(createRmaSvgElement("text",{x:point.x,y:202,"text-anchor":"middle"},point.period));
+        if(point.y!==null){
+          var marker=createRmaSvgElement("circle",{cx:point.x,cy:point.y,r:7,fill:"var(--accent)"});
+          marker.append(createRmaSvgElement("title",{},point.period+": "+formatRmaPercentage(point.assessment.percentageScore)
+            +" — "+point.assessment.masteryLevel));
+          chart.append(marker,createRmaSvgElement("text",{x:point.x,y:point.y-12,"text-anchor":"middle","font-weight":"700"},
+            point.assessment.percentageScore.toFixed(1)+"%"));
+        }
+      });
+    }
+    if(!student||!rmaData.periods.some(function(period){
+      return student.assessments[period].scoringMethod==="template"
+        &&typeof student.assessments[period].percentageScore==="number";
+    })){
+      chart.append(createRmaSvgElement("text",{x:320,y:220,"text-anchor":"middle"},"No scored assessments are available for this learner."));
+    }
+    container.append(chart);
+  }
+
+  function renderRmaReport(){
+    if(!rmaData)return;
+    var period=rmaPeriod;
+    var students=rmaData.students;
+    var assessments=students.map(function(student){return student.assessments[period]});
+    var assessed=assessments.filter(function(assessment){return Boolean(assessment.assessedDate)});
+    var scored=assessed.filter(function(assessment){
+      return assessment.scoringMethod==="template"&&typeof assessment.percentageScore==="number";
+    });
+    var average=scored.length?scored.reduce(function(total,assessment){return total+assessment.percentageScore},0)/scored.length:null;
+    $("rmaAssessedCount").textContent=String(assessed.length);
+    $("rmaClassAverage").textContent=average===null?"Data Not Yet Available":average.toFixed(2)+"%";
+    $("rmaHighestScore").textContent=scored.length
+      ?Math.max.apply(null,scored.map(function(assessment){return assessment.percentageScore})).toFixed(2)+"%"
+      :"Data Not Yet Available";
+    $("rmaLowestScore").textContent=scored.length
+      ?Math.min.apply(null,scored.map(function(assessment){return assessment.percentageScore})).toFixed(2)+"%"
+      :"Data Not Yet Available";
+    $("rmaMasteryCaption").textContent=period+" template levelling distribution";
+    var domainRows=$("rmaDomainRows");
+    domainRows.replaceChildren();
+    rmaData.template.domains.forEach(function(domain){
+      var results=scored.map(function(assessment){
+        return (assessment.domainScores||[]).concat(assessment.cognitiveDomainScores||[])
+          .find(function(result){return result.key===domain.key});
+      }).filter(Boolean);
+      var averageDomain=results.length
+        ?results.reduce(function(total,result){return total+result.percentageScore},0)/results.length:null;
+      var met=results.filter(function(result){return result.meetsBenchmark}).length;
+      var row=document.createElement("tr");
+      [
+        domain.label,
+        averageDomain===null?"Data Not Yet Available":averageDomain.toFixed(2)+"%",
+        met,results.length,results.length?(met/results.length*100).toFixed(1)+"%":"Data Not Yet Available"
+      ].forEach(function(value){var cell=document.createElement("td");cell.textContent=String(value);row.appendChild(cell)});
+      domainRows.appendChild(row);
+    });
+    var bandSummary=rmaData.template.grades[0].masteryBands.map(function(band){
+      var count=scored.filter(function(assessment){return assessment.masteryLevel===band.level}).length;
+      return band.level+": "+count+" ("+(scored.length?(count/scored.length*100).toFixed(1):"0.0")+"%)";
+    });
+    $("rmaClassAnalysis").textContent=scored.length
+      ?"Class performance ("+period+"): "+bandSummary.join("; ")+". "
+        +(scored.some(function(assessment){return assessment.masteryLevel==="Emerging (Not Proficient)"
+          ||assessment.masteryLevel==="Emerging (Low Proficient)"})
+          ?"Recommended class-wide intervention: provide targeted remediation and reteaching; use the domain benchmark results to prioritize support."
+          :"Review learner-level item responses and provide differentiated practice and enrichment.")
+      :assessed.length?"Template-aligned class analysis is not available for legacy scores. Re-enter those assessments using the RMA item scoresheet."
+        :"Class performance ("+period+"): Data Not Yet Available. Enter assessment dates and item-level scores to generate class analysis.";
+    renderRmaMasteryChart(students,period);
+    renderRmaTrendChart();
+    renderRmaLearnerChart();
+  }
+
+  function rmaAge(birthdate,assessedDate){
+    if(!birthdate||!assessedDate)return "Data Not Yet Available";
+    var birth=new Date(birthdate+"T00:00:00.000Z");
+    var assessed=new Date(assessedDate+"T00:00:00.000Z");
+    if(Number.isNaN(birth.getTime())||Number.isNaN(assessed.getTime())||assessed<birth)return "Data Not Yet Available";
+    var age=assessed.getUTCFullYear()-birth.getUTCFullYear();
+    if(assessed.getUTCMonth()<birth.getUTCMonth()
+      ||(assessed.getUTCMonth()===birth.getUTCMonth()&&assessed.getUTCDate()<birth.getUTCDate()))age--;
+    return String(age);
+  }
+
+  function renderRmaEntry(){
+    if(!rmaData)return;
+    $("rmaEntryTitle").textContent="Record "+rmaPeriod+" Assessment";
+    $("rmaEntryCount").textContent=rmaData.students.length+" learners";
+    $("rmaEntryEmpty").hidden=rmaData.students.length>0;
+    $("rmaGradeSelect").value=rmaGradeLevel;
+    var selectedGrade=rmaData.template.grades.find(function(grade){return grade.gradeLevel===rmaGradeLevel});
+    $("rmaGradeInstructions").textContent=rmaGradeLevel+" uses a "+selectedGrade.maximumScore
+      +"-point maximum. Open a learner's form and select the items answered correctly.";
+    var rows=$("rmaEntryRows");
+    rows.replaceChildren();
+    rmaData.students.forEach(function(student){
+      var assessment=student.assessments[rmaPeriod];
+      var row=document.createElement("tr");
+      row.dataset.studentId=student.id;
+      var nameCell=document.createElement("td");
+      nameCell.className="rma-learner-name";
+      nameCell.textContent=student.name;
+      row.appendChild(nameCell);
+      var actionCell=document.createElement("td");
+      actionCell.className="rma-entry-action";
+      var addScore=document.createElement("button");
+      addScore.type="button";
+      addScore.className="btn rma-add-score";
+      addScore.dataset.studentId=student.id;
+      addScore.textContent=assessment.scoringMethod==="template"?"Edit Score":"Add Score";
+      addScore.setAttribute("aria-label",(assessment.scoringMethod==="template"?"Edit":"Add")
+        +" RMA score for "+student.name);
+      actionCell.appendChild(addScore);
+      row.appendChild(actionCell);
+      rows.appendChild(row);
+      var resultRow=document.createElement("tr");
+      resultRow.className="rma-result-row";
+      var resultCell=document.createElement("td");
+      resultCell.colSpan=2;
+      var summary=document.createElement("div");
+      summary.className="rma-result-summary";
+      if(assessment.scoringMethod==="template"&&assessment.assessedDate){
+        var scoreLine=document.createElement("strong");
+        scoreLine.textContent="Score: "+assessment.rawScore+" / "+assessment.totalItems+" points · "
+          +formatRmaPercentage(assessment.percentageScore)+" · "+assessment.masteryLevel;
+        summary.appendChild(scoreLine);
+        if(assessment.remarks){
+          var remarks=document.createElement("div");
+          remarks.textContent=assessment.remarks;
+          summary.appendChild(remarks);
+        }
+      }else if(assessment.scoringMethod==="legacy"){
+        summary.textContent="Legacy overall score: "+formatRmaPercentage(assessment.percentageScore)
+          +". Re-enter this assessment using the item checklist to generate template-aligned results.";
+      }else{
+        summary.textContent="No score recorded for "+rmaPeriod+".";
+      }
+      resultCell.appendChild(summary);
+      resultRow.appendChild(resultCell);
+      rows.appendChild(resultRow);
+    });
+    rmaDirty=false;
+  }
+
+  function openRmaAssessment(studentId){
+    var student=rmaData.students.find(function(entry){return entry.id===studentId});
+    if(!student)return;
+    var assessment=student.assessments[rmaPeriod];
+    rmaEditingStudentId=studentId;
+    $("rmaAssessmentTitle").textContent="Record "+rmaPeriod+" assessment";
+    $("rmaAssessmentSubtitle").textContent=student.name+" · "+(student.lrn||"LRN unavailable");
+    $("rmaAssessmentDate").value=assessment.assessedDate||"";
+    $("rmaAssessmentDate").defaultValue=$("rmaAssessmentDate").value;
+    $("rmaAssessmentAge").textContent=student.birthdate?"Age at assessment: "+rmaAge(student.birthdate,assessment.assessedDate):"";
+    $("rmaAssessmentError").textContent="";
+    $("rmaAssessmentLegacyNote").hidden=assessment.scoringMethod!=="legacy";
+    $("rmaAssessmentLegacyNote").textContent=assessment.scoringMethod==="legacy"
+      ?"This learner has a previously saved overall score. Saving this item checklist will replace it with template-based scoring; unchecked items count as zero."
+      :"";
+    var itemContainer=$("rmaAssessmentItems");
+    itemContainer.replaceChildren();
+    var gradeIndex=rmaData.template.grades.findIndex(function(grade){return grade.gradeLevel===rmaGradeLevel});
+    var applicableItems=rmaData.template.items.filter(function(item){
+      return rmaData.template.grades.findIndex(function(grade){return grade.gradeLevel===item.gradeLevel})<=gradeIndex;
+    });
+    ["Grade 4","Grade 5","Grade 6"].forEach(function(gradeLevel){
+      var items=applicableItems.filter(function(item){return item.gradeLevel===gradeLevel});
+      if(!items.length)return;
+      var group=document.createElement("section");
+      group.className="rma-item-group";
+      var heading=document.createElement("h3");
+      heading.textContent=gradeLevel+" items";
+      group.appendChild(heading);
+      var grid=document.createElement("div");
+      grid.className="rma-item-grid";
+      items.forEach(function(item){
+        var wrapper=document.createElement("div");
+        wrapper.className="rma-item-field";
+        var input=item.maximum===1?document.createElement("input"):document.createElement("select");
+        if(item.maximum===1){
+          input.type="checkbox";
+        }else{
+          var notAnswered=document.createElement("option");
+          notAnswered.value="";
+          notAnswered.textContent="Choose score";
+          input.appendChild(notAnswered);
+          for(var point=0;point<=item.maximum;point++){
+            var scoreOption=document.createElement("option");
+            scoreOption.value=String(point);
+            scoreOption.textContent=point+" point"+(point===1?"":"s");
+            input.appendChild(scoreOption);
+          }
+        }
+        input.className="rma-entry-input";
+        input.dataset.field="correctItem";
+        input.dataset.itemKey=item.key;
+        input.dataset.maximum=String(item.maximum);
+        var itemId="rmaCorrectItem"+item.key;
+        input.id=itemId;
+        var originalScore=Number(assessment.itemScores&&assessment.itemScores[item.key]||0);
+        input.dataset.originalScore=String(originalScore);
+        input.dataset.touched="false";
+        if(item.maximum===1){
+          input.checked=originalScore===item.maximum;
+          input.defaultChecked=input.checked;
+          input.setAttribute("aria-label","Item "+item.label+" answered correctly, worth one point");
+        }else{
+          input.value=assessment.assessedDate?String(originalScore):"";
+          input.dataset.initialValue=input.value;
+          input.setAttribute("aria-label","Score for item "+item.label+", worth up to "+item.maximum+" points");
+        }
+        var label=document.createElement("label");
+        label.htmlFor=itemId;
+        label.textContent="Item "+item.label+" · "+item.maximum+" "+(item.maximum===1?"point":"points");
+        wrapper.append(input,label);
+        if(item.maximum>1&&originalScore>0&&originalScore<item.maximum){
+          var partial=document.createElement("span");
+          partial.className="rma-item-partial";
+          partial.textContent="Previously saved partial score "+originalScore+"/"+item.maximum+" (kept unless changed)";
+          label.appendChild(partial);
+        }
+        grid.appendChild(wrapper);
+      });
+      group.appendChild(grid);
+      itemContainer.appendChild(group);
+    });
+    var domainContainer=$("rmaAssessmentDomains");
+    domainContainer.replaceChildren();
+    rmaData.template.domains.forEach(function(domain){
+      var block=document.createElement("div");
+      block.dataset.domainPreview=domain.key;
+      var title=document.createElement("strong");
+      title.textContent=domain.label;
+      var value=document.createElement("span");
+      block.append(title,value);
+      domainContainer.appendChild(block);
+    });
+    var narrative=$("rmaAssessmentNarrative");
+    narrative.replaceChildren();
+    [
+      ["remarks","Automatically generated remarks",assessment.remarks],
+      ["strengths","Automatically identified strengths",assessment.strengths],
+      ["areasForImprovement","Automatically identified areas for improvement",assessment.areasForImprovement],
+      ["recommendedIntervention","Automatically recommended interventions",assessment.recommendedIntervention]
+    ].forEach(function(field){
+      var wrapper=document.createElement("div");
+      var label=document.createElement("label");
+      var input=document.createElement("textarea");
+      input.readOnly=true;
+      input.setAttribute("aria-live","polite");
+      input.maxLength=1000;
+      input.id="rmaAssessment"+field[0];
+      label.htmlFor=input.id;
+      label.textContent=field[1];
+      input.value=field[2]||"";
+      input.defaultValue=input.value;
+      wrapper.append(label,input);
+      narrative.appendChild(wrapper);
+    });
+    rmaDirty=false;
+    updateRmaAssessmentPreview();
+    $("rmaAssessmentDialog").showModal();
+    var focusTarget=$("rmaAssessmentDate").value
+      ?itemContainer.querySelector('input[type="checkbox"],select[data-field="correctItem"]'):$("rmaAssessmentDate");
+    if(focusTarget)focusTarget.focus();
+  }
+
+  function rmaAssessmentScoresFromForm(includeIncorrectItems){
+    var scores={};
+    $("rmaAssessmentItems").querySelectorAll('[data-field="correctItem"]').forEach(function(input){
+      var originalScore=Number(input.dataset.originalScore)||0;
+      if(input.type==="checkbox"&&input.checked){
+        scores[input.dataset.itemKey]=Number(input.dataset.maximum);
+      }else if(input.tagName==="SELECT"&&input.value!==""){
+        scores[input.dataset.itemKey]=Number(input.value);
+      }else if(input.dataset.touched!=="true"&&originalScore>0){
+        scores[input.dataset.itemKey]=originalScore;
+      }else if(includeIncorrectItems){
+        scores[input.dataset.itemKey]=0;
+      }
+    });
+    return scores;
+  }
+
+  function updateRmaAssessmentPreview(){
+    if(!rmaData||!rmaEditingStudentId)return;
+    var student=rmaData.students.find(function(entry){return entry.id===rmaEditingStudentId});
+    if(!student)return;
+    var date=$("rmaAssessmentDate").value;
+    $("rmaAssessmentAge").textContent=student.birthdate
+      ?"Age at assessment: "+rmaAge(student.birthdate,date):"";
+    var scores=rmaAssessmentScoresFromForm(false);
+    var grade=rmaData.template.grades.find(function(entry){return entry.gradeLevel===rmaGradeLevel});
+    var gradeIndex=rmaData.template.grades.indexOf(grade);
+    var eligible=rmaData.template.items.filter(function(item){
+      return rmaData.template.grades.findIndex(function(entry){return entry.gradeLevel===item.gradeLevel})<=gradeIndex;
+    });
+    if(!date){
+      $("rmaAssessmentPreview").textContent="Enter an assessment date to calculate the score.";
+      $("rmaAssessmentDomains").querySelectorAll("[data-domain-preview] span").forEach(function(span){
+        span.textContent="Data Not Yet Available";
+      });
+      updateRmaAssessmentNarrative(null);
+      return;
+    }
+    var raw=eligible.reduce(function(total,item){return total+(scores[item.key]||0)},0);
+    var percentage=raw/grade.maximumScore*100;
+    var band=grade.masteryBands.find(function(entry){return raw>=entry.minimumRawScore})
+      ||grade.masteryBands[grade.masteryBands.length-1];
+    $("rmaAssessmentPreview").textContent=raw+" / "+grade.maximumScore+" points · "
+      +percentage.toFixed(2)+"% · "+band.level;
+    var domainResults=[];
+    rmaData.template.domains.forEach(function(domain){
+      var target=$("rmaAssessmentDomains").querySelector('[data-domain-preview="'+domain.key+'"] span');
+      var itemKeys=domain.itemKeys[rmaGradeLevel];
+      var maximum=itemKeys.reduce(function(total,key){
+        return total+rmaData.template.items.find(function(item){return item.key===key}).maximum;
+      },0);
+      var score=itemKeys.reduce(function(total,key){return total+(scores[key]||0)},0);
+      target.textContent=score+" / "+maximum+" · "+(score/maximum>=.75?"75% benchmark met":"below 75%");
+      domainResults.push({
+        key:domain.key,label:domain.label,category:domain.category,score:score,maximum:maximum,
+        percentageScore:score/maximum*100,meetsBenchmark:score/maximum>=.75
+      });
+    });
+    updateRmaAssessmentNarrative({
+      rawScore:raw,totalItems:grade.maximumScore,percentageScore:percentage,masteryLevel:band.level,
+      domainScores:domainResults.filter(function(domain){return domain.category==="Content Domain"})
+    });
+  }
+
+  function updateRmaAssessmentNarrative(score){
+    var fields=["remarks","strengths","areasForImprovement","recommendedIntervention"];
+    var narrative=score?rmaGeneratedNarrative(score):{
+      remarks:"Enter the assessment date and item results to generate this summary.",
+      strengths:"Enter the assessment date and item results to identify strengths.",
+      areasForImprovement:"Enter the assessment date and item results to identify areas for improvement.",
+      recommendedIntervention:"Enter the assessment date and item results to generate recommendations."
+    };
+    fields.forEach(function(field){
+      $("rmaAssessment"+field).value=narrative[field];
+    });
+  }
+
+  function rmaGeneratedNarrative(score){
+    var domains=score.domainScores||[];
+    var meetingBenchmark=domains.filter(function(domain){return domain.meetsBenchmark});
+    var belowBenchmark=domains.filter(function(domain){return !domain.meetsBenchmark})
+      .sort(function(left,right){return left.percentageScore-right.percentageScore});
+    var domainSummary=domains.map(function(domain){
+      return domain.label+": "+domain.score+"/"+domain.maximum+" ("+domain.percentageScore.toFixed(2)+"%)";
+    }).join("; ");
+    var strongest=domains.slice().sort(function(left,right){return right.percentageScore-left.percentageScore})[0];
+    var interventions={
+      "Number and Number Sense":"Use number lines, place-value models, and guided computation practice.",
+      "Geometry":"Review shape properties and spatial reasoning with diagrams and hands-on models.",
+      "Measurement":"Practice selecting units and solving measurement problems with visual and real-world examples.",
+      "Statistics & Probability":"Use tables, graphs, and simple experiments to practice interpreting data and probability.",
+      "Algebra":"Model unknown values with patterns, expressions, and step-by-step equation practice."
+    };
+    return {
+      remarks:score.rawScore+"/"+score.totalItems+" points ("+score.percentageScore.toFixed(2)+"%). "
+        +score.masteryLevel+". "+domainSummary,
+      strengths:meetingBenchmark.length?meetingBenchmark.map(function(domain){
+        return domain.label+" ("+domain.percentageScore.toFixed(2)+"%)";
+      }).join("; "):strongest
+        ?"No content domain met the 75% benchmark. Relative strength: "+strongest.label+"."
+        :"Data Not Yet Available",
+      areasForImprovement:belowBenchmark.length?belowBenchmark.map(function(domain){
+        return domain.label+" ("+domain.percentageScore.toFixed(2)+"%; "+domain.score+"/"+domain.maximum+")";
+      }).join("; "):"All assessed content domains met or exceeded the 75% benchmark.",
+      recommendedIntervention:belowBenchmark.length?belowBenchmark.map(function(domain){
+        return domain.label+": "+interventions[domain.label];
+      }).join(" "):"Maintain progress with mixed review and enrichment tasks across all five content domains."
+    };
+  }
+
+  function hasUnsavedRmaChanges(){
+    if(!$("rmaAssessmentDialog").open)return false;
+    return Array.from($("rmaAssessmentForm").querySelectorAll(".rma-entry-input"))
+      .some(function(input){
+        if(input.tagName==="SELECT")return input.value!==input.dataset.initialValue;
+        if(input.type!=="checkbox")return input.value!==input.defaultValue;
+        return input.checked!==input.defaultChecked
+          ||(Number(input.dataset.originalScore)>0&&input.dataset.touched==="true"&&!input.checked);
+      });
+  }
+
+  async function loadRma(){
+    var requestId=++rmaRequestId;
+    var initialLoad=!rmaData;
+    $("rmaNotice").textContent="";
+    $("rmaNotice").classList.remove("error");
+    $("rmaEntryCount").textContent="Loading learners...";
+    try{
+      var results=await Promise.all([api("/api/math-assessments"),api("/api/teacher/profile")]);
+      if(requestId!==rmaRequestId)return;
+      if(!Array.isArray(results[0].students)||!Array.isArray(results[0].periods)
+        ||!Array.isArray(results[0].masteryBands)||!results[0].template
+        ||!Array.isArray(results[0].template.grades)||!Array.isArray(results[0].template.items)
+        ||!Array.isArray(results[0].template.domains)){
+        throw new Error("The server returned an invalid RMA assessment report.");
+      }
+      rmaData=results[0];
+      rmaProfile=results[1];
+      if(initialLoad){
+        var profileGrade=rmaData.template.grades.find(function(grade){
+          return grade.gradeLevel===rmaProfile.grade;
+        });
+        var savedGrade=rmaData.students.map(function(student){
+          return student.assessments[rmaPeriod].gradeLevel;
+        }).find(function(gradeLevel){
+          return rmaData.template.grades.some(function(grade){return grade.gradeLevel===gradeLevel});
+        });
+        rmaGradeLevel=profileGrade?profileGrade.gradeLevel:savedGrade||"Grade 5";
+      }
+      renderRmaReport();
+      renderRmaEntry();
+    }catch(error){
+      if(requestId!==rmaRequestId)return;
+      $("rmaEntryCount").textContent="Unable to load";
+      $("rmaNotice").textContent=error.message;
+      $("rmaNotice").classList.add("error");
+    }
+  }
+
+  function setRmaPeriod(period){
+    if(!rmaData||!rmaData.periods.includes(period)||period===rmaPeriod)return;
+    if(rmaDirty&&!window.confirm("Discard unsaved RMA assessment changes?"))return;
+    rmaDirty=false;
+    if($("rmaAssessmentDialog").open)$("rmaAssessmentDialog").close();
+    rmaEditingStudentId="";
+    rmaPeriod=period;
+    var savedGrade=rmaData.students.map(function(student){return student.assessments[period].gradeLevel})
+      .find(function(gradeLevel){return rmaData.template.grades.some(function(grade){return grade.gradeLevel===gradeLevel})});
+    if(savedGrade)rmaGradeLevel=savedGrade;
+    document.querySelectorAll(".rma-period-tab").forEach(function(tab){
+      tab.setAttribute("aria-selected",String(tab.dataset.period===period));
+    });
+    renderRmaReport();
+    renderRmaEntry();
+  }
+
+  async function saveRmaAssessment(){
+    if(rmaSaving)return;
+    var studentId=rmaEditingStudentId;
+    var student=rmaData&&rmaData.students.find(function(entry){return entry.id===studentId});
+    if(!student)return;
+    var fields={};
+    $("rmaAssessmentForm").querySelectorAll(".rma-entry-input").forEach(function(input){
+      if(input.dataset.field==="assessedDate")fields[input.dataset.field]=input.value.trim();
+    });
+    var itemScores=fields.assessedDate?rmaAssessmentScoresFromForm(true):{};
+    var hasItemAnswers=Array.from($("rmaAssessmentItems").querySelectorAll('[data-field="correctItem"]'))
+      .some(function(input){
+        if(input.type==="checkbox")return input.checked
+          ||(input.dataset.touched!=="true"&&Number(input.dataset.originalScore)>0);
+        return input.value!==""||(input.dataset.touched!=="true"&&Number(input.dataset.originalScore)>0);
+      });
+    if(!fields.assessedDate&&hasItemAnswers){
+      $("rmaAssessmentError").textContent="Enter the assessment date before saving item scores.";
+      $("rmaAssessmentDate").focus();
+      return;
+    }
+    var button=$("saveRmaAssessment");
+    var controls=Array.from($("rmaAssessmentForm").querySelectorAll("input,textarea,button"));
+    rmaSaving=true;
+    controls.forEach(function(control){control.disabled=true});
+    button.textContent="Saving...";
+    $("rmaAssessmentError").textContent="";
+    $("rmaNotice").textContent="";
+    $("rmaNotice").classList.remove("error");
+    var period=rmaPeriod;
+    try{
+      var saved=await api("/api/math-assessments",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          studentId:studentId,
+          period:period,
+          gradeLevel:rmaGradeLevel,
+          assessedDate:fields.assessedDate,
+          itemScores:itemScores
+        })
+      });
+      var studentName=student.name;
+      rmaDirty=false;
+      $("rmaAssessmentDialog").close();
+      rmaEditingStudentId="";
+      if(rmaPeriod===period){
+        await loadRma();
+        $("rmaNotice").textContent=saved.removed
+          ?"Empty assessment cleared.":"Template-aligned results saved for "+studentName+" ("+period+").";
+      }else{
+        $("rmaNotice").textContent="RMA results were saved. Reload the selected assessment cycle to view them.";
+      }
+    }catch(error){
+      $("rmaAssessmentError").textContent=error.message;
+    }finally{
+      rmaSaving=false;
+      controls.forEach(function(control){control.disabled=false});
+      button.textContent="Save Assessment";
+    }
+  }
+
+  async function downloadRma(format){
+    if(rmaDirty&&!window.confirm("Unsaved RMA entries will not be included in this export. Continue with the last saved results?"))return;
+    var button=format==="xlsx"?$("rmaExportXlsx"):$("rmaExportCsv");
+    button.disabled=true;
+    $("rmaNotice").textContent="";
+    $("rmaNotice").classList.remove("error");
+    try{
+      var response=await fetch("/api/math-assessments/export?period="+encodeURIComponent(rmaPeriod)
+        +"&format="+encodeURIComponent(format));
+      if(!response.ok){
+        var errorResult=await response.json();
+        throw new Error(errorResult.error||"Unable to export RMA results.");
+      }
+      var objectUrl=URL.createObjectURL(await response.blob());
+      var link=document.createElement("a");
+      link.href=objectUrl;
+      link.download=format==="xlsx"?"RMA TEMP.xlsx":"RMA_"+rmaPeriod+"_report.csv";
+      link.style.display="none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(function(){URL.revokeObjectURL(objectUrl)},1000);
+      $("rmaNotice").textContent=rmaPeriod+" RMA "+format.toUpperCase()+" export started.";
+    }catch(error){
+      $("rmaNotice").textContent=error.message;
+      $("rmaNotice").classList.add("error");
+    }finally{
+      button.disabled=false;
+    }
+  }
+
+  function setRmaView(view){
+    if(view===rmaView)return;
+    if(rmaDirty&&!window.confirm("Discard unsaved RMA assessment changes?")){
+      return;
+    }
+    if(rmaDirty){
+      rmaDirty=false;
+    }
+    if($("rmaAssessmentDialog").open)$("rmaAssessmentDialog").close();
+    rmaEditingStudentId="";
+    rmaView=view;
+    $("rmaReportPanel").hidden=view!=="report";
+    $("rmaEntryPanel").hidden=view!=="record";
+    $("rmaReportTab").setAttribute("aria-selected",String(view==="report"));
+    $("rmaRecordTab").setAttribute("aria-selected",String(view==="record"));
+    if(view==="record")renderRmaEntry();
+  }
+
   function setReadingPanel(panel){
     var periodByTab={
       readingBosyTab:"BOSY",
@@ -3070,6 +5031,150 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       loadReadingProgress();
     }
   }
+  document.querySelectorAll(".rma-period-tab").forEach(function(tab){
+    tab.onclick=function(){setRmaPeriod(tab.dataset.period)};
+  });
+  $("rmaReportTab").onclick=function(){setRmaView("report")};
+  $("rmaRecordTab").onclick=function(){setRmaView("record")};
+  $("rmaEntryRows").addEventListener("click",function(event){
+    var button=event.target.closest("button[data-student-id]");
+    if(button)openRmaAssessment(button.dataset.studentId);
+  });
+  $("rmaAssessmentForm").addEventListener("submit",function(event){event.preventDefault()});
+  $("rmaAssessmentForm").addEventListener("input",function(event){
+    if(!event.target.matches(".rma-entry-input"))return;
+    updateRmaAssessmentPreview();
+    rmaDirty=hasUnsavedRmaChanges();
+  });
+  $("rmaAssessmentForm").addEventListener("change",function(event){
+    var input=event.target;
+    if(input.dataset.field==="correctItem")input.dataset.touched="true";
+    updateRmaAssessmentPreview();
+    rmaDirty=hasUnsavedRmaChanges();
+  });
+  function closeRmaAssessment(){
+    if(!$("rmaAssessmentDialog").open)return;
+    if(rmaSaving)return;
+    if(rmaDirty&&!window.confirm("Discard unsaved RMA assessment changes?"))return;
+    rmaDirty=false;
+    $("rmaAssessmentDialog").close();
+    rmaEditingStudentId="";
+  }
+  $("rmaAssessmentDialog").addEventListener("cancel",function(event){
+    if(rmaSaving){
+      event.preventDefault();
+      return;
+    }
+    if(rmaDirty&&!window.confirm("Discard unsaved RMA assessment changes?")){
+      event.preventDefault();
+      return;
+    }
+    rmaDirty=false;
+  });
+  $("rmaAssessmentDialog").addEventListener("close",function(){rmaEditingStudentId=""});
+  $("closeRmaAssessment").onclick=closeRmaAssessment;
+  $("cancelRmaAssessment").onclick=closeRmaAssessment;
+  $("saveRmaAssessment").onclick=saveRmaAssessment;
+  $("rmaGradeSelect").onchange=function(){
+    if(!rmaData){
+      this.value=rmaGradeLevel;
+      return;
+    }
+    var selectedGrade=this.value;
+    if(!rmaData.template.grades.some(function(grade){return grade.gradeLevel===selectedGrade})){
+      this.value=rmaGradeLevel;
+      return;
+    }
+    if(selectedGrade===rmaGradeLevel)return;
+    if(rmaDirty&&!window.confirm("Discard unsaved RMA assessment changes?")){
+      this.value=rmaGradeLevel;
+      return;
+    }
+    rmaDirty=false;
+    rmaGradeLevel=selectedGrade;
+    renderRmaEntry();
+  };
+  $("rmaLearnerSelect").onchange=renderRmaLearnerChart;
+  $("rmaExportXlsx").onclick=function(){downloadRma("xlsx")};
+  $("rmaExportCsv").onclick=function(){downloadRma("csv")};
+  $("rmaPrint").onclick=function(){
+    if(rmaDirty&&!window.confirm("Unsaved RMA entries will not be included in the printable report. Continue with saved results?"))return;
+    rmaView="report";
+    $("rmaReportPanel").hidden=false;
+    $("rmaEntryPanel").hidden=true;
+    $("rmaReportTab").setAttribute("aria-selected","true");
+    $("rmaRecordTab").setAttribute("aria-selected","false");
+    document.body.classList.add("rma-printing");
+    window.print();
+  };
+  $("rmaAddStudent").onclick=function(){showDashboardPage("students")};
+  $("philIriRecordTab").onclick=function(){setPhilIriTab("philIriRecordTab")};
+  $("philIriClassTab").onclick=function(){setPhilIriTab("philIriClassTab")};
+  $("philIriSettingsTab").onclick=function(){setPhilIriTab("philIriSettingsTab")};
+  $("philIriSchoolTab").onclick=function(){setPhilIriTab("philIriSchoolTab")};
+  $("philIriPeriod").onchange=function(){
+    loadPhilIriReports();
+    if(!$("philIriSchoolPanel").hidden)loadPhilIriSchoolReport();
+  };
+  $("philIriType").onchange=function(){
+    loadPhilIriReports();
+    if(!$("philIriSchoolPanel").hidden)loadPhilIriSchoolReport();
+  };
+  $("philIriLearnerSearch").oninput=renderPhilIriLearners;
+  $("philIriLearner").onchange=updatePhilIriEntry;
+  $("philIriLanguage").onchange=updatePhilIriEntry;
+  $("philIriMode").onchange=function(){
+    loadPhilIriEntry();
+    updatePhilIriIndividualPreview();
+  };
+  $("philIriGstScore").oninput=function(){
+    updatePhilIriGstPreview();
+    schedulePhilIriAutosave("GST");
+  };
+  $("philIriGstTotal").oninput=function(){
+    updatePhilIriGstPreview();
+    schedulePhilIriAutosave("GST");
+  };
+  ["philIriDate","philIriAssessor"].forEach(function(id){
+    $(id).addEventListener("input",function(){
+      if($("philIriGstScore").value&&$("philIriGstTotal").value)schedulePhilIriAutosave("GST");
+      if($("philIriWords").value&&$("philIriQuestions").value)schedulePhilIriAutosave("Individualized");
+    });
+  });
+  ["philIriPassage","philIriWords","philIriMiscues","philIriSeconds","philIriCorrectAnswers","philIriQuestions",
+    "philIriDifficulty","philIriIntervention","philIriInterventionStart","philIriInterventionEnd","philIriProgressNotes","philIriRemarks"]
+    .forEach(function(id){
+      $(id).addEventListener("input",function(){
+        updatePhilIriIndividualPreview();
+        schedulePhilIriAutosave("Individualized");
+      });
+      $(id).addEventListener("change",function(){
+        updatePhilIriIndividualPreview();
+        schedulePhilIriAutosave("Individualized");
+      });
+    });
+  $("philIriSaveGst").onclick=function(){savePhilIriAssessment("GST",false)};
+  $("philIriSaveIndividual").onclick=function(){savePhilIriAssessment("Individualized",false)};
+  $("philIriSaveCutoffs").onclick=savePhilIriCutoffs;
+  $("philIriClassSearch").oninput=renderPhilIriClassReport;
+  $("philIriGradeFilter").onchange=renderPhilIriClassReport;
+  $("philIriSectionFilter").onchange=renderPhilIriClassReport;
+  $("philIriLevelFilter").onchange=renderPhilIriClassReport;
+  $("philIriExportClass").onclick=function(){downloadPhilIriReport("class","")};
+  $("philIriExportStudent").onclick=function(){
+    var student=philIriSelectedStudent();
+    if(student)downloadPhilIriReport("class",student.id);
+    else{
+      $("philIriRecordNotice").textContent="Select a learner before exporting an individual report.";
+      $("philIriRecordNotice").classList.add("error");
+    }
+  };
+  $("philIriExportSchool").onclick=function(){downloadPhilIriReport("school","")};
+  $("philIriPrint").onclick=printPhilIriReport;
+  window.addEventListener("afterprint",function(){
+    document.body.classList.remove("philiri-printing","rma-printing");
+    $("philIriIndividualPrint").hidden=true;
+  });
   $("readingBosyTab").onclick=function(){setReadingPanel("readingBosyTab")};
   $("readingMosyTab").onclick=function(){setReadingPanel("readingMosyTab")};
   $("readingEosyTab").onclick=function(){setReadingPanel("readingEosyTab")};
@@ -3480,9 +5585,10 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   };
 
   async function signOut(){
-    if((readingDirty||attendanceDirty||teacherProfileDirty||teacherPasswordDirty)
+    if((readingDirty||rmaDirty||attendanceDirty||teacherProfileDirty||teacherPasswordDirty)
       &&!window.confirm("Discard unsaved changes?"))return;
     readingDirty=false;
+    rmaDirty=false;
     attendanceDirty=false;
     teacherProfileDirty=false;
     teacherPasswordDirty=false;
@@ -3518,6 +5624,7 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
   refreshAttendanceYears();
   $("attendanceMonth").value=String(new Date().getMonth()+1);
   $("attendanceYear").value=String(currentYear);
+  document.querySelectorAll(".drag-scroll-wrap").forEach(enableTableDragScroll);
 
   render();
   fetch("/api/health")
@@ -3529,8 +5636,8 @@ body.portal-active .brand,body.portal-active #authCard{display:none}
       return response.json();
     })
     .then(function(result){
-      if(result.status!=="ok"||result.storage!=="excel")throw new Error("The workbook is unavailable.");
-      $("storageStatus").textContent="Connected. New accounts and sign-ins are saved in the Excel workbook.";
+      if(result.status!=="ok"||!["sqlite","supabase"].includes(result.storage))throw new Error("The portal database is unavailable.");
+      $("storageStatus").textContent="Connected. Portal records are saved to the configured database.";
       api("/api/auth/session").then(function(result){return enter(result.user)}).catch(function(){});
     })
     .catch(function(){

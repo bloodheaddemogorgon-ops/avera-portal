@@ -1,5 +1,8 @@
 "use strict";
 
+require("dotenv").config();
+
+const { AsyncLocalStorage } = require("node:async_hooks");
 const crypto = require("node:crypto");
 const fileSystem = require("node:fs");
 const fs = require("node:fs/promises");
@@ -11,6 +14,7 @@ const path = require("node:path");
 const { promisify } = require("node:util");
 const ExcelJS = require("exceljs");
 const XLSX = require("@e965/xlsx");
+const { Pool } = require("pg");
 
 const DOWNLOADS_DIRECTORY = path.join(os.homedir(), "Downloads");
 const DEFAULT_DATABASE_PATH = path.join(__dirname, "grade5-portal-database.sqlite");
@@ -83,8 +87,184 @@ const SESSION_COOKIE = "grade5_session";
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 const GRADE_TERMS = ["Term 1", "Term 2", "Term 3"];
 const READING_PERIODS = ["BOSY", "MOSY", "EOSY"];
+const MATH_ASSESSMENT_PERIODS = ["BOSY", "MOSY", "EOSY"];
+const MATH_ASSESSMENT_ITEMS = [
+  ["1", 1], ["2", 1], ["3", 1], ["4", 1], ["5", 2], ["6", 1], ["7", 1], ["8", 1],
+  ["9", 1], ["10", 1], ["11", 1], ["12", 1], ["13", 1], ["14", 1], ["15", 1],
+  ["16", 1], ["17", 3], ["18", 1], ["19", 1], ["20", 1], ["21", 2], ["22", 1],
+  ["23", 2], ["24", 1], ["25", 1], ["26", 1], ["27", 1], ["28", 1], ["29", 1],
+  ["30a", 1], ["30b", 1], ["31", 1], ["32", 2], ["33", 2], ["34", 1], ["35", 1],
+  ["36", 1], ["37a", 1], ["37b", 1], ["38", 1], ["39", 2], ["40", 1],
+].map(([key, maximum], index) => ({
+  key,
+  label: key,
+  maximum,
+  gradeLevel: index < 12 ? "Grade 4" : index < 27 ? "Grade 5" : "Grade 6",
+}));
+const MATH_ASSESSMENT_GRADES = [
+  { gradeLevel: "Grade 4", maximumScore: 13, levelCutoffs: [11, 8, 5, 3] },
+  { gradeLevel: "Grade 5", maximumScore: 32, levelCutoffs: [27, 21, 14, 7] },
+  { gradeLevel: "Grade 6", maximumScore: 50, levelCutoffs: [45, 39, 29, 15] },
+];
+const MATH_ASSESSMENT_DOMAINS = [
+  {
+    key: "numberAndNumberSense",
+    label: "Number and Number Sense",
+    category: "Content Domain",
+    itemKeys: ["1", "3", "7", "8", "10", "11", "12", "14", "15", "19", "21", "25", "29", "31", "32", "33", "34", "35", "38"],
+  },
+  {
+    key: "geometry",
+    label: "Geometry",
+    category: "Content Domain",
+    itemKeys: ["5", "13", "17", "20", "22", "23", "26", "36"],
+  },
+  {
+    key: "measurement",
+    label: "Measurement",
+    category: "Content Domain",
+    itemKeys: ["9", "16", "18", "24", "28"],
+  },
+  {
+    key: "statisticsAndProbability",
+    label: "Statistics & Probability",
+    category: "Content Domain",
+    itemKeys: ["4", "27", "30a", "30b", "37a", "37b", "40"],
+  },
+  {
+    key: "algebra",
+    label: "Algebra",
+    category: "Content Domain",
+    itemKeys: ["2", "6", "39"],
+  },
+  {
+    key: "knowing",
+    label: "Knowing",
+    category: "Cognitive Domain",
+    itemKeysByGrade: {
+      "Grade 4": ["1", "4", "6", "12"],
+      "Grade 5": ["1", "4", "6", "12", "13", "15", "16", "19", "21", "22", "27"],
+      "Grade 6": ["1", "4", "6", "12", "13", "15", "16", "19", "21", "22", "27", "28", "29", "32", "34", "35", "37a", "37b"],
+    },
+  },
+  {
+    key: "applying",
+    label: "Applying",
+    category: "Cognitive Domain",
+    itemKeysByGrade: {
+      "Grade 4": ["2", "3", "5", "7", "8", "11"],
+      "Grade 5": ["2", "3", "5", "7", "8", "11", "14", "18", "24", "25", "26"],
+      "Grade 6": ["2", "3", "5", "7", "8", "11", "14", "18", "24", "25", "26", "30a", "31", "33", "38", "39", "40"],
+    },
+  },
+  {
+    key: "reasoning",
+    label: "Reasoning",
+    category: "Cognitive Domain",
+    itemKeysByGrade: {
+      "Grade 4": ["9", "10"],
+      "Grade 5": ["9", "10", "17", "20", "23"],
+      "Grade 6": ["9", "10", "17", "20", "23", "30b", "36"],
+    },
+  },
+];
+const MATH_ASSESSMENT_DOMAIN_INTERVENTIONS = {
+  "Number and Number Sense": "Use number lines, place-value models, and guided computation practice.",
+  Geometry: "Review shape properties and spatial reasoning with diagrams and hands-on models.",
+  Measurement: "Practice selecting units and solving measurement problems with visual and real-world examples.",
+  "Statistics & Probability": "Use tables, graphs, and simple experiments to practice interpreting data and probability.",
+  Algebra: "Model unknown values with patterns, expressions, and step-by-step equation practice.",
+};
+
+function mathAssessmentDomainItems(domain, gradeLevel) {
+  if (domain.itemKeysByGrade) return domain.itemKeysByGrade[gradeLevel];
+  const gradeIndex = MATH_ASSESSMENT_GRADES.findIndex((grade) => grade.gradeLevel === gradeLevel);
+  return domain.itemKeys.filter((key) => {
+    const item = MATH_ASSESSMENT_ITEMS.find((entry) => entry.key === key);
+    return item && MATH_ASSESSMENT_GRADES.findIndex((grade) => grade.gradeLevel === item.gradeLevel) <= gradeIndex;
+  });
+}
+
+function mathTemplateAssessmentNarrative(score) {
+  if (typeof score.percentageScore !== "number") {
+    return { remarks: "", strengths: "", areasForImprovement: "", recommendedIntervention: "" };
+  }
+  const domains = score.domainScores || [];
+  const meetingBenchmark = domains.filter((domain) => domain.meetsBenchmark);
+  const belowBenchmark = domains.filter((domain) => !domain.meetsBenchmark)
+    .sort((left, right) => left.percentageScore - right.percentageScore);
+  const domainSummary = domains.map((domain) =>
+    `${domain.label}: ${domain.score}/${domain.maximum} (${domain.percentageScore.toFixed(2)}%)`,
+  ).join("; ");
+  const strengths = meetingBenchmark.length
+    ? meetingBenchmark.map((domain) =>
+      `${domain.label} (${domain.percentageScore.toFixed(2)}%)`,
+    ).join("; ")
+    : domains.length
+      ? `No content domain met the 75% benchmark. Relative strength: ${domains
+        .slice().sort((left, right) => right.percentageScore - left.percentageScore)[0].label}.`
+      : "Data Not Yet Available";
+  const areasForImprovement = belowBenchmark.length
+    ? belowBenchmark.map((domain) =>
+      `${domain.label} (${domain.percentageScore.toFixed(2)}%; ${domain.score}/${domain.maximum})`,
+    ).join("; ")
+    : "All assessed content domains met or exceeded the 75% benchmark.";
+  const recommendedIntervention = belowBenchmark.length
+    ? belowBenchmark.map((domain) =>
+      `${domain.label}: ${MATH_ASSESSMENT_DOMAIN_INTERVENTIONS[domain.label]}`,
+    ).join(" ")
+    : "Maintain progress with mixed review and enrichment tasks across all five content domains.";
+  return {
+    remarks: `${score.rawScore}/${score.totalItems} points (${score.percentageScore.toFixed(2)}%). `
+      +`${score.masteryLevel}. ${domainSummary}`,
+    strengths,
+    areasForImprovement,
+    recommendedIntervention,
+  };
+}
+const MATH_ASSESSMENT_LEVELS = [
+  { level: "At Grade Level (Highly Proficient)", interpretation: "At grade level; highly proficient." },
+  { level: "Transitioning (Proficient)", interpretation: "Transitioning; proficient." },
+  { level: "Developing (Nearly Proficient)", interpretation: "Developing; nearly proficient." },
+  { level: "Emerging (Low Proficient)", interpretation: "Emerging; low proficiency." },
+  { level: "Emerging (Not Proficient)", interpretation: "Emerging; not yet proficient." },
+];
+const MATH_MASTERY_BANDS = [
+  {
+    level: "Advanced Mastery",
+    minimum: 90,
+    interpretation: "Exceeds expectations; demonstrates strong understanding and application of mathematical skills.",
+  },
+  {
+    level: "Proficient Mastery",
+    minimum: 75,
+    interpretation: "Meets expectations; demonstrates adequate understanding of mathematical skills.",
+  },
+  {
+    level: "Developing Mastery",
+    minimum: 50,
+    interpretation: "Shows partial understanding; requires additional practice and support.",
+  },
+  {
+    level: "Beginning Mastery",
+    minimum: 0,
+    interpretation: "Requires intensive intervention, remediation, and reteaching.",
+  },
+];
 const READING_LANGUAGES = ["English", "Filipino"];
 const READING_LEVELS = ["Non-reader", "Frustration", "Instructional", "Independent"];
+const PHILIRI_LEVELS = ["Independent", "Instructional", "Frustration"];
+const PHILIRI_ASSESSMENT_TYPES = ["Pretest", "Posttest"];
+const PHILIRI_MODES = ["Oral Reading", "Silent Reading"];
+const PHILIRI_GRADES = ["Grade 4", "Grade 5", "Grade 6"];
+const PHILIRI_INTERVENTIONS = [
+  "Guided Reading",
+  "Peer Reading",
+  "One-on-One Reading",
+  "Remedial Reading",
+  "Home Reading Program",
+  "Customized Intervention",
+];
 const ATTENDANCE_STATUSES = ["Present", "Absent", "Tardy", "Half-day", "Excused"];
 const GRADE_SUBJECTS = [
   ["filipino", "Filipino"],
@@ -391,6 +571,102 @@ function getReadingAssessmentSheet(workbook) {
   };
 }
 
+function getPhilIriAssessmentSheet(workbook) {
+  let sheet = workbook.getWorksheet("PHIL-IRI Assessments");
+  if (!sheet) {
+    sheet = workbook.addWorksheet("PHIL-IRI Assessments");
+    sheet.addRow([
+      "Assessment ID", "Student ID", "Class ID", "Teacher User ID", "Assessment Period",
+      "Assessment Type", "Language", "Reading Level", "Assessed Date", "Assessment Data JSON", "Updated",
+    ]);
+    sheet.getRow(1).font = { bold: true };
+  }
+  const headers = headerColumns(sheet);
+  return {
+    sheet,
+    columns: {
+      id: getColumn(headers, "Assessment ID"),
+      studentId: getColumn(headers, "Student ID"),
+      classId: getColumn(headers, "Class ID"),
+      teacherUserId: getColumn(headers, "Teacher User ID"),
+      period: getColumn(headers, "Assessment Period"),
+      assessmentType: getColumn(headers, "Assessment Type"),
+      language: getColumn(headers, "Language"),
+      level: getColumn(headers, "Reading Level"),
+      assessed: getColumn(headers, "Assessed Date"),
+      data: getColumn(headers, "Assessment Data JSON"),
+      updated: getColumn(headers, "Updated"),
+    },
+  };
+}
+
+function getPhilIriCutoffSheet(workbook) {
+  let sheet = workbook.getWorksheet("PHIL-IRI GST Cutoffs");
+  if (!sheet) {
+    sheet = workbook.addWorksheet("PHIL-IRI GST Cutoffs");
+    sheet.addRow(["Class ID", "Teacher User ID", "Grade", "Language", "Passing Score", "Updated"]);
+    sheet.getRow(1).font = { bold: true };
+  }
+  const headers = headerColumns(sheet);
+  return {
+    sheet,
+    columns: {
+      classId: getColumn(headers, "Class ID"),
+      teacherUserId: getColumn(headers, "Teacher User ID"),
+      grade: getColumn(headers, "Grade"),
+      language: getColumn(headers, "Language"),
+      passingScore: getColumn(headers, "Passing Score"),
+      updated: getColumn(headers, "Updated"),
+    },
+  };
+}
+
+function getMathAssessmentSheet(workbook) {
+  let sheet = workbook.getWorksheet("Math Assessments");
+  if (!sheet) {
+    sheet = workbook.addWorksheet("Math Assessments");
+    sheet.addRow([
+      "Assessment ID",
+      "Student ID",
+      "Class ID",
+      "Teacher User ID",
+      "Assessment Period",
+      "Raw Score",
+      "Total Items",
+      "Assessed Date",
+      "Identified Strengths",
+      "Areas for Improvement",
+      "Recommended Intervention",
+      "Updated",
+    ]);
+    sheet.getRow(1).font = { bold: true };
+  }
+  const headers = headerColumns(sheet);
+  const gradeLevel = ensureColumn(sheet, headers, "Grade Level");
+  const itemResponses = ensureColumn(sheet, headers, "Item Responses");
+  const remarks = ensureColumn(sheet, headers, "Remarks");
+  return {
+    sheet,
+    columns: {
+      id: getColumn(headers, "Assessment ID"),
+      studentId: getColumn(headers, "Student ID"),
+      classId: getColumn(headers, "Class ID"),
+      teacherUserId: getColumn(headers, "Teacher User ID"),
+      period: getColumn(headers, "Assessment Period"),
+      rawScore: getColumn(headers, "Raw Score"),
+      totalItems: getColumn(headers, "Total Items"),
+      assessed: getColumn(headers, "Assessed Date"),
+      strengths: getColumn(headers, "Identified Strengths"),
+      areas: getColumn(headers, "Areas for Improvement"),
+      intervention: getColumn(headers, "Recommended Intervention"),
+      updated: getColumn(headers, "Updated"),
+      gradeLevel,
+      itemResponses,
+      remarks,
+    },
+  };
+}
+
 function getAttendanceSheet(workbook) {
   let sheet = workbook.getWorksheet("Attendance Records");
   if (!sheet) {
@@ -585,6 +861,16 @@ function nextReadingAssessmentId(sheet, idColumn) {
     if (match) highest = Math.max(highest, Number(match[1]));
   }
   return `R${String(highest + 1).padStart(5, "0")}`;
+}
+
+function nextMathAssessmentId(sheet, idColumn) {
+  let highest = 0;
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const id = cellText(sheet.getRow(rowNumber).getCell(idColumn).value);
+    const match = id.match(/^M(\d+)$/i);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `M${String(highest + 1).padStart(5, "0")}`;
 }
 
 function createTeacherClass(workbook, classroomNumber, teacherId, teacherName) {
@@ -1040,6 +1326,27 @@ async function readSF2Upload(request) {
 function createServer(options = {}) {
   const databasePath = options.databasePath || DATABASE_PATH;
   const migrationWorkbookPath = options.migrationWorkbookPath || MIGRATION_WORKBOOK_PATH;
+  const migrationWorkbookWasSpecified = Boolean(
+    options.migrationWorkbookPath || process.env.PORTAL_MIGRATION_WORKBOOK,
+  );
+  const supabaseDatabaseUrl = options.supabaseDatabaseUrl || process.env.SUPABASE_DB_URL;
+  const postgresConnectionUrl = supabaseDatabaseUrl ? new URL(supabaseDatabaseUrl) : null;
+  if (postgresConnectionUrl) {
+    for (const parameter of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) {
+      postgresConnectionUrl.searchParams.delete(parameter);
+    }
+  }
+  const postgresPool = options.postgresPool || (supabaseDatabaseUrl
+    ? new Pool({
+      connectionString: postgresConnectionUrl.toString(),
+      ssl: { rejectUnauthorized: true },
+      max: 10,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+    })
+    : null);
+  const storage = postgresPool ? "supabase" : "sqlite";
+  const transactionContext = new AsyncLocalStorage();
   const profilePhotoDirectories = databasePath === DEFAULT_DATABASE_PATH
     ? [
       `${databasePath}.profiles`,
@@ -1058,6 +1365,62 @@ function createServer(options = {}) {
   async function initializeDatabase() {
     if (databaseInitialization) return databaseInitialization;
     databaseInitialization = (async () => {
+      if (postgresPool) {
+        await postgresPool.query(`
+          CREATE TABLE IF NOT EXISTS portal_state (
+            id smallint PRIMARY KEY CHECK (id = 1),
+            schema_version integer NOT NULL,
+            workbook_state bytea NOT NULL,
+            updated_at timestamptz NOT NULL DEFAULT now()
+          )
+        `);
+        await postgresPool.query(`
+          CREATE TABLE IF NOT EXISTS portal_profile_photos (
+            user_id text PRIMARY KEY,
+            extension text NOT NULL CHECK (extension IN ('jpg', 'png', 'webp')),
+            photo_data bytea NOT NULL,
+            updated_at timestamptz NOT NULL DEFAULT now()
+          )
+        `);
+        await postgresPool.query(
+          "REVOKE ALL ON TABLE portal_state, portal_profile_photos FROM PUBLIC, anon, authenticated",
+        );
+        const existingState = await postgresPool.query(
+          "SELECT workbook_state FROM portal_state WHERE id = 1",
+        );
+        if (existingState.rows.length) {
+          decodeWorkbookState(existingState.rows[0].workbook_state);
+          return;
+        }
+
+        let workbook;
+        const hasLocalDatabase = fileSystem.existsSync(databasePath);
+        if (!migrationWorkbookWasSpecified && hasLocalDatabase) {
+          workbook = readPortalDatabaseWorkbook(databasePath);
+          console.log(`Migrating portal data from ${path.resolve(databasePath)} into Supabase.`);
+        } else {
+          if (!fileSystem.existsSync(migrationWorkbookPath)) {
+            throw new Error(
+              `The Supabase database is empty and the migration workbook was not found: ${migrationWorkbookPath}`,
+            );
+          }
+          workbook = new ExcelJS.Workbook();
+          await workbook.xlsx.readFile(migrationWorkbookPath);
+          console.log(`Migrating portal data from ${path.resolve(migrationWorkbookPath)} into Supabase.`);
+        }
+        getUserSheet(workbook);
+        if (!workbook.getWorksheet("Classes") || !workbook.getWorksheet("SignInLog")) {
+          throw new Error("The migration source is missing required portal worksheets.");
+        }
+        await postgresPool.query(
+          `INSERT INTO portal_state (id, schema_version, workbook_state, updated_at)
+           VALUES (1, 1, $1, $2)
+           ON CONFLICT (id) DO NOTHING`,
+          [encodeWorkbookState(workbook), new Date().toISOString()],
+        );
+        return;
+      }
+
       await fs.mkdir(path.dirname(databasePath), { recursive: true });
       database = openPortalDatabase(databasePath);
       const existingState = database.prepare(
@@ -1088,6 +1451,14 @@ function createServer(options = {}) {
 
   async function readDatabaseWorkbook() {
     await initializeDatabase();
+    if (postgresPool) {
+      const client = transactionContext.getStore() || postgresPool;
+      const result = await client.query(
+        "SELECT workbook_state FROM portal_state WHERE id = 1",
+      );
+      if (!result.rows.length) throw new Error("The Supabase portal database has no saved state.");
+      return decodeWorkbookState(result.rows[0].workbook_state);
+    }
     const result = database.prepare(
       "SELECT workbook_state FROM portal_state WHERE id = 1",
     ).get();
@@ -1097,6 +1468,15 @@ function createServer(options = {}) {
 
   async function saveDatabaseWorkbook(workbook) {
     await initializeDatabase();
+    if (postgresPool) {
+      const client = transactionContext.getStore() || postgresPool;
+      const result = await client.query(
+        "UPDATE portal_state SET workbook_state = $1, updated_at = $2 WHERE id = 1",
+        [encodeWorkbookState(workbook), new Date().toISOString()],
+      );
+      if (result.rowCount !== 1) throw new Error("The Supabase portal database has no saved state.");
+      return;
+    }
     const result = database.prepare(
       "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
     ).run(encodeWorkbookState(workbook), new Date().toISOString());
@@ -1104,7 +1484,23 @@ function createServer(options = {}) {
   }
 
   function serializeWorkbook(operation) {
-    const result = workbookQueue.then(operation);
+    const result = workbookQueue.then(async () => {
+      if (!postgresPool) return operation();
+      await initializeDatabase();
+      const client = await postgresPool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT id FROM portal_state WHERE id = 1 FOR UPDATE");
+        const result = await transactionContext.run(client, operation);
+        await client.query("COMMIT");
+        return result;
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    });
     workbookQueue = result.then(() => undefined, () => undefined);
     return result;
   }
@@ -1384,6 +1780,8 @@ function createServer(options = {}) {
         ["Term Grades", getGradeSheet, "studentId"],
         ["Term Grade Locks", getGradeLockSheet, "studentId"],
         ["Reading Assessments", getReadingAssessmentSheet, "studentId"],
+        ["PHIL-IRI Assessments", getPhilIriAssessmentSheet, "studentId"],
+        ["Math Assessments", getMathAssessmentSheet, "studentId"],
         ["Attendance Records", getAttendanceSheet, "studentId"],
         ["Attendance Monthly Notes", getAttendanceNotesSheet, "studentId"],
       ];
@@ -1493,6 +1891,13 @@ function createServer(options = {}) {
               { level: "", assessedDate: "", attempts: [] },
             ])),
           ])),
+          philIri: Object.fromEntries(READING_PERIODS.map((period) => [
+            period,
+            Object.fromEntries(PHILIRI_ASSESSMENT_TYPES.map((assessmentType) => [
+              assessmentType,
+              Object.fromEntries(READING_LANGUAGES.map((language) => [language, null])),
+            ])),
+          ])),
           attendance: [],
         };
         learners.push(learner);
@@ -1565,6 +1970,34 @@ function createServer(options = {}) {
           for (const language of READING_LANGUAGES) {
             learner.reading[period][language].attempts.sort((left, right) => left.attemptNo - right.attemptNo);
           }
+        }
+      }
+
+      const philIriSheet = workbook.getWorksheet("PHIL-IRI Assessments");
+      if (philIriSheet) {
+        const { columns } = getPhilIriAssessmentSheet(workbook);
+        for (let rowNumber = 2; rowNumber <= philIriSheet.rowCount; rowNumber += 1) {
+          const row = philIriSheet.getRow(rowNumber);
+          if (
+            cellText(row.getCell(columns.classId).value) !== session.classId
+            || cellText(row.getCell(columns.teacherUserId).value) !== classroom.teacherId
+          ) continue;
+          const learner = learnersById.get(cellText(row.getCell(columns.studentId).value));
+          const period = cellText(row.getCell(columns.period).value);
+          const assessmentType = cellText(row.getCell(columns.assessmentType).value);
+          const language = cellText(row.getCell(columns.language).value);
+          if (!learner || !Object.hasOwn(learner.philIri, period)
+            || !Object.hasOwn(learner.philIri[period], assessmentType)
+            || !Object.hasOwn(learner.philIri[period][assessmentType], language)) continue;
+          const data = parsePhilIriData(row.getCell(columns.data).value, rowNumber);
+          const assessed = row.getCell(columns.assessed).value;
+          learner.philIri[period][assessmentType][language] = {
+            assessedDate: assessed instanceof Date ? assessed.toISOString().slice(0, 10) : cellText(assessed),
+            readingLevel: cellText(row.getCell(columns.level).value),
+            gst: data.gst || null,
+            individualized: data.individualized || {},
+            intervention: data.intervention || {},
+          };
         }
       }
 
@@ -2186,6 +2619,1035 @@ function createServer(options = {}) {
       await saveDatabaseWorkbook(workbook);
       return { saved: true, attemptNo, assessedDates };
     });
+  }
+
+  function getPhilIriClassProfile(workbook, session) {
+    const { sheet, columns } = getClassSheet(workbook);
+    for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+      const row = sheet.getRow(rowNumber);
+      if (cellText(row.getCell(columns.id).value) === session.classId
+        && cellText(row.getCell(columns.teacherId).value) === session.userId) {
+        return {
+          classId: session.classId,
+          teacherUserId: session.userId,
+          grade: cellText(row.getCell(columns.grade).value),
+          section: cellText(row.getCell(columns.section).value),
+          schoolName: cellText(row.getCell(columns.schoolName).value),
+          schoolId: cellText(row.getCell(columns.schoolId).value),
+          schoolHead: cellText(row.getCell(columns.schoolHead).value),
+          schoolYear: cellText(row.getCell(columns.schoolYear).value),
+        };
+      }
+    }
+    throw new HttpError(404, "The teacher's classroom could not be found.");
+  }
+
+  function getPhilIriCutoffs(workbook, session) {
+    const profile = getPhilIriClassProfile(workbook, session);
+    const { sheet, columns } = getPhilIriCutoffSheet(workbook);
+    return {
+      profile,
+      cutoffs: Object.fromEntries(PHILIRI_GRADES.map((grade) => [
+        grade,
+        Object.fromEntries(READING_LANGUAGES.map((language) => [language, ""])),
+      ])),
+      rows: Array.from({ length: Math.max(0, sheet.rowCount - 1) }, (_, index) => sheet.getRow(index + 2))
+        .filter((row) => cellText(row.getCell(columns.classId).value) === session.classId
+          && cellText(row.getCell(columns.teacherUserId).value) === session.userId),
+    };
+  }
+
+  function getPhilIriCutoffValue(workbook, session, grade, language) {
+    const { sheet, columns } = getPhilIriCutoffSheet(workbook);
+    for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+      const row = sheet.getRow(rowNumber);
+      if (cellText(row.getCell(columns.classId).value) === session.classId
+        && cellText(row.getCell(columns.teacherUserId).value) === session.userId
+        && cellText(row.getCell(columns.grade).value) === grade
+        && cellText(row.getCell(columns.language).value) === language) {
+        const score = row.getCell(columns.passingScore).value;
+        return score === "" || score === null || score === undefined ? null : Number(score);
+      }
+    }
+    return null;
+  }
+
+  async function getPhilIriSettings(session) {
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { profile, cutoffs, rows } = getPhilIriCutoffs(workbook, session);
+      const columns = getPhilIriCutoffSheet(workbook).columns;
+      rows.forEach((row) => {
+        const grade = cellText(row.getCell(columns.grade).value);
+        const language = cellText(row.getCell(columns.language).value);
+        if (Object.hasOwn(cutoffs, grade) && READING_LANGUAGES.includes(language)) {
+          const score = row.getCell(columns.passingScore).value;
+          cutoffs[grade][language] = score === "" || score === null ? "" : Number(score);
+        }
+      });
+      return {
+        profile,
+        grades: PHILIRI_GRADES,
+        languages: READING_LANGUAGES,
+        interventions: PHILIRI_INTERVENTIONS,
+        cutoffs,
+      };
+    });
+  }
+
+  async function savePhilIriSettings(session, data) {
+    if (!data || typeof data.cutoffs !== "object" || Array.isArray(data.cutoffs)) {
+      throw new HttpError(400, "Enter the GST passing score settings for Grades 4–6.");
+    }
+    const values = [];
+    for (const grade of PHILIRI_GRADES) {
+      const gradeCutoffs = data.cutoffs[grade];
+      if (!gradeCutoffs || typeof gradeCutoffs !== "object" || Array.isArray(gradeCutoffs)) {
+        throw new HttpError(400, `Enter English and Filipino GST cutoffs for ${grade}.`);
+      }
+      for (const language of READING_LANGUAGES) {
+        const score = gradeCutoffs[language];
+        if (typeof score !== "number" || !Number.isFinite(score) || score < 0 || score > 10000) {
+          throw new HttpError(400, `Enter a whole-number ${language} GST passing score for ${grade}.`);
+        }
+        if (!Number.isInteger(score)) throw new HttpError(400, `Enter a whole-number ${language} GST passing score for ${grade}.`);
+        values.push({ grade, language, score });
+      }
+    }
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { sheet, columns } = getPhilIriCutoffSheet(workbook);
+      const existingRows = new Map();
+      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+        const row = sheet.getRow(rowNumber);
+        if (cellText(row.getCell(columns.classId).value) === session.classId
+          && cellText(row.getCell(columns.teacherUserId).value) === session.userId) {
+          existingRows.set(
+            `${cellText(row.getCell(columns.grade).value)}\u0000${cellText(row.getCell(columns.language).value)}`,
+            row,
+          );
+        }
+      }
+      const updated = new Date();
+      for (const value of values) {
+        const key = `${value.grade}\u0000${value.language}`;
+        const existing = existingRows.get(key);
+        if (existing) {
+          existing.getCell(columns.passingScore).value = value.score;
+          existing.getCell(columns.updated).value = updated;
+        } else {
+          writeRow(sheet, [columns.classId, columns.grade, columns.language], {
+            [columns.classId]: session.classId,
+            [columns.teacherUserId]: session.userId,
+            [columns.grade]: value.grade,
+            [columns.language]: value.language,
+            [columns.passingScore]: value.score,
+            [columns.updated]: updated,
+          });
+        }
+      }
+      await saveDatabaseWorkbook(workbook);
+      return { saved: true };
+    });
+  }
+
+  function validatePhilIriDate(value, fieldName) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)
+      || Number.isNaN(Date.parse(`${value}T00:00:00.000Z`))) {
+      throw new HttpError(400, `Enter a valid ${fieldName}.`);
+    }
+    return value;
+  }
+
+  function validatePhilIriNumber(value, fieldName, { minimum = 0, maximum = 100000 } = {}) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
+      throw new HttpError(400, `Enter a valid ${fieldName}.`);
+    }
+    return value;
+  }
+
+  function classifyPhilIriReading(mode, accuracy, comprehension) {
+    if (mode === "Silent Reading") {
+      if (comprehension >= 80) return "Independent";
+      if (comprehension <= 58) return "Frustration";
+      return "Instructional";
+    }
+    if (accuracy >= 97 && comprehension >= 80) return "Independent";
+    if (accuracy <= 89 || comprehension <= 58) return "Frustration";
+    return "Instructional";
+  }
+
+  function recommendedPhilIriIntervention(level) {
+    if (level === "Frustration") return "One-on-One Reading";
+    if (level === "Instructional") return "Guided Reading";
+    if (level === "Independent") return "Home Reading Program";
+    return "";
+  }
+
+  function parsePhilIriData(value, rowNumber) {
+    const text = cellText(value);
+    if (!text) return {};
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid data shape");
+      return parsed;
+    } catch (error) {
+      throw new Error(`PHIL-IRI assessment row ${rowNumber} contains invalid assessment data.`, { cause: error });
+    }
+  }
+
+  async function getPhilIriAssessmentSummary(session, period, assessmentType, schoolWide = false) {
+    if (!READING_PERIODS.includes(period)) {
+      throw new HttpError(400, "Choose BOSY, MOSY, or EOSY for the assessment period.");
+    }
+    if (!PHILIRI_ASSESSMENT_TYPES.includes(assessmentType)) {
+      throw new HttpError(400, "Choose Pretest or Posttest.");
+    }
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const profile = getPhilIriClassProfile(workbook, session);
+      let allowedClasses = new Map([[session.classId, {
+        classId: session.classId,
+        teacherUserId: session.userId,
+        grade: profile.grade,
+        section: profile.section,
+      }]]);
+      if (schoolWide) {
+        if (!profile.schoolId) throw new HttpError(400, "Enter the School ID in Teacher Profile before opening school reports.");
+        const { sheet: classes, columns } = getClassSheet(workbook);
+        allowedClasses = new Map();
+        for (let rowNumber = 2; rowNumber <= classes.rowCount; rowNumber += 1) {
+          const row = classes.getRow(rowNumber);
+          if (cellText(row.getCell(columns.schoolId).value) !== profile.schoolId) continue;
+          const classId = cellText(row.getCell(columns.id).value);
+          const teacherUserId = cellText(row.getCell(columns.teacherId).value);
+          if (!classId || !teacherUserId) continue;
+          allowedClasses.set(classId, {
+            classId,
+            teacherUserId,
+            grade: cellText(row.getCell(columns.grade).value),
+            section: cellText(row.getCell(columns.section).value),
+          });
+        }
+      }
+      const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
+      const students = [];
+      for (let rowNumber = 2; rowNumber <= studentSheet.rowCount; rowNumber += 1) {
+        const row = studentSheet.getRow(rowNumber);
+        const classId = cellText(row.getCell(studentColumns.classId).value);
+        const classroom = allowedClasses.get(classId);
+        const id = cellText(row.getCell(studentColumns.id).value);
+        const name = cellText(row.getCell(studentColumns.name).value);
+        if (!classroom || cellText(row.getCell(studentColumns.teacherUserId).value) !== classroom.teacherUserId
+          || !id || !name) continue;
+        students.push({
+          id,
+          name,
+          lrn: cellText(row.getCell(studentColumns.lrn).value),
+          classId,
+          grade: classroom.grade,
+          section: classroom.section,
+          languages: Object.fromEntries(READING_LANGUAGES.map((language) => [language, {}])),
+        });
+      }
+      const studentsById = new Map(students.map((student) => [student.id, student]));
+      const { sheet: assessmentSheet, columns: assessmentColumns } = getPhilIriAssessmentSheet(workbook);
+      for (let rowNumber = 2; rowNumber <= assessmentSheet.rowCount; rowNumber += 1) {
+        const row = assessmentSheet.getRow(rowNumber);
+        const classId = cellText(row.getCell(assessmentColumns.classId).value);
+        const classroom = allowedClasses.get(classId);
+        const assessmentTypeValue = cellText(row.getCell(assessmentColumns.assessmentType).value);
+        if (!classroom
+          || cellText(row.getCell(assessmentColumns.teacherUserId).value) !== classroom.teacherUserId
+          || cellText(row.getCell(assessmentColumns.period).value) !== period
+          || assessmentTypeValue !== assessmentType) continue;
+        const student = studentsById.get(cellText(row.getCell(assessmentColumns.studentId).value));
+        const language = cellText(row.getCell(assessmentColumns.language).value);
+        if (!student || !READING_LANGUAGES.includes(language)) continue;
+        const assessedValue = row.getCell(assessmentColumns.assessed).value;
+        const data = parsePhilIriData(row.getCell(assessmentColumns.data).value, rowNumber);
+        student.languages[language] = {
+          assessmentId: cellText(row.getCell(assessmentColumns.id).value),
+          period,
+          assessmentType,
+          language,
+          readingLevel: cellText(row.getCell(assessmentColumns.level).value),
+          assessedDate: assessedValue instanceof Date ? assessedValue.toISOString().slice(0, 10) : cellText(assessedValue),
+          data,
+        };
+      }
+      const results = students.map((student) => {
+        const result = { ...student };
+        delete result.languages;
+        result.reading = student.languages;
+        return result;
+      });
+      return {
+        period,
+        assessmentType,
+        languages: READING_LANGUAGES,
+        levels: PHILIRI_LEVELS,
+        modes: PHILIRI_MODES,
+        interventions: PHILIRI_INTERVENTIONS,
+        profile,
+        schoolWide,
+        students: results,
+      };
+    });
+  }
+
+  async function savePhilIriAssessment(session, input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new HttpError(400, "Enter assessment details.");
+    const studentId = typeof input.studentId === "string" ? input.studentId.trim() : "";
+    if (!studentId || studentId.length > 40) throw new HttpError(400, "Choose a learner from your class roster.");
+    const period = typeof input.period === "string" ? input.period : "";
+    if (!READING_PERIODS.includes(period)) throw new HttpError(400, "Choose BOSY, MOSY, or EOSY.");
+    const assessmentType = typeof input.assessmentType === "string" ? input.assessmentType : "";
+    if (!PHILIRI_ASSESSMENT_TYPES.includes(assessmentType)) throw new HttpError(400, "Choose Pretest or Posttest.");
+    const language = typeof input.language === "string" ? input.language : "";
+    if (!READING_LANGUAGES.includes(language)) throw new HttpError(400, "Choose English or Filipino.");
+    const stage = input.stage;
+    if (stage !== "GST" && stage !== "Individualized") throw new HttpError(400, "Choose Group Screening Test or Individualized Assessment.");
+    const assessedDate = validatePhilIriDate(input.assessedDate, "assessment date");
+    const assessor = typeof input.assessor === "string" ? input.assessor.trim() : "";
+    if (!assessor || assessor.length > 120) throw new HttpError(400, "Enter the assessor or teacher's name.");
+    const difficultyObserved = typeof input.difficultyObserved === "string" ? input.difficultyObserved.trim() : "";
+    const progressNotes = typeof input.progressNotes === "string" ? input.progressNotes.trim() : "";
+    const teacherRemarks = typeof input.teacherRemarks === "string" ? input.teacherRemarks.trim() : "";
+    const recommendedIntervention = typeof input.recommendedIntervention === "string"
+      ? input.recommendedIntervention
+      : "";
+    if (difficultyObserved.length > 1000 || progressNotes.length > 2000 || teacherRemarks.length > 2000) {
+      throw new HttpError(400, "Keep assessment notes within the allowed length.");
+    }
+    if (recommendedIntervention && !PHILIRI_INTERVENTIONS.includes(recommendedIntervention)) {
+      throw new HttpError(400, "Choose a valid intervention type.");
+    }
+    const interventionStartDate = input.interventionStartDate
+      ? validatePhilIriDate(input.interventionStartDate, "intervention start date")
+      : "";
+    const interventionEndDate = input.interventionEndDate
+      ? validatePhilIriDate(input.interventionEndDate, "intervention end date")
+      : "";
+    if (interventionStartDate && interventionEndDate && interventionEndDate < interventionStartDate) {
+      throw new HttpError(400, "The intervention end date cannot be before its start date.");
+    }
+
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
+      const studentRow = findOwnedStudent(studentSheet, studentColumns, session, studentId);
+      const student = {
+        id: cellText(studentRow.getCell(studentColumns.id).value),
+        name: cellText(studentRow.getCell(studentColumns.name).value),
+      };
+      const profile = getPhilIriClassProfile(workbook, session);
+      if (!PHILIRI_GRADES.includes(profile.grade)) {
+        throw new HttpError(400, "Set the class grade to Grade 4, Grade 5, or Grade 6 in Teacher Profile before recording PHIL-IRI assessments.");
+      }
+      const cutoff = getPhilIriCutoffValue(workbook, session, profile.grade, language);
+      if (cutoff === null) {
+        throw new HttpError(400, `Configure the ${profile.grade} ${language} GST passing score in PHIL-IRI Settings first.`);
+      }
+      const { sheet, columns } = getPhilIriAssessmentSheet(workbook);
+      let assessmentRow = null;
+      let assessmentData = {};
+      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+        const row = sheet.getRow(rowNumber);
+        if (cellText(row.getCell(columns.studentId).value) === studentId
+          && cellText(row.getCell(columns.classId).value) === session.classId
+          && cellText(row.getCell(columns.teacherUserId).value) === session.userId
+          && cellText(row.getCell(columns.period).value) === period
+          && cellText(row.getCell(columns.assessmentType).value) === assessmentType
+          && cellText(row.getCell(columns.language).value) === language) {
+          assessmentRow = row;
+          assessmentData = parsePhilIriData(row.getCell(columns.data).value, rowNumber);
+          break;
+        }
+      }
+      if (stage === "GST") {
+        const score = validatePhilIriNumber(input.gstScore, "GST score");
+        const totalItems = validatePhilIriNumber(input.gstTotalItems, "GST total items", { minimum: 1 });
+        if (!Number.isInteger(score) || !Number.isInteger(totalItems) || score > totalItems) {
+          throw new HttpError(400, "Enter whole-number GST scores, with score no greater than total items.");
+        }
+        assessmentData.gst = {
+          score,
+          totalItems,
+          percentageScore: Math.round((score / totalItems) * 10000) / 100,
+          passingScore: cutoff,
+          passed: score >= cutoff,
+        };
+      } else {
+        const mode = typeof input.readingMode === "string" ? input.readingMode : "";
+        if (!PHILIRI_MODES.includes(mode)) throw new HttpError(400, "Choose Oral Reading or Silent Reading.");
+        if (!assessmentData.gst) throw new HttpError(400, "Record the Group Screening Test before Individualized Assessment.");
+        if (assessmentData.gst.passed) throw new HttpError(400, "This learner passed the GST and does not require Individualized Assessment.");
+        const totalWords = validatePhilIriNumber(input.totalWords, "total words", { minimum: 1 });
+        const miscues = validatePhilIriNumber(input.miscues, "miscue/error count");
+        const timeSeconds = validatePhilIriNumber(input.timeSeconds, "reading time in seconds", { minimum: 1 });
+        const correctAnswers = validatePhilIriNumber(input.correctAnswers, "correct comprehension answers");
+        const totalQuestions = validatePhilIriNumber(input.totalQuestions, "total comprehension questions", { minimum: 1 });
+        if (![totalWords, miscues, timeSeconds, correctAnswers, totalQuestions].every(Number.isInteger)
+          || miscues > totalWords || correctAnswers > totalQuestions) {
+          throw new HttpError(400, "Enter whole-number reading results within the passage and question totals.");
+        }
+        const accuracyPercentage = Math.round(((totalWords - miscues) / totalWords) * 10000) / 100;
+        const comprehensionPercentage = Math.round((correctAnswers / totalQuestions) * 10000) / 100;
+        const readingLevel = classifyPhilIriReading(mode, accuracyPercentage, comprehensionPercentage);
+        const recommended = recommendedPhilIriIntervention(readingLevel);
+        const startDate = input.interventionStartDate
+          ? validatePhilIriDate(input.interventionStartDate, "intervention start date")
+          : "";
+        const endDate = input.interventionEndDate
+          ? validatePhilIriDate(input.interventionEndDate, "intervention end date")
+          : "";
+        assessmentData.individualized = assessmentData.individualized || {};
+        assessmentData.individualized[mode] = {
+          mode,
+          passage: typeof input.passage === "string" ? input.passage.trim().slice(0, 500) : "",
+          totalWords,
+          miscues,
+          timeSeconds,
+          wordsPerMinute: Math.round((totalWords / (timeSeconds / 60)) * 100) / 100,
+          accuracyPercentage,
+          correctAnswers,
+          totalQuestions,
+          comprehensionPercentage,
+          readingLevel,
+          difficultyObserved,
+          recommendedIntervention: recommendedIntervention || recommended,
+          interventionStartDate: startDate,
+          interventionEndDate: endDate,
+          progressNotes,
+          teacherRemarks,
+        };
+        assessmentData.intervention = {
+          difficultyObserved,
+          recommendedIntervention: recommendedIntervention || recommended,
+          interventionStartDate: startDate,
+          interventionEndDate: endDate,
+          progressNotes,
+          teacherRemarks,
+        };
+      }
+      const latestIndividual = assessmentData.individualized
+        ? assessmentData.individualized["Oral Reading"] || assessmentData.individualized["Silent Reading"]
+        : null;
+      const readingLevel = latestIndividual ? latestIndividual.readingLevel : "";
+      const now = new Date();
+      const savedData = {
+        ...assessmentData,
+        assessmentType,
+        assessedDate,
+        assessor,
+        grade: profile.grade,
+        section: profile.section,
+      };
+      const dataJson = JSON.stringify(savedData);
+      if (assessmentRow) {
+        assessmentRow.getCell(columns.level).value = readingLevel;
+        assessmentRow.getCell(columns.assessed).value = assessedDate;
+        assessmentRow.getCell(columns.data).value = dataJson;
+        assessmentRow.getCell(columns.updated).value = now;
+      } else {
+        writeRow(sheet, [columns.id], {
+          [columns.id]: nextReadingAssessmentId(sheet, columns.id),
+          [columns.studentId]: student.id,
+          [columns.classId]: session.classId,
+          [columns.teacherUserId]: session.userId,
+          [columns.period]: period,
+          [columns.assessmentType]: assessmentType,
+          [columns.language]: language,
+          [columns.level]: readingLevel,
+          [columns.assessed]: assessedDate,
+          [columns.data]: dataJson,
+          [columns.updated]: now,
+        });
+      }
+      await saveDatabaseWorkbook(workbook);
+      return {
+        saved: true,
+        studentId,
+        studentName: student.name,
+        period,
+        assessmentType,
+        language,
+        readingLevel,
+        data: savedData,
+      };
+    });
+  }
+
+  async function exportPhilIriReport(session, period, assessmentType, scope, studentId = "") {
+    const schoolWide = scope === "school";
+    if (scope !== "class" && !schoolWide) throw new HttpError(400, "Choose a class or school report.");
+    const report = await getPhilIriAssessmentSummary(session, period, assessmentType, schoolWide);
+    const students = studentId
+      ? report.students.filter((student) => student.id === studentId && student.classId === session.classId)
+      : report.students;
+    if (studentId && !students.length) throw new HttpError(404, "That learner is not in the selected report.");
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "Class Adviser's Portal";
+    workbook.subject = "PHIL-IRI reading assessment report";
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet(schoolWide ? "Division Submission" : "Class Profile");
+    sheet.addRows([
+      ["PHIL-IRI Reading Assessment Report"],
+      ["School", report.profile.schoolName],
+      ["School ID", report.profile.schoolId],
+      ["School Year", report.profile.schoolYear],
+      ["School Head", report.profile.schoolHead],
+      ["Assessment Period", period],
+      ["Assessment Type", assessmentType],
+      ["Grade", schoolWide ? "All Grades 4–6" : report.profile.grade],
+      ["Section", schoolWide ? "All sections" : report.profile.section],
+      [],
+      [
+        "Grade", "Section", "Learner", "LRN", "Language", "Assessment Date", "Assessor",
+        "GST Score", "GST Total Items", "GST Percentage", "GST Status", "Oral Passage",
+        "Oral WPM", "Oral Accuracy %", "Oral Comprehension %", "Oral Reading Level",
+        "Silent Passage", "Silent WPM", "Silent Accuracy %", "Silent Comprehension %",
+        "Silent Reading Level", "Reading Difficulty", "Recommended Intervention",
+        "Intervention Start Date", "Intervention End Date", "Progress Notes", "Teacher Remarks",
+      ],
+    ]);
+    for (const student of students) {
+      for (const language of READING_LANGUAGES) {
+        const result = student.reading[language] || {};
+        const data = result.data || {};
+        const gst = data.gst || {};
+        const oral = data.individualized && data.individualized["Oral Reading"] || {};
+        const silent = data.individualized && data.individualized["Silent Reading"] || {};
+        const intervention = data.intervention || {};
+        sheet.addRow([
+          student.grade, student.section, student.name, student.lrn, language,
+          data.assessedDate || result.assessedDate, data.assessor || "",
+          gst.score ?? "", gst.totalItems ?? "", gst.percentageScore ?? "",
+          gst.passed === undefined ? "" : gst.passed ? "Passed" : "Failed — Individualized Assessment",
+          oral.passage || "", oral.wordsPerMinute ?? "", oral.accuracyPercentage ?? "",
+          oral.comprehensionPercentage ?? "", oral.readingLevel || "",
+          silent.passage || "", silent.wordsPerMinute ?? "", silent.accuracyPercentage ?? "",
+          silent.comprehensionPercentage ?? "", silent.readingLevel || "",
+          intervention.difficultyObserved || "",
+          intervention.recommendedIntervention || "",
+          intervention.interventionStartDate || "", intervention.interventionEndDate || "",
+          intervention.progressNotes || "", intervention.teacherRemarks || "",
+        ]);
+      }
+    }
+    sheet.columns = [
+      { width: 14 }, { width: 18 }, { width: 28 }, { width: 16 }, { width: 14 },
+      { width: 16 }, { width: 24 }, { width: 14 }, { width: 17 }, { width: 16 },
+      { width: 34 }, { width: 30 }, { width: 14 }, { width: 16 }, { width: 21 },
+      { width: 20 }, { width: 30 }, { width: 14 }, { width: 16 }, { width: 21 },
+      { width: 20 }, { width: 32 }, { width: 28 }, { width: 18 }, { width: 18 },
+      { width: 40 }, { width: 40 },
+    ];
+    sheet.getRow(11).font = { bold: true };
+    sheet.views = [{ state: "frozen", ySplit: 11 }];
+    return {
+      buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      filename: `${schoolWide ? "PHIL-IRI_School_Consolidated" : studentId ? "PHIL-IRI_Learner_Report" : "PHIL-IRI_Class_Profile"}_${period}_${assessmentType}.xlsx`,
+    };
+  }
+
+  function validateMathAssessmentPeriod(value) {
+    if (!MATH_ASSESSMENT_PERIODS.includes(value)) {
+      throw new HttpError(400, "Choose BOSY, MOSY, or EOSY for the math assessment period.");
+    }
+    return value;
+  }
+
+  function mathAssessmentScore(rawScore, totalItems) {
+    if (rawScore === "" || totalItems === "") {
+      return {
+        percentageScore: "",
+        masteryLevel: "Data Not Yet Available",
+        interpretation: "Data Not Yet Available",
+      };
+    }
+    const percentageScore = Math.round((rawScore / totalItems) * 10000) / 100;
+    const band = MATH_MASTERY_BANDS.find((entry) => percentageScore >= entry.minimum);
+    return {
+      percentageScore,
+      masteryLevel: band.level,
+      interpretation: band.interpretation,
+    };
+  }
+
+  function mathTemplateAssessmentScore(itemScores, gradeLevel, assessedDate) {
+    const grade = MATH_ASSESSMENT_GRADES.find((entry) => entry.gradeLevel === gradeLevel);
+    if (!grade || !assessedDate) {
+      return {
+        rawScore: "",
+        totalItems: grade ? grade.maximumScore : "",
+        percentageScore: "",
+        masteryLevel: "Data Not Yet Available",
+        interpretation: "Data Not Yet Available",
+        gradeLevelScores: [],
+        domainScores: [],
+        cognitiveDomainScores: [],
+      };
+    }
+    const gradeIndex = MATH_ASSESSMENT_GRADES.indexOf(grade);
+    const eligibleItems = MATH_ASSESSMENT_ITEMS.filter((item) =>
+      MATH_ASSESSMENT_GRADES.findIndex((entry) => entry.gradeLevel === item.gradeLevel) <= gradeIndex,
+    );
+    const scoreFor = (key) => Number(itemScores[key] || 0);
+    const rawScore = eligibleItems.reduce((total, item) => total + scoreFor(item.key), 0);
+    const percentageScore = Math.round((rawScore / grade.maximumScore) * 10000) / 100;
+    const masteryIndex = grade.levelCutoffs.findIndex((cutoff) => rawScore >= cutoff);
+    const masteryBand = MATH_ASSESSMENT_LEVELS[masteryIndex < 0 ? 4 : masteryIndex];
+    const scoreDomains = (category) => MATH_ASSESSMENT_DOMAINS
+      .filter((domain) => domain.category === category)
+      .map((domain) => {
+        const itemKeys = mathAssessmentDomainItems(domain, gradeLevel);
+        const maximum = itemKeys.reduce((total, key) =>
+          total + MATH_ASSESSMENT_ITEMS.find((item) => item.key === key).maximum, 0);
+        const score = itemKeys.reduce((total, key) => total + scoreFor(key), 0);
+        return {
+          key: domain.key,
+          label: domain.label,
+          score,
+          maximum,
+          percentageScore: Math.round((score / maximum) * 10000) / 100,
+          meetsBenchmark: score / maximum >= 0.75,
+        };
+      });
+    const gradeLevelScores = MATH_ASSESSMENT_GRADES.map((componentGrade) => {
+      const items = MATH_ASSESSMENT_ITEMS.filter((item) => item.gradeLevel === componentGrade.gradeLevel);
+      return {
+        gradeLevel: componentGrade.gradeLevel,
+        score: items.reduce((total, item) => total + scoreFor(item.key), 0),
+        maximum: items.reduce((total, item) => total + item.maximum, 0),
+      };
+    });
+    return {
+      rawScore,
+      totalItems: grade.maximumScore,
+      percentageScore,
+      masteryLevel: masteryBand.level,
+      interpretation: masteryBand.interpretation,
+      gradeLevelScores,
+      domainScores: scoreDomains("Content Domain"),
+      cognitiveDomainScores: scoreDomains("Cognitive Domain"),
+    };
+  }
+
+  function mathAssessmentTemplate() {
+    return {
+      grades: MATH_ASSESSMENT_GRADES.map((grade) => ({
+        gradeLevel: grade.gradeLevel,
+        maximumScore: grade.maximumScore,
+        masteryBands: MATH_ASSESSMENT_LEVELS.map((band, index) => ({
+          level: band.level,
+          minimumRawScore: index < grade.levelCutoffs.length ? grade.levelCutoffs[index] : 0,
+          interpretation: band.interpretation,
+        })),
+      })),
+      items: MATH_ASSESSMENT_ITEMS,
+      domains: MATH_ASSESSMENT_DOMAINS.map((domain) => ({
+        key: domain.key,
+        label: domain.label,
+        category: domain.category,
+        itemKeys: Object.fromEntries(MATH_ASSESSMENT_GRADES.map((grade) => [
+          grade.gradeLevel,
+          mathAssessmentDomainItems(domain, grade.gradeLevel),
+        ])),
+      })),
+      benchmarkPercentage: 75,
+    };
+  }
+
+  async function getMathAssessmentSummary(session) {
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
+      const students = getOwnedStudents(studentSheet, studentColumns, session).map((student) => ({
+        id: student.id,
+        name: student.name,
+        lrn: student.lrn,
+        gender: student.gender,
+        birthdate: student.birthdate,
+        assessments: Object.fromEntries(MATH_ASSESSMENT_PERIODS.map((period) => [period, {
+          gradeLevel: "",
+          rawScore: "",
+          totalItems: "",
+          assessedDate: "",
+          itemScores: {},
+          scoringMethod: "",
+          strengths: "",
+          areasForImprovement: "",
+          recommendedIntervention: "",
+          remarks: "",
+          percentageScore: "",
+          masteryLevel: "Data Not Yet Available",
+          interpretation: "Data Not Yet Available",
+          gradeLevelScores: [],
+          domainScores: [],
+          cognitiveDomainScores: [],
+        }])),
+      }));
+      const studentsById = new Map(students.map((student) => [student.id, student]));
+      const sheet = workbook.getWorksheet("Math Assessments");
+      if (sheet) {
+        const { columns } = getMathAssessmentSheet(workbook);
+        for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+          const row = sheet.getRow(rowNumber);
+          if (
+            cellText(row.getCell(columns.classId).value) !== session.classId
+            || cellText(row.getCell(columns.teacherUserId).value) !== session.userId
+          ) continue;
+          const student = studentsById.get(cellText(row.getCell(columns.studentId).value));
+          const period = cellText(row.getCell(columns.period).value);
+          if (!student || !MATH_ASSESSMENT_PERIODS.includes(period)) continue;
+          const rawValue = row.getCell(columns.rawScore).value;
+          const totalValue = row.getCell(columns.totalItems).value;
+          const rawScore = rawValue === null || rawValue === undefined || rawValue === "" ? "" : Number(rawValue);
+          const totalItems = totalValue === null || totalValue === undefined || totalValue === "" ? "" : Number(totalValue);
+          const assessed = row.getCell(columns.assessed).value;
+          const assessedDate = assessed instanceof Date
+            ? assessed.toISOString().slice(0, 10)
+            : cellText(assessed);
+          const gradeLevel = cellText(row.getCell(columns.gradeLevel).value);
+          const itemResponsesValue = cellText(row.getCell(columns.itemResponses).value);
+          const itemScores = itemResponsesValue ? JSON.parse(itemResponsesValue) : {};
+          if (!itemScores || typeof itemScores !== "object" || Array.isArray(itemScores)) {
+            throw new Error(`RMA item responses in workbook row ${rowNumber} are invalid.`);
+          }
+          const isTemplateAssessment = Boolean(itemResponsesValue);
+          const score = isTemplateAssessment
+            ? mathTemplateAssessmentScore(itemScores, gradeLevel, assessedDate)
+            : mathAssessmentScore(rawScore, totalItems);
+          const narrative = isTemplateAssessment
+            ? mathTemplateAssessmentNarrative(score)
+            : {
+              strengths: cellText(row.getCell(columns.strengths).value),
+              areasForImprovement: cellText(row.getCell(columns.areas).value),
+              recommendedIntervention: cellText(row.getCell(columns.intervention).value),
+              remarks: cellText(row.getCell(columns.remarks).value),
+            };
+          student.assessments[period] = {
+            gradeLevel,
+            rawScore,
+            totalItems,
+            assessedDate,
+            itemScores,
+            scoringMethod: isTemplateAssessment ? "template" : rawScore !== "" || totalItems !== "" ? "legacy" : "",
+            ...narrative,
+            ...score,
+          };
+        }
+      }
+      return {
+        periods: MATH_ASSESSMENT_PERIODS,
+        template: mathAssessmentTemplate(),
+        masteryBands: MATH_MASTERY_BANDS.map(({ level, minimum, interpretation }) => ({
+          level,
+          minimum,
+          interpretation,
+        })),
+        students,
+      };
+    });
+  }
+
+  async function saveMathAssessment(session, data) {
+    const period = validateMathAssessmentPeriod(data.period);
+    const studentId = typeof data.studentId === "string" ? data.studentId.trim() : "";
+    if (!studentId || studentId.length > 40) {
+      throw new HttpError(400, "Choose a student from your class roster.");
+    }
+    const templateAssessment = data.itemScores !== undefined;
+    let gradeLevel = "";
+    let itemScores = {};
+    let assessmentDate = null;
+    let templateScore = null;
+    if (templateAssessment) {
+      gradeLevel = typeof data.gradeLevel === "string" ? data.gradeLevel.trim() : "";
+      if (!MATH_ASSESSMENT_GRADES.some((grade) => grade.gradeLevel === gradeLevel)) {
+        throw new HttpError(400, "Choose Grade 4, Grade 5, or Grade 6 for this RMA assessment.");
+      }
+      const dateValue = data.assessedDate === "" || data.assessedDate === undefined ? "" : data.assessedDate;
+      if (typeof dateValue !== "string" || (dateValue && !/^\d{4}-\d{2}-\d{2}$/.test(dateValue))) {
+        throw new HttpError(400, "Enter a valid RMA assessment date.");
+      }
+      if (dateValue) {
+        assessmentDate = new Date(`${dateValue}T00:00:00.000Z`);
+        if (Number.isNaN(assessmentDate.getTime()) || assessmentDate.toISOString().slice(0, 10) !== dateValue) {
+          throw new HttpError(400, "Enter a valid RMA assessment date.");
+        }
+      }
+      if (!data.itemScores || typeof data.itemScores !== "object" || Array.isArray(data.itemScores)) {
+        throw new HttpError(400, "Enter valid item-level RMA scores.");
+      }
+      const gradeIndex = MATH_ASSESSMENT_GRADES.findIndex((grade) => grade.gradeLevel === gradeLevel);
+      const eligibleItems = MATH_ASSESSMENT_ITEMS.filter((item) =>
+        MATH_ASSESSMENT_GRADES.findIndex((grade) => grade.gradeLevel === item.gradeLevel) <= gradeIndex,
+      );
+      const eligibleItemKeys = new Set(eligibleItems.map((item) => item.key));
+      for (const [key, value] of Object.entries(data.itemScores)) {
+        if (!eligibleItemKeys.has(key)) {
+          if (value === "" || value === null || value === undefined) continue;
+          throw new HttpError(400, `${key} is not part of the ${gradeLevel} assessment.`);
+        }
+        if (value !== "" && (!Number.isSafeInteger(value) || value < 0
+          || value > eligibleItems.find((item) => item.key === key).maximum)) {
+          throw new HttpError(400, `Enter a whole-number score within the maximum for item ${key}.`);
+        }
+        if (value !== "") itemScores[key] = value;
+      }
+      if (!assessmentDate && Object.keys(itemScores).length) {
+        throw new HttpError(400, "Enter the assessment date before saving item scores.");
+      }
+      templateScore = mathTemplateAssessmentScore(itemScores, gradeLevel, dateValue);
+    }
+    const rawScoreValue = data.rawScore === "" || data.rawScore === undefined ? "" : data.rawScore;
+    const totalItemsValue = data.totalItems === "" || data.totalItems === undefined ? "" : data.totalItems;
+    if (!templateAssessment && (rawScoreValue === "") !== (totalItemsValue === "")) {
+      throw new HttpError(400, "Enter both the raw score and total number of items, or leave both blank.");
+    }
+    if (!templateAssessment && rawScoreValue !== "" && (
+      !Number.isSafeInteger(rawScoreValue)
+      || !Number.isSafeInteger(totalItemsValue)
+      || rawScoreValue < 0
+      || totalItemsValue < 1
+      || rawScoreValue > totalItemsValue
+    )) {
+      throw new HttpError(400, "Enter a whole-number raw score from zero through the total number of items.");
+    }
+    const fields = {};
+    for (const [key, label] of [
+      ["strengths", "Identified strengths"],
+      ["areasForImprovement", "Areas for improvement"],
+      ["recommendedIntervention", "Recommended intervention"],
+      ["remarks", "Remarks"],
+    ]) {
+      const value = data[key] === undefined ? "" : data[key];
+      if (typeof value !== "string" || value.length > 1000) {
+        throw new HttpError(400, `${label} must be text of 1,000 characters or fewer.`);
+      }
+      fields[key] = value.trim();
+    }
+    const narrative = templateAssessment
+      ? mathTemplateAssessmentNarrative(templateScore)
+      : fields;
+
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
+      findOwnedStudent(studentSheet, studentColumns, session, studentId);
+      const { sheet, columns } = getMathAssessmentSheet(workbook);
+      const existingRows = [];
+      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+        const row = sheet.getRow(rowNumber);
+        if (
+          cellText(row.getCell(columns.studentId).value) === studentId
+          && cellText(row.getCell(columns.classId).value) === session.classId
+          && cellText(row.getCell(columns.teacherUserId).value) === session.userId
+          && cellText(row.getCell(columns.period).value) === period
+        ) existingRows.push(row);
+      }
+      const hasAssessment = templateAssessment
+        ? Boolean(assessmentDate || Object.keys(itemScores).length || Object.values(fields).some(Boolean))
+        : rawScoreValue !== "" || Object.values(fields).some(Boolean);
+      if (!hasAssessment) {
+        existingRows.sort((left, right) => right.number - left.number)
+          .forEach((row) => sheet.spliceRows(row.number, 1));
+        await saveDatabaseWorkbook(workbook);
+        return { saved: true, removed: existingRows.length > 0, period, assessedDate: "" };
+      }
+      const existingLegacyScore = existingRows.some((row) =>
+        !cellText(row.getCell(columns.itemResponses).value)
+        && row.getCell(columns.rawScore).value !== ""
+        && row.getCell(columns.rawScore).value !== null
+        && row.getCell(columns.rawScore).value !== undefined,
+      );
+      if (templateAssessment && existingLegacyScore && !Object.keys(itemScores).length) {
+        throw new HttpError(400, "Enter at least one item score (zero is valid) before replacing this previously saved overall score.");
+      }
+
+      const savedAt = new Date();
+      const existing = existingRows.shift();
+      const values = {
+        [columns.rawScore]: templateAssessment ? templateScore.rawScore : rawScoreValue,
+        [columns.totalItems]: templateAssessment ? templateScore.totalItems : totalItemsValue,
+        [columns.assessed]: templateAssessment ? assessmentDate : savedAt,
+        [columns.strengths]: narrative.strengths,
+        [columns.areas]: narrative.areasForImprovement,
+        [columns.intervention]: narrative.recommendedIntervention,
+        [columns.updated]: savedAt,
+        [columns.gradeLevel]: templateAssessment ? gradeLevel : "",
+        [columns.itemResponses]: templateAssessment ? JSON.stringify(itemScores) : "",
+        [columns.remarks]: narrative.remarks,
+      };
+      if (existing) {
+        Object.entries(values).forEach(([column, value]) => {
+          existing.getCell(Number(column)).value = value;
+        });
+      } else {
+        writeRow(sheet, [columns.id], {
+          [columns.id]: nextMathAssessmentId(sheet, columns.id),
+          [columns.studentId]: studentId,
+          [columns.classId]: session.classId,
+          [columns.teacherUserId]: session.userId,
+          [columns.period]: period,
+          ...values,
+        });
+      }
+      existingRows.sort((left, right) => right.number - left.number)
+        .forEach((row) => sheet.spliceRows(row.number, 1));
+      await saveDatabaseWorkbook(workbook);
+      return {
+        saved: true,
+        removed: false,
+        period,
+        assessedDate: templateAssessment
+          ? assessmentDate ? assessmentDate.toISOString().slice(0, 10) : ""
+          : savedAt.toISOString().slice(0, 10),
+        ...(templateAssessment ? templateScore : mathAssessmentScore(rawScoreValue, totalItemsValue)),
+        ...(templateAssessment ? narrative : {}),
+      };
+    });
+  }
+
+  async function exportMathAssessment(session, period, format) {
+    validateMathAssessmentPeriod(period);
+    if (!["xlsx", "csv"].includes(format)) {
+      throw new HttpError(400, "Choose XLSX or CSV for the RMA export.");
+    }
+    const data = await getMathAssessmentSummary(session);
+    const profile = await getTeacherProfile(session);
+    const assessmentItemColumns = data.template.items.map((item) => `Item ${item.label}`);
+    const scoreSheetHeaders = [
+      "S/N", "LRN", "Name of Learner", "Sex", "Birthdate", "Date of Assessment", "Age",
+      ...assessmentItemColumns,
+      "Grade 4 Score", "Grade 5 Score", "Grade 6 Score",
+      "TOTAL SCORE", "Total Points / Scores", "% of Correct Answer", "Levelling of Learners",
+      ...data.template.domains.flatMap((domain) => [domain.label, `${domain.label} ≥75%`]),
+      "Remarks", "Identified Strengths", "Areas for Improvement", "Recommended Intervention",
+    ];
+    const assessedStudents = data.students.filter((student) => student.assessments[period].assessedDate);
+    const scoreSheetRows = assessedStudents.map((student, index) => {
+      const assessment = student.assessments[period];
+      const templateScore = assessment.scoringMethod === "template";
+      const gradeIndex = data.template.grades.findIndex((grade) => grade.gradeLevel === assessment.gradeLevel);
+      const gradeScores = new Map((assessment.gradeLevelScores || []).map((component) => [
+        component.gradeLevel,
+        component.score,
+      ]));
+      const domains = new Map([
+        ...(assessment.domainScores || []),
+        ...(assessment.cognitiveDomainScores || []),
+      ].map((domain) => [domain.key, domain]));
+      const birthdate = student.birthdate || "";
+      const age = birthdate
+        ? Math.round((Date.parse(`${assessment.assessedDate}T00:00:00.000Z`)
+          - Date.parse(`${birthdate}T00:00:00.000Z`)) / 86400000 / 365)
+        : "";
+      return [
+        index + 1,
+        student.lrn,
+        student.name,
+        student.gender,
+        birthdate,
+        assessment.assessedDate,
+        age,
+        ...data.template.items.map((item) => templateScore && assessment.itemScores[item.key] !== undefined
+          ? assessment.itemScores[item.key]
+          : templateScore && data.template.grades.findIndex((grade) => grade.gradeLevel === item.gradeLevel) <= gradeIndex
+            ? 0
+            : ""),
+        ...["Grade 4", "Grade 5", "Grade 6"].map((gradeLevel) => gradeScores.get(gradeLevel) ?? ""),
+        assessment.rawScore,
+        assessment.totalItems,
+        assessment.percentageScore,
+        assessment.masteryLevel,
+        ...data.template.domains.flatMap((domain) => {
+          const result = domains.get(domain.key);
+          return [
+            result ? `${result.score}/${result.maximum}` : "",
+            result ? result.meetsBenchmark ? "Yes" : "No" : "",
+          ];
+        }),
+        assessment.remarks,
+        assessment.strengths,
+        assessment.areasForImprovement,
+        assessment.recommendedIntervention,
+      ];
+    });
+    if (format === "csv") {
+      const escapeCSV = (value) => `"${String(value === "" || value === null || value === undefined ? "" : value).replace(/"/g, '""')}"`;
+      const csv = [scoreSheetHeaders, ...scoreSheetRows].map((row) => row.map(escapeCSV).join(",")).join("\r\n");
+      return {
+        buffer: Buffer.from(`\uFEFF${csv}`, "utf8"),
+        contentType: "text/csv; charset=utf-8",
+        filename: `RMA_${period}_results.csv`,
+      };
+    }
+
+    const templateAssessedStudents = assessedStudents.filter((student) =>
+      student.assessments[period].scoringMethod === "template");
+    if (templateAssessedStudents.length && (
+      !data.template.grades.some((grade) => grade.gradeLevel === profile.grade)
+      || templateAssessedStudents.some((student) => student.assessments[period].gradeLevel !== profile.grade)
+    )) {
+      throw new HttpError(400,
+        "The RMA template has one Grade field. Match the Teacher Profile grade with all assessed learners before exporting.");
+    }
+    if (data.students.length > 99) {
+      throw new HttpError(400, "The RMA template supports up to 99 learners per class.");
+    }
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(path.join(__dirname, "RMA TEMP.xlsx"));
+    const scoreSheet = workbook.getWorksheet("RMAKS2 Scoresheet");
+    if (!scoreSheet) {
+      throw new Error("The RMA template is missing a required worksheet.");
+    }
+    scoreSheet.getCell("C4").value = period === "BOSY" ? "BoSY" : period === "EOSY" ? "EoSY" : "MoSY";
+    scoreSheet.getCell("C6").value = profile.schoolId || "";
+    scoreSheet.getCell("F6").value = profile.schoolName || "";
+    scoreSheet.getCell("M6").value = profile.name;
+    scoreSheet.getCell("C7").value = profile.grade || "";
+    scoreSheet.getCell("F7").value = profile.section || "";
+    scoreSheet.getCell("X6").value = data.students.filter((student) => student.gender === "Male").length;
+    scoreSheet.getCell("AE6").value = data.students.filter((student) => student.gender === "Female").length;
+    scoreSheet.getCell("AJ6").value = data.students.length;
+    const dateValue = (value) => {
+      if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? "" : date;
+    };
+
+    data.students.forEach((student, index) => {
+      const rowNumber = index + 10;
+      const row = scoreSheet.getRow(rowNumber);
+      const assessment = student.assessments[period];
+      const isTemplateScored = assessment.scoringMethod === "template" && Boolean(assessment.assessedDate);
+      const gradeIndex = data.template.grades.findIndex((grade) => grade.gradeLevel === assessment.gradeLevel);
+      row.getCell(1).value = index + 1;
+      row.getCell(2).value = student.lrn || "";
+      row.getCell(3).value = student.name;
+      row.getCell(4).value = student.gender || "";
+      row.getCell(5).value = dateValue(student.birthdate);
+      row.getCell(6).value = isTemplateScored ? dateValue(assessment.assessedDate) : "";
+      data.template.items.forEach((item, itemIndex) => {
+        const itemGradeIndex = data.template.grades.findIndex((grade) => grade.gradeLevel === item.gradeLevel);
+        row.getCell(8 + itemIndex).value = isTemplateScored && itemGradeIndex <= gradeIndex
+          ? Number(assessment.itemScores[item.key] || 0)
+          : "";
+      });
+    });
+    workbook.calcProperties.fullCalcOnLoad = true;
+    workbook.calcProperties.forceFullCalc = true;
+    workbook.calcProperties.calcMode = "auto";
+    return {
+      buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      filename: "RMA TEMP.xlsx",
+    };
   }
 
   function validateAttendanceDate(value) {
@@ -3094,6 +4556,9 @@ function createServer(options = {}) {
     const month = validateAttendanceMonth(monthValue);
     const attendance = await getAttendanceMonth(session, month);
     const teacherProfile = await getTeacherProfile(session);
+    if (!teacherProfile.grade || !teacherProfile.schoolYear) {
+      throw new HttpError(400, "Enter the Grade and School Year in Teacher Profile before downloading SF2.");
+    }
     const maleStudents = attendance.students.filter((student) => student.gender === "Male");
     const femaleStudents = attendance.students.filter((student) => student.gender === "Female");
     if (
@@ -3128,6 +4593,16 @@ function createServer(options = {}) {
     for (const otherSheet of workbook.worksheets.slice()) {
       if (otherSheet.id !== sheet.id) workbook.removeWorksheet(otherSheet.id);
     }
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        const fill = cell.fill;
+        const color = fill && fill.fgColor && (fill.fgColor.argb || fill.fgColor.rgb);
+        if (fill && fill.type === "pattern" && fill.pattern === "solid"
+          && ["FFF2F2F2", "FFE6E6E6"].includes(String(color || "").toUpperCase())) {
+          cell.fill = { type: "pattern", pattern: "none" };
+        }
+      });
+    });
     sheet.name = sf2WorksheetName(month);
     const displayedMonth = sf2DisplayedMonth(month);
     sheet.getCell("N6").value = teacherProfile.schoolYear || null;
@@ -3193,11 +4668,6 @@ function createServer(options = {}) {
         const cell = row.getCell(dateColumns.get(date));
         if (attendance.noClassDates.includes(date)) {
           cell.value = "NC";
-          cell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: "FFE6E6E6" },
-          };
           continue;
         }
         if (student.lockedDates.includes(date)) {
@@ -3419,12 +4889,16 @@ function createServer(options = {}) {
     }
     workbook.calcProperties = { fullCalcOnLoad: true };
 
+    const filenamePart = (value) => value.trim()
+      .replace(/[^A-Za-z0-9-]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const monthName = new Date(`${month}-01T00:00:00.000Z`).toLocaleString("en-US", {
+      month: "long",
+      timeZone: "UTC",
+    });
     return {
       buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
-      filename: `SF2_${new Date(`${month}-01T00:00:00.000Z`).toLocaleString("en-US", {
-        month: "long",
-        timeZone: "UTC",
-      })}_${month.slice(0, 4)}.xlsx`,
+      filename: `SF2_${monthName}_${filenamePart(teacherProfile.grade)}_${filenamePart(teacherProfile.schoolYear)}.xlsx`,
     };
   }
 
@@ -3730,6 +5204,17 @@ function createServer(options = {}) {
   }
 
   async function findTeacherPhoto(userId) {
+    if (postgresPool) {
+      if (!/^T\d{3,}$/i.test(userId)) throw new HttpError(404, "The profile picture was not found.");
+      await initializeDatabase();
+      const result = await postgresPool.query(
+        "SELECT photo_data FROM portal_profile_photos WHERE user_id = $1",
+        [userId],
+      );
+      if (!result.rows.length) throw new HttpError(404, "No profile picture has been uploaded.");
+      const buffer = result.rows[0].photo_data;
+      return { buffer, ...getProfilePhotoFormat(buffer) };
+    }
     for (const extension of ["jpg", "png", "webp"]) {
       const filePath = teacherPhotoPath(userId, extension);
       try {
@@ -3744,6 +5229,20 @@ function createServer(options = {}) {
 
   async function saveTeacherPhoto(session, request) {
     const photo = await readProfilePhoto(request);
+    if (postgresPool) {
+      if (!/^T\d{3,}$/i.test(session.userId)) throw new HttpError(404, "The profile picture was not found.");
+      await initializeDatabase();
+      await postgresPool.query(
+        `INSERT INTO portal_profile_photos (user_id, extension, photo_data, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (user_id)
+         DO UPDATE SET extension = EXCLUDED.extension,
+                       photo_data = EXCLUDED.photo_data,
+                       updated_at = now()`,
+        [session.userId, photo.extension, photo.buffer],
+      );
+      return;
+    }
     const filePath = teacherPhotoPath(session.userId, photo.extension);
     await fs.mkdir(profilePhotoDirectory, { recursive: true });
     await fs.writeFile(filePath, photo.buffer);
@@ -3758,6 +5257,15 @@ function createServer(options = {}) {
   }
 
   async function removeTeacherPhoto(session) {
+    if (postgresPool) {
+      if (!/^T\d{3,}$/i.test(session.userId)) throw new HttpError(404, "The profile picture was not found.");
+      await initializeDatabase();
+      await postgresPool.query(
+        "DELETE FROM portal_profile_photos WHERE user_id = $1",
+        [session.userId],
+      );
+      return;
+    }
     for (const extension of ["jpg", "png", "webp"]) {
       try {
         await fs.unlink(teacherPhotoPath(session.userId, extension));
@@ -3784,11 +5292,11 @@ function createServer(options = {}) {
       if (request.method === "GET" && url.pathname === "/api/health") {
         try {
           await serializeWorkbook(checkWorkbook);
-          sendJson(response, 200, { status: "ok", storage: "sqlite" });
+          sendJson(response, 200, { status: "ok", storage });
         } catch (error) {
           console.error("Portal database health check failed:", error);
           sendJson(response, 503, {
-            error: "The portal is running, but its SQLite database is unavailable. Check that the database file exists and is accessible.",
+            error: "The portal is running, but its database is unavailable. Check the configured database connection and migration source.",
           });
         }
         return;
@@ -3997,6 +5505,83 @@ function createServer(options = {}) {
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/api/phil-iri/settings") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await getPhilIriSettings(session));
+        return;
+      }
+
+      if (request.method === "PUT" && url.pathname === "/api/phil-iri/settings") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await savePhilIriSettings(session, await readJson(request)));
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/phil-iri/assessments") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await getPhilIriAssessmentSummary(
+          session,
+          url.searchParams.get("period") || "BOSY",
+          url.searchParams.get("assessmentType") || "Pretest",
+          url.searchParams.get("scope") === "school",
+        ));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/phil-iri/assessments") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await savePhilIriAssessment(session, await readJson(request)));
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/phil-iri/export") {
+        const session = requireTeacherSession(request);
+        const { buffer, contentType, filename } = await exportPhilIriReport(
+          session,
+          url.searchParams.get("period") || "BOSY",
+          url.searchParams.get("assessmentType") || "Pretest",
+          url.searchParams.get("scope") || "class",
+          url.searchParams.get("studentId") || "",
+        );
+        response.writeHead(200, {
+          "Content-Type": contentType,
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(buffer);
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/math-assessments") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await getMathAssessmentSummary(session));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/math-assessments") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await saveMathAssessment(session, await readJson(request)));
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/math-assessments/export") {
+        const session = requireTeacherSession(request);
+        const { buffer, contentType, filename } = await exportMathAssessment(
+          session,
+          url.searchParams.get("period") || "BOSY",
+          url.searchParams.get("format") || "xlsx",
+        );
+        response.writeHead(200, {
+          "Content-Type": contentType,
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(buffer);
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/api/attendance") {
         const session = requireTeacherSession(request);
         sendJson(response, 200, await getAttendance(session, url.searchParams.get("date") || ""));
@@ -4063,7 +5648,14 @@ function createServer(options = {}) {
       });
     }
   });
-  server.on("close", () => database?.close());
+  server.on("close", () => {
+    database?.close();
+    if (postgresPool) {
+      postgresPool.end().catch((error) => {
+        console.error("Could not close the Supabase database connection pool:", error);
+      });
+    }
+  });
   return server;
 }
 
@@ -4084,7 +5676,11 @@ if (require.main === module) {
       process.exitCode = 1;
     });
     server.listen(port, host, () => {
-      console.log(`Using SQLite backend: ${path.resolve(DATABASE_PATH)}`);
+      if (process.env.SUPABASE_DB_URL) {
+        console.log("Using Supabase PostgreSQL backend.");
+      } else {
+        console.log(`Using SQLite backend: ${path.resolve(DATABASE_PATH)}`);
+      }
       console.log(`Class Adviser's Portal is running at http://${host}:${port}`);
     });
   }

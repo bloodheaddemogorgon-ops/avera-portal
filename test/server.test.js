@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const vm = require("node:vm");
 const test = require("node:test");
 const ExcelJS = require("exceljs");
 const XLSX = require("@e965/xlsx");
@@ -33,6 +34,7 @@ const testWorkbookHeaders = {
   ],
   SignInLog: ["Timestamp", "Email", "Role chosen", "Result", "User ID", "Note"],
 };
+
 const sf2StudentRows = [
   ...Array.from({ length: 50 }, (_, index) => 13 + index),
   ...Array.from({ length: 50 }, (_, index) => 64 + index),
@@ -57,6 +59,17 @@ function applyTestWorkbookHeaders(workbook) {
       sheet.getRow(1).getCell(index + 1).value = header;
     });
   }
+}
+
+function assertNoLightGraySf2Fills(sheet) {
+  const lightGrayColors = new Set(["FFF2F2F2", "FFE6E6E6"]);
+  sheet.eachRow({ includeEmpty: true }, (row) => {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      const color = cell.fill && cell.fill.fgColor
+        && String(cell.fill.fgColor.argb || cell.fill.fgColor.rgb || "").toUpperCase();
+      assert.equal(lightGrayColors.has(color), false, `${cell.address} has no light-gray fill`);
+    });
+  });
 }
 
 async function createSF2Upload(month, learners) {
@@ -203,6 +216,24 @@ test("registrations persist in the workbook and can sign in after a restart", as
   const portalPageResponse = await fetch(baseUrl);
   assert.equal(portalPageResponse.status, 200);
   const portalPage = await portalPageResponse.text();
+  const gradeInterpretationSource = portalPage.match(/function getGradeInterpretation\(grade\)\{[\s\S]*?\n  \}/);
+  assert.ok(gradeInterpretationSource, "general-average interpretation helper exists");
+  const getGradeInterpretation = vm.runInNewContext(`${gradeInterpretationSource[0]}; getGradeInterpretation`);
+  for (const [grade, expected] of [
+    [100, "Advancing"], [90, "Advancing"], [89.99, "Benchmarking"], [85, "Benchmarking"],
+    [84.99, "Connecting"], [80, "Connecting"], [79.99, "Developing"], [75, "Developing"],
+    [74.99, "Emerging"], [0, "Emerging"],
+  ]) {
+    assert.equal(getGradeInterpretation(grade).label, expected, `grade ${grade} is ${expected}`);
+  }
+  assert.equal(getGradeInterpretation(-0.01), null);
+  assert.equal(getGradeInterpretation(100.01), null);
+  assert.match(portalPage, /id="gradeGeneralAverageDescriptor"/);
+  assert.match(portalPage, /gradeSummaryRows[\s\S]*?descriptor\.textContent=interpretation\.label/);
+  assert.match(portalPage, /overallAverageCell\.append\(overallDescriptor\)/);
+  assert.match(portalPage, /\.grade-summary-table th,\.grade-summary-table td\{[^}]*border:1px solid #e6e6e6/);
+  assert.match(portalPage, /#parentGradeRecords \.parent-grade-table th,#parentGradeRecords \.parent-grade-table td\{border:1px solid #e6e6e6\}/);
+  assert.match(portalPage, /\.grade-interpretation a\{text-decoration:none;color:#464feb\}/);
   assert.match(portalPage, /sidebar-collapsed \.sidebar\{flex-basis:0;width:0/);
   assert.match(portalPage, /window\.matchMedia\("\(max-width: 760px\)"\)/);
   assert.match(portalPage, /toggle\("sidebar-collapsed"\)/);
@@ -223,6 +254,34 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /statusDate:student\.statusDate\|\|""/);
   assert.match(portalPage, /id="attendanceSummaryTab"[^>]*>Summary Of Attendance<\/button>/);
   assert.match(portalPage, /id="attendanceSummaryRows"/);
+  assert.match(portalPage, /id="navRma"[^>]*>[\s\S]*?RMA/);
+  assert.match(portalPage, /id="rmaPage"[\s\S]*?Rapid Mathematics Assessment/);
+  assert.doesNotMatch(portalPage, /rma-template-context|rmaSchoolId|rmaSchoolName|rmaTeacherName|rmaGradeSection|rmaEnrolment/);
+  assert.doesNotMatch(portalPage, /rma-report-table|rma-progress-table|rma-band-table|rmaReportRows|rmaProgressRows|rmaBandRows/);
+  assert.match(portalPage, /id="rmaGradeSelect"/);
+  assert.match(portalPage, /id="rmaAssessmentDialog"/);
+  assert.match(portalPage, /id="rmaAssessmentForm"/);
+  assert.doesNotMatch(portalPage, /className="rma-learner-button"|class="rma-learner-button"/);
+  assert.match(portalPage, /addScore\.className="btn rma-add-score"/);
+  assert.match(portalPage, /resultRow\.className="rma-result-row"/);
+  assert.match(portalPage, /Score: "\+assessment\.rawScore\+" \/ "\+assessment\.totalItems\+" points/);
+  const rmaEntryHeader = portalPage.match(/<table class="student-table rma-entry-table">[\s\S]*?<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
+  assert.ok(rmaEntryHeader, "RMA assessment entry has a learner list");
+  assert.equal(Array.from(rmaEntryHeader[1].matchAll(/<th>/g)).length, 2);
+  assert.match(rmaEntryHeader[1], /<th>Learner Name<\/th><th>Action<\/th>/);
+  assert.doesNotMatch(rmaEntryHeader[1], /LRN|Sex|Birthdate|Assessment|Score/);
+  assert.match(portalPage, /input=item\.maximum===1\?document\.createElement\("input"\):document\.createElement\("select"\)/);
+  assert.match(portalPage, /if\(item\.maximum===1\)\{\s*input\.type="checkbox"/);
+  assert.match(portalPage, /for\(var point=0;point<=item\.maximum;point\+\+\)/);
+  assert.match(portalPage, /input\.value=assessment\.assessedDate\?String\(originalScore\):""/);
+  assert.match(portalPage, /function rmaAssessmentScoresFromForm\(includeIncorrectItems\)[\s\S]*?input\.type==="checkbox"&&input\.checked[\s\S]*?input\.tagName==="SELECT"&&input\.value!==""[\s\S]*?Number\(input\.value\)/);
+  assert.match(portalPage, /Select only the items this learner answered correctly/);
+  assert.doesNotMatch(portalPage, /data-field="itemScore"|input\.type="number";[\s\S]{0,180}data-field="itemScore"/);
+  assert.match(portalPage, /id="rmaDomainRows"/);
+  assert.doesNotMatch(portalPage, /Per-Learner Results|Progress Over Time|Mastery and Interpretation Bands|id="rmaBandRows"/);
+  assert.match(portalPage, /percentage score = total score ÷ the selected grade-level maximum/i);
+  assert.match(portalPage, /if\(rmaDirty&&!window\.confirm\("Discard unsaved RMA assessment changes\?"\)\)return;/);
+  assert.match(portalPage, /Print \/ Save PDF/);
   assert.match(portalPage, /\.attendance-summary-table th:nth-child\(2\),\.attendance-summary-table td:nth-child\(2\)\{position:sticky;left:48px/);
   assert.match(portalPage, /api\("\/api\/attendance\/summary"\)/);
   assert.match(portalPage, /Registered Learner as of End of the Month count/);
@@ -230,12 +289,15 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /\.attendance-table td\.attendance-no-class-cell\{background:#e6e6e6/);
   assert.match(portalPage, /control\.disabled=isNoClass/);
   assert.match(portalPage, /fetch\("\/api\/attendance\/month\/export\?month="\+encodeURIComponent\(month\)\)/);
+  assert.match(portalPage, /if\(attendanceDirty\)\{[\s\S]*?await \$\("saveAttendance"\)\.onclick\(\);[\s\S]*?if\(attendanceDirty\)return;[\s\S]*?fetch\("\/api\/attendance\/month\/export/);
   assert.match(portalPage, /link\.download=filename;[\s\S]*?link\.click\(\);/);
   assert.ok(portalPage.indexOf('id="navSettings"') > portalPage.indexOf('id="navTeacherProfile"'));
   assert.match(portalPage, /id="settingsPage"/);
   assert.match(portalPage, /id="appearanceSetting"/);
   assert.match(portalPage, /<nav id="parentSidebarNav" aria-label="Learner information navigation" hidden>[\s\S]*?data-parent-target="parentStudentInfo" aria-current="page"[\s\S]*?data-parent-target="parentAttendanceSection"[\s\S]*?data-parent-target="parentReadingSection"[\s\S]*?data-parent-target="parentGradesSection"[\s\S]*?<\/nav>/);
-  assert.match(portalPage, /\$\("parentSidebarNav"\)\.hidden=user\.role!=="parent"/);
+  assert.match(portalPage, /\$\("parentSidebarNav"\)\.hidden=true/);
+  assert.match(portalPage, /\$\("parentSidebarNav"\)\.hidden=parentPortal\.learners\.length===0/);
+  assert.match(portalPage, /\$\("parentSidebarNav"\)\.hidden=parentPortalData\.learners\.length===0/);
   assert.match(portalPage, /function showParentSection\(targetId\)\{[\s\S]*?section\.hidden=!selected[\s\S]*?button\.setAttribute\("aria-current","page"\)/);
   assert.match(portalPage, /showParentSection\("parentStudentInfo"\)/);
   assert.match(portalPage, /id="parentAttendanceSection" hidden/);
@@ -515,6 +577,246 @@ test("registrations persist in the workbook and can sign in after a restart", as
   }
   writePortalDatabaseWorkbook(databasePath, legacyRosterWorkbook);
 
+  const philIriHeaders = { "Content-Type": "application/json", Cookie: teacherCookie };
+  const philIriSettings = await fetch(`${baseUrl}/api/phil-iri/settings`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(philIriSettings.status, 200);
+  const defaultPhilIriSettings = await philIriSettings.json();
+  assert.deepEqual(defaultPhilIriSettings.grades, ["Grade 4", "Grade 5", "Grade 6"]);
+  assert.deepEqual(defaultPhilIriSettings.languages, ["English", "Filipino"]);
+  assert.ok(defaultPhilIriSettings.interventions.includes("Guided Reading"));
+  const philIriCutoffs = {
+    "Grade 4": { English: 12, Filipino: 13 },
+    "Grade 5": { English: 15, Filipino: 16 },
+    "Grade 6": { English: 18, Filipino: 19 },
+  };
+  const savePhilIriCutoffs = await fetch(`${baseUrl}/api/phil-iri/settings`, {
+    method: "PUT",
+    headers: philIriHeaders,
+    body: JSON.stringify({ cutoffs: philIriCutoffs }),
+  });
+  assert.equal(savePhilIriCutoffs.status, 200);
+  const savedPhilIriSettings = await (await fetch(`${baseUrl}/api/phil-iri/settings`, {
+    headers: { Cookie: teacherCookie },
+  })).json();
+  assert.deepEqual(savedPhilIriSettings.cutoffs, philIriCutoffs);
+  const invalidPhilIriCutoffs = await fetch(`${baseUrl}/api/phil-iri/settings`, {
+    method: "PUT",
+    headers: philIriHeaders,
+    body: JSON.stringify({ cutoffs: { ...philIriCutoffs, "Grade 5": { English: 15, Filipino: 16.5 } } }),
+  });
+  assert.equal(invalidPhilIriCutoffs.status, 400);
+
+  const philIriAssessment = (values) => fetch(`${baseUrl}/api/phil-iri/assessments`, {
+    method: "POST",
+    headers: philIriHeaders,
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "BOSY",
+      assessmentType: "Pretest",
+      language: "English",
+      assessedDate: "2026-10-14",
+      assessor: "Taylor Teacher",
+      ...values,
+    }),
+  });
+  const failedPhilIriGst = await philIriAssessment({
+    stage: "GST",
+    gstScore: 14,
+    gstTotalItems: 20,
+  });
+  assert.equal(failedPhilIriGst.status, 200);
+  const failedPhilIriResult = await failedPhilIriGst.json();
+  assert.equal(failedPhilIriResult.data.gst.passed, false);
+  assert.equal(failedPhilIriResult.data.gst.percentageScore, 70);
+  const gstPersistenceCheck = await fetch(
+    `${baseUrl}/api/phil-iri/assessments?period=BOSY&assessmentType=Pretest`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(gstPersistenceCheck.status, 200);
+  const gstPersistenceSummary = await gstPersistenceCheck.json();
+  const persistedGst = gstPersistenceSummary.students
+    .find(({ id }) => id === addedStudent.student.id)?.reading?.English?.data?.gst;
+  assert.ok(persistedGst, "GST data is present in the saved assessment");
+  const philIriOral = await philIriAssessment({
+    stage: "Individualized",
+    readingMode: "Oral Reading",
+    passage: "Grade-level passage",
+    totalWords: 100,
+    miscues: 10,
+    timeSeconds: 60,
+    correctAnswers: 6,
+    totalQuestions: 10,
+    interventionStartDate: "2026-10-15",
+    interventionEndDate: "2026-11-15",
+    progressNotes: "Weekly guided reading",
+  });
+  const philIriOralResult = await philIriOral.json();
+  assert.equal(philIriOral.status, 200, JSON.stringify(philIriOralResult));
+  assert.equal(philIriOralResult.data.individualized["Oral Reading"].wordsPerMinute, 100);
+  assert.equal(philIriOralResult.data.individualized["Oral Reading"].accuracyPercentage, 90);
+  assert.equal(philIriOralResult.data.individualized["Oral Reading"].comprehensionPercentage, 60);
+  assert.equal(philIriOralResult.data.individualized["Oral Reading"].readingLevel, "Instructional");
+  assert.equal(philIriOralResult.data.intervention.recommendedIntervention, "Guided Reading");
+  const frustrationPhilIriGst = await philIriAssessment({
+    period: "MOSY",
+    stage: "GST",
+    gstScore: 14,
+    gstTotalItems: 20,
+  });
+  assert.equal(frustrationPhilIriGst.status, 200);
+  const oralFrustration = await philIriAssessment({
+    period: "MOSY",
+    stage: "Individualized",
+    readingMode: "Oral Reading",
+    totalWords: 100,
+    miscues: 11,
+    timeSeconds: 60,
+    correctAnswers: 6,
+    totalQuestions: 10,
+  });
+  assert.equal(oralFrustration.status, 200);
+  const oralFrustrationResult = await oralFrustration.json();
+  assert.equal(oralFrustrationResult.data.individualized["Oral Reading"].accuracyPercentage, 89);
+  assert.equal(oralFrustrationResult.data.individualized["Oral Reading"].readingLevel, "Frustration");
+  assert.equal(oralFrustrationResult.data.intervention.recommendedIntervention, "One-on-One Reading");
+  const silentFrustration = await philIriAssessment({
+    period: "MOSY",
+    stage: "Individualized",
+    readingMode: "Silent Reading",
+    totalWords: 50,
+    miscues: 0,
+    timeSeconds: 60,
+    correctAnswers: 29,
+    totalQuestions: 50,
+  });
+  assert.equal(silentFrustration.status, 200);
+  assert.equal((await silentFrustration.json()).data.individualized["Silent Reading"].readingLevel, "Frustration");
+  const philIriSilent = await philIriAssessment({
+    stage: "Individualized",
+    readingMode: "Silent Reading",
+    passage: "Silent reading passage",
+    totalWords: 100,
+    miscues: 20,
+    timeSeconds: 120,
+    correctAnswers: 8,
+    totalQuestions: 10,
+    interventionStartDate: "2026-10-15",
+    interventionEndDate: "2026-11-15",
+    progressNotes: "Weekly guided reading",
+  });
+  assert.equal(philIriSilent.status, 200);
+  assert.equal((await philIriSilent.json()).data.individualized["Silent Reading"].readingLevel, "Independent");
+  const philIriSummary = await fetch(
+    `${baseUrl}/api/phil-iri/assessments?period=BOSY&assessmentType=Pretest`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(philIriSummary.status, 200);
+  const philIriSummaryData = await philIriSummary.json();
+  const savedPhilIriLearner = philIriSummaryData.students.find(({ id }) => id === addedStudent.student.id);
+  assert.equal(savedPhilIriLearner.reading.English.data.individualized["Oral Reading"].readingLevel, "Instructional");
+  assert.equal(savedPhilIriLearner.reading.English.data.individualized["Silent Reading"].readingLevel, "Independent");
+  const philIriSchoolSummary = await fetch(
+    `${baseUrl}/api/phil-iri/assessments?scope=school&period=BOSY&assessmentType=Pretest`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(philIriSchoolSummary.status, 200);
+  assert.equal((await philIriSchoolSummary.json()).schoolWide, true);
+  for (const scope of ["class", "school"]) {
+    const exportResponse = await fetch(
+      `${baseUrl}/api/phil-iri/export?scope=${scope}&period=BOSY&assessmentType=Pretest`,
+      { headers: { Cookie: teacherCookie } },
+    );
+    assert.equal(exportResponse.status, 200);
+    assert.match(exportResponse.headers.get("content-type"), /spreadsheetml/);
+    const reportWorkbook = new ExcelJS.Workbook();
+    await reportWorkbook.xlsx.load(Buffer.from(await exportResponse.arrayBuffer()));
+    assert.equal(reportWorkbook.worksheets[0].getCell("A1").value, "PHIL-IRI Reading Assessment Report");
+    assert.equal(reportWorkbook.worksheets[0].getCell("A11").value, "Grade");
+  }
+  const learnerPhilIriExport = await fetch(
+    `${baseUrl}/api/phil-iri/export?scope=class&period=BOSY&assessmentType=Pretest&studentId=${encodeURIComponent(addedStudent.student.id)}`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(learnerPhilIriExport.status, 200);
+  const passedPhilIriGst = await fetch(`${baseUrl}/api/phil-iri/assessments`, {
+    method: "POST",
+    headers: philIriHeaders,
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "BOSY",
+      assessmentType: "Posttest",
+      language: "Filipino",
+      stage: "GST",
+      assessedDate: "2026-10-14",
+      assessor: "Taylor Teacher",
+      gstScore: 16,
+      gstTotalItems: 20,
+    }),
+  });
+  assert.equal(passedPhilIriGst.status, 200);
+  assert.equal((await passedPhilIriGst.json()).data.gst.passed, true);
+  const posttestPhilIriGst = await fetch(`${baseUrl}/api/phil-iri/assessments`, {
+    method: "POST",
+    headers: philIriHeaders,
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "BOSY",
+      assessmentType: "Posttest",
+      language: "English",
+      stage: "GST",
+      assessedDate: "2026-10-14",
+      assessor: "Taylor Teacher",
+      gstScore: 14,
+      gstTotalItems: 20,
+    }),
+  });
+  assert.equal(posttestPhilIriGst.status, 200);
+  const oralBoundaryPhilIri = await fetch(`${baseUrl}/api/phil-iri/assessments`, {
+    method: "POST",
+    headers: philIriHeaders,
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "BOSY",
+      assessmentType: "Posttest",
+      language: "English",
+      stage: "Individualized",
+      assessedDate: "2026-10-14",
+      assessor: "Taylor Teacher",
+      readingMode: "Oral Reading",
+      totalWords: 100,
+      miscues: 3,
+      timeSeconds: 60,
+      correctAnswers: 8,
+      totalQuestions: 10,
+    }),
+  });
+  assert.equal(oralBoundaryPhilIri.status, 200);
+  assert.equal((await oralBoundaryPhilIri.json()).data.individualized["Oral Reading"].readingLevel, "Independent");
+  const individualizedAfterPass = await fetch(`${baseUrl}/api/phil-iri/assessments`, {
+    method: "POST",
+    headers: philIriHeaders,
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "BOSY",
+      assessmentType: "Posttest",
+      language: "Filipino",
+      stage: "Individualized",
+      assessedDate: "2026-10-14",
+      assessor: "Taylor Teacher",
+      readingMode: "Silent Reading",
+      totalWords: 100,
+      miscues: 0,
+      timeSeconds: 60,
+      correctAnswers: 10,
+      totalQuestions: 10,
+    }),
+  });
+  assert.equal(individualizedAfterPass.status, 400);
+  const unauthenticatedPhilIri = await fetch(`${baseUrl}/api/phil-iri/settings`);
+  assert.equal(unauthenticatedPhilIri.status, 401);
+
   const unauthenticatedGrades = await fetch(
     `${baseUrl}/api/grades?studentId=${encodeURIComponent(addedStudent.student.id)}&term=Term%201`,
   );
@@ -525,6 +827,12 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(unauthenticatedSummary.status, 401);
   const unauthenticatedReading = await fetch(`${baseUrl}/api/reading-assessments`);
   assert.equal(unauthenticatedReading.status, 401);
+  const unauthenticatedMathAssessment = await fetch(`${baseUrl}/api/math-assessments`);
+  assert.equal(unauthenticatedMathAssessment.status, 401);
+  const unauthenticatedMathAssessmentExport = await fetch(
+    `${baseUrl}/api/math-assessments/export?period=BOSY&format=xlsx`,
+  );
+  assert.equal(unauthenticatedMathAssessmentExport.status, 401);
   const unauthenticatedAttendance = await fetch(`${baseUrl}/api/attendance?date=2026-10-14`);
   assert.equal(unauthenticatedAttendance.status, 401);
   const unauthenticatedSF2Export = await fetch(`${baseUrl}/api/attendance/month/export?month=2026-10`);
@@ -547,6 +855,366 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.deepEqual(emptyReading.levels, ["Non-reader", "Frustration", "Instructional", "Independent"]);
   assert.equal(emptyReading.attemptNo, 1);
   assert.equal(emptyReading.students[0].levels.English, "");
+  const emptyMathAssessmentResponse = await fetch(`${baseUrl}/api/math-assessments`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(emptyMathAssessmentResponse.status, 200);
+  const emptyMathAssessment = await emptyMathAssessmentResponse.json();
+  assert.deepEqual(emptyMathAssessment.periods, ["BOSY", "MOSY", "EOSY"]);
+  assert.equal(emptyMathAssessment.students[0].assessments.BOSY.masteryLevel, "Data Not Yet Available");
+  assert.equal(emptyMathAssessment.students[0].assessments.BOSY.percentageScore, "");
+  const masteryBoundaryCases = [
+    [90, "Advanced Mastery"],
+    [89, "Proficient Mastery"],
+    [75, "Proficient Mastery"],
+    [74, "Developing Mastery"],
+    [50, "Developing Mastery"],
+    [49, "Beginning Mastery"],
+  ];
+  for (const [rawScore, expectedMastery] of masteryBoundaryCases) {
+    const savedBoundaryCase = await fetch(`${baseUrl}/api/math-assessments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+      body: JSON.stringify({
+        studentId: addedStudent.student.id,
+        period: "BOSY",
+        rawScore,
+        totalItems: 100,
+      }),
+    });
+    assert.equal(savedBoundaryCase.status, 200, await savedBoundaryCase.clone().text());
+    assert.equal((await savedBoundaryCase.json()).masteryLevel, expectedMastery);
+  }
+  const savedBaselineMathAssessment = await fetch(`${baseUrl}/api/math-assessments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "BOSY",
+      rawScore: 9,
+      totalItems: 10,
+      strengths: "Number sense",
+      areasForImprovement: "Fractions",
+      recommendedIntervention: "Use visual fraction models",
+    }),
+  });
+  assert.equal(savedBaselineMathAssessment.status, 200);
+  assert.equal((await savedBaselineMathAssessment.json()).percentageScore, 90);
+  const savedMidlineMathAssessment = await fetch(`${baseUrl}/api/math-assessments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "MOSY",
+      rawScore: 7,
+      totalItems: 10,
+    }),
+  });
+  assert.equal(savedMidlineMathAssessment.status, 200);
+  assert.equal((await savedMidlineMathAssessment.json()).masteryLevel, "Developing Mastery");
+  const savedEndlineNotes = await fetch(`${baseUrl}/api/math-assessments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "EOSY",
+      strengths: "Improved calculation fluency",
+    }),
+  });
+  assert.equal(savedEndlineNotes.status, 200);
+  const mathAssessmentReportResponse = await fetch(`${baseUrl}/api/math-assessments`, {
+    headers: { Cookie: teacherCookie },
+  });
+  const mathAssessmentReport = await mathAssessmentReportResponse.json();
+  const savedMathLearner = mathAssessmentReport.students.find(({ id }) => id === addedStudent.student.id);
+  assert.equal(savedMathLearner.assessments.BOSY.percentageScore, 90);
+  assert.equal(savedMathLearner.assessments.BOSY.masteryLevel, "Advanced Mastery");
+  assert.match(savedMathLearner.assessments.BOSY.assessedDate, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(savedMathLearner.assessments.BOSY.strengths, "Number sense");
+  assert.equal(savedMathLearner.assessments.MOSY.percentageScore, 70);
+  assert.equal(savedMathLearner.assessments.EOSY.percentageScore, "");
+  assert.equal(savedMathLearner.assessments.EOSY.masteryLevel, "Data Not Yet Available");
+  const invalidMathAssessmentCases = [
+    { rawScore: 11, totalItems: 10 },
+    { rawScore: 1, totalItems: "" },
+    { rawScore: 1.5, totalItems: 10 },
+  ];
+  for (const invalidScore of invalidMathAssessmentCases) {
+    const invalidMathAssessment = await fetch(`${baseUrl}/api/math-assessments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+      body: JSON.stringify({ studentId: addedStudent.student.id, period: "EOSY", ...invalidScore }),
+    });
+    assert.equal(invalidMathAssessment.status, 400);
+  }
+  const mathCsvExport = await fetch(
+    `${baseUrl}/api/math-assessments/export?period=BOSY&format=csv`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(mathCsvExport.status, 200);
+  assert.match(mathCsvExport.headers.get("content-type"), /text\/csv/);
+  assert.match(await mathCsvExport.text(), /Advanced Mastery/);
+  const mathXlsxExport = await fetch(
+    `${baseUrl}/api/math-assessments/export?period=BOSY&format=xlsx`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(mathXlsxExport.status, 200);
+  assert.match(mathXlsxExport.headers.get("content-disposition"), /RMA TEMP\.xlsx/);
+  const mathReportWorkbook = new ExcelJS.Workbook();
+  await mathReportWorkbook.xlsx.load(Buffer.from(await mathXlsxExport.arrayBuffer()));
+  assert.deepEqual(mathReportWorkbook.worksheets.map(({ name }) => name), [
+    "RMAKS2 Scoresheet",
+  ]);
+  const initialScoresheet = mathReportWorkbook.getWorksheet("RMAKS2 Scoresheet");
+  assert.equal(initialScoresheet.getCell("C4").value, "BoSY");
+  assert.equal(initialScoresheet.getCell("C6").value, "123456");
+  assert.equal(initialScoresheet.getCell("F6").value, "Sample Elementary School");
+  assert.equal(initialScoresheet.getCell("M6").value, teacherCredentials.name);
+  assert.equal(initialScoresheet.getCell("C7").value, "Grade 5");
+  assert.equal(initialScoresheet.getCell("F7").value, "Mabini");
+  assert.equal(initialScoresheet.getCell("B10").value, studentDetails.lrn);
+  assert.equal(initialScoresheet.getCell("C10").value, addedStudent.student.name);
+  assert.equal(initialScoresheet.getCell("D10").value, "Female");
+  assert.equal(initialScoresheet.getCell("F10").value, "");
+
+  const template = emptyMathAssessment.template;
+  assert.deepEqual(template.grades.map(({ gradeLevel, maximumScore }) => [gradeLevel, maximumScore]), [
+    ["Grade 4", 13],
+    ["Grade 5", 32],
+    ["Grade 6", 50],
+  ]);
+  assert.deepEqual(template.grades.map(({ masteryBands }) =>
+    masteryBands.map(({ minimumRawScore }) => minimumRawScore)), [
+    [11, 8, 5, 3, 0],
+    [27, 21, 14, 7, 0],
+    [45, 39, 29, 15, 0],
+  ]);
+  const emptyTemplateReplacement = await fetch(`${baseUrl}/api/math-assessments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "BOSY",
+      gradeLevel: "Grade 5",
+      assessedDate: "2026-09-22",
+      itemScores: {},
+    }),
+  });
+  assert.equal(emptyTemplateReplacement.status, 400);
+  assert.match((await emptyTemplateReplacement.json()).error, /at least one item score/i);
+  const preservedLegacyAssessment = await fetch(`${baseUrl}/api/math-assessments`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal((await preservedLegacyAssessment.json()).students[0].assessments.BOSY.percentageScore, 90);
+  assert.equal(template.items.length, 42);
+  assert.equal(template.items.find(({ key }) => key === "17").maximum, 3);
+  const rmaTemplateWorkbook = new ExcelJS.Workbook();
+  await rmaTemplateWorkbook.xlsx.readFile(path.join(__dirname, "..", "RMA TEMP.xlsx"));
+  const rmaSourceScoresheet = rmaTemplateWorkbook.getWorksheet("RMAKS2 Scoresheet");
+  assert.ok(rmaSourceScoresheet, "RMA template scoresheet exists");
+  const templateItemValues = [];
+  for (let column = 8; column <= 49; column += 1) {
+    const itemCell = rmaSourceScoresheet.getRow(8).getCell(column).value;
+    templateItemValues.push([
+      String(itemCell && typeof itemCell === "object" ? itemCell.result : itemCell),
+      rmaSourceScoresheet.getRow(9).getCell(column).value,
+    ]);
+  }
+  assert.deepEqual(template.items.map(({ key, maximum }) => [key, maximum]), templateItemValues);
+  const expectedItemLabels = [
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+    "21", "22", "23", "24", "25", "26", "27", "28", "29", "30a",
+    "30b", "31", "32", "33", "34", "35", "36", "37a", "37b", "38", "39", "40",
+  ];
+  assert.deepEqual(template.items.map(({ key, label }) => [key, label]),
+    expectedItemLabels.map((label) => [label, label]));
+  const levellingFormula = String(rmaSourceScoresheet.getCell("BC10").value.formula);
+  for (const cutoff of ["45", "39", "29", "15", "27", "21", "14", "7", "11", "8", "5", "3"]) {
+    assert.ok(levellingFormula.includes(`>=${cutoff}`), `template levelling formula includes ${cutoff} point cutoff`);
+  }
+  assert.ok(String(rmaSourceScoresheet.getCell("BN10").value.formula).includes(">=0.75"));
+  assert.deepEqual(template.domains.filter(({ category }) => category === "Content Domain")
+    .map(({ key, label, itemKeys }) => [key, label, itemKeys["Grade 6"].length, itemKeys["Grade 6"]]), [
+    ["numberAndNumberSense", "Number and Number Sense", 19, [
+      "1", "3", "7", "8", "10", "11", "12", "14", "15", "19", "21", "25", "29", "31", "32", "33", "34", "35", "38",
+    ]],
+    ["geometry", "Geometry", 8, ["5", "13", "17", "20", "22", "23", "26", "36"]],
+    ["measurement", "Measurement", 5, ["9", "16", "18", "24", "28"]],
+    ["statisticsAndProbability", "Statistics & Probability", 7, ["4", "27", "30a", "30b", "37a", "37b", "40"]],
+    ["algebra", "Algebra", 3, ["2", "6", "39"]],
+  ]);
+  const domainItems = template.domains.filter(({ category }) => category === "Content Domain")
+    .flatMap(({ itemKeys }) => itemKeys["Grade 6"]);
+  assert.equal(domainItems.length, template.items.length, "content domain item lists account for all template items");
+  assert.equal(new Set(domainItems).size, template.items.length, "each template item belongs to one content domain");
+  const gradeFourItemScores = Object.fromEntries(template.items
+    .filter(({ gradeLevel }) => gradeLevel === "Grade 4")
+    .map(({ key, maximum }) => [key, maximum]));
+  const gradeFourAssessmentResponse = await fetch(`${baseUrl}/api/math-assessments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "EOSY",
+      gradeLevel: "Grade 4",
+      assessedDate: "2026-09-22",
+      itemScores: gradeFourItemScores,
+      remarks: "Template formula verification",
+    }),
+  });
+  assert.equal(gradeFourAssessmentResponse.status, 200, await gradeFourAssessmentResponse.clone().text());
+  const gradeFourAssessment = await gradeFourAssessmentResponse.json();
+  assert.equal(gradeFourAssessment.rawScore, 13);
+  assert.equal(gradeFourAssessment.totalItems, 13);
+  assert.equal(gradeFourAssessment.percentageScore, 100);
+  assert.equal(gradeFourAssessment.masteryLevel, "At Grade Level (Highly Proficient)");
+  assert.equal(gradeFourAssessment.gradeLevelScores[0].score, 13);
+  assert.deepEqual(gradeFourAssessment.domainScores.map(({ label, score, maximum, meetsBenchmark }) => [
+    label, score, maximum, meetsBenchmark,
+  ]), [
+    ["Number and Number Sense", 7, 7, true],
+    ["Geometry", 2, 2, true],
+    ["Measurement", 1, 1, true],
+    ["Statistics & Probability", 1, 1, true],
+    ["Algebra", 2, 2, true],
+  ]);
+  assert.equal(gradeFourAssessment.domainScores.reduce((sum, domain) => sum + domain.maximum, 0), 13);
+  assert.match(gradeFourAssessment.remarks, /13\/13 points \(100\.00%\)/);
+  assert.doesNotMatch(gradeFourAssessment.remarks, /Template formula verification/);
+  assert.match(gradeFourAssessment.strengths, /Number and Number Sense/);
+  assert.match(gradeFourAssessment.strengths, /Algebra/);
+  assert.match(gradeFourAssessment.areasForImprovement, /All assessed content domains met or exceeded the 75% benchmark/);
+  assert.match(gradeFourAssessment.recommendedIntervention, /mixed review and enrichment/);
+  assert.deepEqual(gradeFourAssessment.cognitiveDomainScores.map(({ score, maximum, meetsBenchmark }) => [
+    score, maximum, meetsBenchmark,
+  ]), [[4, 4, true], [7, 7, true], [2, 2, true]]);
+  const saveRmaGrade = async (period, gradeLevel, targetScore) => {
+    let remaining = targetScore;
+    const itemScores = {};
+    const gradeIndex = template.grades.findIndex((grade) => grade.gradeLevel === gradeLevel);
+    for (const item of template.items.filter((entry) =>
+      template.grades.findIndex((grade) => grade.gradeLevel === entry.gradeLevel) <= gradeIndex)) {
+      itemScores[item.key] = Math.min(item.maximum, remaining);
+      remaining -= itemScores[item.key];
+    }
+    assert.equal(remaining, 0, `${targetScore} points are attainable for ${gradeLevel}`);
+    return fetch(`${baseUrl}/api/math-assessments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+      body: JSON.stringify({
+        studentId: addedStudent.student.id,
+        period,
+        gradeLevel,
+        assessedDate: "2026-09-23",
+        itemScores,
+      }),
+    });
+  };
+  const gradeFiveThresholdResponse = await saveRmaGrade("BOSY", "Grade 5", 27);
+  assert.equal(gradeFiveThresholdResponse.status, 200);
+  const gradeFiveThreshold = await gradeFiveThresholdResponse.json();
+  assert.equal(gradeFiveThreshold.rawScore, 27);
+  assert.equal(gradeFiveThreshold.totalItems, 32);
+  assert.equal(gradeFiveThreshold.masteryLevel, "At Grade Level (Highly Proficient)");
+  assert.equal(gradeFiveThreshold.domainScores.reduce((sum, domain) => sum + domain.maximum, 0), 32);
+  assert.match(gradeFiveThreshold.remarks, /27\/32 points/);
+  assert.match(gradeFiveThreshold.areasForImprovement, /%/);
+  assert.match(gradeFiveThreshold.recommendedIntervention, /practice/);
+  const gradeSixThresholdResponse = await saveRmaGrade("MOSY", "Grade 6", 45);
+  assert.equal(gradeSixThresholdResponse.status, 200);
+  const gradeSixThreshold = await gradeSixThresholdResponse.json();
+  assert.equal(gradeSixThreshold.rawScore, 45);
+  assert.equal(gradeSixThreshold.totalItems, 50);
+  assert.equal(gradeSixThreshold.masteryLevel, "At Grade Level (Highly Proficient)");
+  assert.equal(gradeSixThreshold.domainScores.reduce((sum, domain) => sum + domain.maximum, 0), 50);
+  const generatedNarrativeReportResponse = await fetch(`${baseUrl}/api/math-assessments`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(generatedNarrativeReportResponse.status, 200);
+  const generatedNarrativeReport = await generatedNarrativeReportResponse.json();
+  const generatedMosYAssessment = generatedNarrativeReport.students
+    .find(({ id }) => id === addedStudent.student.id).assessments.MOSY;
+  assert.match(generatedMosYAssessment.remarks, /45\/50 points/);
+  assert.match(generatedMosYAssessment.strengths, /Number and Number Sense|No content domain met/);
+  assert.match(generatedMosYAssessment.recommendedIntervention, /Geometry|Measurement|Number and Number Sense|Statistics & Probability|Algebra|Maintain progress/);
+  const gradeFourItemLimit = await fetch(`${baseUrl}/api/math-assessments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "EOSY",
+      gradeLevel: "Grade 4",
+      assessedDate: "2026-09-22",
+      itemScores: { ...gradeFourItemScores, "5": 3 },
+    }),
+  });
+  assert.equal(gradeFourItemLimit.status, 400);
+  const undatedItemScores = await fetch(`${baseUrl}/api/math-assessments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({
+      studentId: addedStudent.student.id,
+      period: "EOSY",
+      gradeLevel: "Grade 4",
+      assessedDate: "",
+      itemScores: { "1": 1 },
+    }),
+  });
+  assert.equal(undatedItemScores.status, 400);
+  const templateCsvExport = await fetch(
+    `${baseUrl}/api/math-assessments/export?period=EOSY&format=csv`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(templateCsvExport.status, 200);
+  const templateCsv = await templateCsvExport.text();
+  assert.match(templateCsv, /Item 30a/);
+  assert.match(templateCsv, /Grade 4 Score/);
+  const mismatchedGradeTemplateExport = await fetch(
+    `${baseUrl}/api/math-assessments/export?period=EOSY&format=xlsx`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(mismatchedGradeTemplateExport.status, 400);
+  assert.match((await mismatchedGradeTemplateExport.json()).error, /Teacher Profile grade/i);
+  const gradeFiveTemplateAssessment = await saveRmaGrade("EOSY", "Grade 5", 27);
+  assert.equal(gradeFiveTemplateAssessment.status, 200);
+  const templateXlsxExport = await fetch(
+    `${baseUrl}/api/math-assessments/export?period=EOSY&format=xlsx`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(templateXlsxExport.status, 200);
+  assert.match(templateXlsxExport.headers.get("content-disposition"), /RMA TEMP\.xlsx/);
+  const templateWorkbook = new ExcelJS.Workbook();
+  await templateWorkbook.xlsx.load(Buffer.from(await templateXlsxExport.arrayBuffer()));
+  const sourceRmaTempWorkbook = new ExcelJS.Workbook();
+  await sourceRmaTempWorkbook.xlsx.readFile(path.join(__dirname, "..", "RMA TEMP.xlsx"));
+  assert.deepEqual(templateWorkbook.worksheets.map(({ name }) => name), [
+    "RMAKS2 Scoresheet",
+  ]);
+  assert.deepEqual(templateWorkbook.worksheets.map(({ name }) => name),
+    sourceRmaTempWorkbook.worksheets.map(({ name }) => name));
+  for (const sheet of sourceRmaTempWorkbook.worksheets) {
+    assert.deepEqual([...templateWorkbook.getWorksheet(sheet.name).model.merges].sort(), [...sheet.model.merges].sort(),
+      `${sheet.name} retains the RMA TEMP template merged cells`);
+  }
+  const templateScoresheet = templateWorkbook.getWorksheet("RMAKS2 Scoresheet");
+  assert.equal(templateScoresheet.getCell("C4").value, "EoSY");
+  assert.equal(templateScoresheet.getCell("B10").value, studentDetails.lrn);
+  assert.equal(templateScoresheet.getCell("C10").value, addedStudent.student.name);
+  assert.equal(templateScoresheet.getCell("E10").value.toISOString().slice(0, 10), studentDetails.birthdate);
+  assert.equal(templateScoresheet.getCell("F10").value.toISOString().slice(0, 10), "2026-09-23");
+  assert.equal(templateScoresheet.getCell("H8").value, 1);
+  assert.equal(templateScoresheet.getCell("AK8").value, "30a");
+  assert.equal(templateScoresheet.getCell("AL8").value, "30b");
+  assert.equal(templateScoresheet.getCell("H10").value, 1);
+  assert.equal(templateScoresheet.getCell("L10").value, 2);
+  assert.equal(templateScoresheet.getCell("T10").value, 1);
+  assert.equal(templateScoresheet.getCell("X6").value, 0);
+  assert.equal(templateScoresheet.getCell("AE6").value, 1);
+  assert.equal(templateScoresheet.getCell("AJ6").value, 1);
+  assert.match(templateScoresheet.getCell("AS6").value.formula, /COUNTA\(F10:F108\)/);
+  assert.match(templateScoresheet.getCell("BA10").value.formula, /\$C\$7/);
+  assert.equal(templateScoresheet.getCell("A9").value, "Total Points / Scores");
   const initialRosterResponse = await fetch(`${baseUrl}/api/students`, {
     headers: { Cookie: teacherCookie },
   });
@@ -1261,7 +1929,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(sf2ExportResponse.status, 200, await sf2ExportResponse.clone().text());
   assert.equal(
     sf2ExportResponse.headers.get("content-disposition"),
-    `attachment; filename="SF2_January_${attendanceMonth.slice(0, 4)}.xlsx"`,
+    `attachment; filename="SF2_January_Grade_5_2026-2027.xlsx"`,
   );
   const exportedSF2Workbook = new ExcelJS.Workbook();
   const exportedSF2Buffer = Buffer.from(await sf2ExportResponse.arrayBuffer());
@@ -1270,6 +1938,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   const exportedMonthName = `${monthNames[Number(attendanceMonth.slice(5, 7)) - 1]} ${attendanceMonth.slice(0, 4)}`;
   const exportedSF2Sheet = exportedSF2Workbook.getWorksheet(exportedMonthName);
   assert.ok(exportedSF2Sheet, "exported workbook has the selected month worksheet");
+  assertNoLightGraySf2Fills(exportedSF2Sheet);
   assert.equal(exportedSF2Sheet.getCell("AA6").value, "JANUARY");
   assert.equal(exportedSF2Sheet.getCell("AG117").value, "JANUARY");
   assert.equal(exportedSF2Sheet.getCell("AG118").value, "JANUARY");
@@ -1288,12 +1957,13 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(alternateExportResponse.status, 200, await alternateExportResponse.clone().text());
   assert.equal(
     alternateExportResponse.headers.get("content-disposition"),
-    `attachment; filename="SF2_February_${alternateMonth.slice(0, 4)}.xlsx"`,
+    `attachment; filename="SF2_February_Grade_5_2026-2027.xlsx"`,
   );
   const alternateExportWorkbook = new ExcelJS.Workbook();
   await alternateExportWorkbook.xlsx.load(Buffer.from(await alternateExportResponse.arrayBuffer()));
   const alternateExportSheet = alternateExportWorkbook.getWorksheet(`FEB ${alternateMonth.slice(0, 4)}`);
   assert.ok(alternateExportSheet, "export uses the requested alternate month worksheet");
+  assertNoLightGraySf2Fills(alternateExportSheet);
   assert.equal(alternateExportSheet.getCell("AA6").value, "FEBRUARY");
   assert.equal(alternateExportSheet.getCell("AG117").value, "FEBRUARY");
   assert.equal(alternateExportSheet.getCell("AG118").value, "FEBRUARY");
@@ -1535,16 +2205,15 @@ test("registrations persist in the workbook and can sign in after a restart", as
   for (const rowNumber of exportedRowsByName.values()) {
     const noClassCell = noClassExportSheet.getCell(rowNumber, noClassDateColumn);
     assert.equal(noClassCell.value, "NC", `learner row ${rowNumber} displays NC`);
-    assert.equal(noClassCell.fill.fgColor.argb, "FFE6E6E6", `learner row ${rowNumber} has a light-gray fill`);
+    assert.equal(noClassCell.fill.pattern, "none", `learner row ${rowNumber} has no fill`);
   }
-  assert.notEqual(noClassExportSheet.getCell(10, noClassDateColumn).fill.fgColor?.argb, "FFE6E6E6");
-  assert.notEqual(noClassExportSheet.getCell(11, noClassDateColumn).fill.fgColor?.argb, "FFE6E6E6");
+  assertNoLightGraySf2Fills(noClassExportSheet);
   const classDayColumn = noClassDateColumn === 7 ? 8 : 7;
   for (const rowNumber of exportedRowsByName.values()) {
     assert.notEqual(
-      noClassExportSheet.getCell(rowNumber, classDayColumn).fill.fgColor?.argb,
-      "FFE6E6E6",
-      `class-day cell in learner row ${rowNumber} remains unshaded`,
+      noClassExportSheet.getCell(rowNumber, classDayColumn).fill.pattern,
+      "solid",
+      `class-day cell in learner row ${rowNumber} has no fill`,
     );
   }
   assert.equal(noClassExportSheet.getCell("AK127").value.result, maleRosterCount);
@@ -2001,6 +2670,19 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(parentPortalResult.learners[0].reading.BOSY.English.level, "Instructional");
   assert.equal(parentPortalResult.learners[0].reading.MOSY.Filipino.level, "Frustration");
   assert.equal(parentPortalResult.learners[0].reading.EOSY.Filipino.level, "Independent");
+  const parentPhilIri = parentPortalResult.learners[0].philIri;
+  assert.equal(parentPhilIri.BOSY.Pretest.English.gst.passed, false);
+  assert.equal(parentPhilIri.BOSY.Pretest.English.individualized["Oral Reading"].readingLevel, "Instructional");
+  assert.equal(parentPhilIri.BOSY.Pretest.English.individualized["Silent Reading"].readingLevel, "Independent");
+  assert.equal(parentPhilIri.BOSY.Posttest.English.individualized["Oral Reading"].readingLevel, "Independent");
+  assert.equal(parentPhilIri.BOSY.Posttest.Filipino.gst.passed, true);
+  assert.equal(parentPhilIri.BOSY.Posttest.Filipino.individualized["Silent Reading"], undefined);
+  assert.equal(parentPhilIri.EOSY.Pretest.English, null);
+  const unlinkedParentPortal = await fetch(`${baseUrl}/api/parent/portal`, {
+    headers: { Cookie: secondParentRegistration.headers.get("set-cookie").split(";")[0] },
+  });
+  assert.equal(unlinkedParentPortal.status, 200);
+  assert.deepEqual((await unlinkedParentPortal.json()).learners, []);
   const parentAttendanceHistory = parentPortalResult.learners[0].attendance;
   assert.deepEqual(parentAttendanceHistory.filter(({ date }) => !date.startsWith(`${attendanceMonth}-`)), [
     { date: attendanceDate, status: "Present" },
@@ -2046,6 +2728,9 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(parentPortalResult.learners[0].reading.BOSY.English.level, "Instructional");
   assert.equal(parentPortalResult.learners[0].reading.BOSY.English.attemptNo, 2);
   assert.match(portalPage, /id="readingAttemptNumber" type="number" min="1" step="1" value="1" inputmode="numeric" required/);
+  assert.match(portalPage, /id="parentPhilIriProgress"/);
+  assert.match(portalPage, /parentPortalData\.readingPeriods\.forEach\(function\(period\)\{[\s\S]*?learner\.philIri/);
+  assert.match(portalPage, /PHIL-IRI assessment results/);
   assert.match(portalPage, /Date set automatically when saved/);
   assert.match(portalPage, /saved\.assessedDates\[language\]/);
   assert.match(portalPage, /Assessment history/);
@@ -2431,7 +3116,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.deepEqual(clearedRoster.students, []);
   assert.equal(clearedRoster.parents.length, 2, "clearing the roster preserves parent accounts");
   const clearedDatabase = readPortalDatabaseWorkbook(databasePath);
-  for (const sheetName of ["Students", "Term Grades", "Term Grade Locks", "Reading Assessments", "Attendance Records", "Attendance Monthly Notes"]) {
+  for (const sheetName of ["Students", "Term Grades", "Term Grade Locks", "Reading Assessments", "Math Assessments", "Attendance Records", "Attendance Monthly Notes"]) {
     const sheet = clearedDatabase.getWorksheet(sheetName);
     if (sheet) {
       const studentIdColumn = new Map(
@@ -2542,4 +3227,69 @@ test("SQLite migration preserves existing portal accounts", async (context) => {
     if (email) migratedAccounts.push(email);
   }
   assert.ok(migratedAccounts.length > 0, "existing accounts are present after migration");
+});
+
+test("Supabase PostgreSQL storage persists the portal state transactionally", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "grade5-portal-supabase-"));
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+
+  let savedState = null;
+  const queries = [];
+  const query = async (text, values = []) => {
+    const sql = text.trim().replace(/\s+/g, " ").toLowerCase();
+    queries.push(sql);
+    if (sql.startsWith("select id from portal_state")) {
+      return { rows: savedState ? [{ id: 1 }] : [], rowCount: savedState ? 1 : 0 };
+    }
+    if (sql.startsWith("select workbook_state from portal_state")) {
+      return { rows: savedState ? [{ workbook_state: savedState }] : [], rowCount: savedState ? 1 : 0 };
+    }
+    if (sql.startsWith("insert into portal_state")) {
+      if (!savedState) savedState = Buffer.from(values[0]);
+      return { rows: [], rowCount: savedState ? 1 : 0 };
+    }
+    if (sql.startsWith("update portal_state")) {
+      savedState = Buffer.from(values[0]);
+      return { rows: [], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  };
+  const postgresPool = {
+    query,
+    async connect() {
+      return { query, release() {} };
+    },
+    async end() {},
+  };
+  const server = createServer({ postgresPool, migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) =>
+        server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const health = await fetch(`${baseUrl}/api/health`);
+  assert.equal(health.status, 200);
+  assert.deepEqual(await health.json(), { status: "ok", storage: "supabase" });
+
+  const registration = await fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Supabase Teacher",
+      email: "supabase.teacher@example.com",
+      password: "secure-pass-123",
+      role: "teacher",
+      extra: "12",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  assert.ok(queries.includes("begin"));
+  assert.ok(queries.includes("commit"));
+  assert.ok(queries.some((sql) => sql.startsWith("update portal_state")));
 });
