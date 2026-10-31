@@ -1,21 +1,77 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.0",
+  "version": "1.0.22",
   "private": true,
+  "description": "Grade 5 Class Portal desktop application",
+  "main": "desktop/main.js",
   "engines": {
     "node": ">=22.5.0"
   },
   "scripts": {
     "start": "node server.js",
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win nsis --publish never",
+    "release": "node scripts/release.js",
+    "check": "node scripts/check.js",
     "test": "node --test"
   },
   "dependencies": {
     "@e965/xlsx": "^0.20.3",
     "dotenv": "^18.0.8",
+    "electron-updater": "^6.8.11",
     "exceljs": "^4.4.0",
-    "pg": "^8.23.1"
+    "jszip": "^3.10.2",
+    "pg": "^8.23.1",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.12"
   },
   "overrides": {
     "uuid": "11.1.1"
+  },
+  "build": {
+    "appId": "com.deped.grade5portal",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Bontoy2025",
+        "repo": "Advisers_Portal"
+      }
+    ],
+    "productName": "AVeRA",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "**/*",
+      "!test/**",
+      "!release/**",
+      "!downloads/**",
+      "!.kilo/**",
+      "!.qodo/**",
+      "!.vscode/**",
+      "!grade5-portal-database.xlsx",
+      "!PROJECT_ANALYSIS.md",
+      "!*.sqlite*",
+      "!*.profiles/**",
+      "!*.profiles.school-logos/**",
+      "!.env*",
+      "!package-lock.json",
+      "!README.md",
+      "!start-portal.bat"
+    ],
+    "win": {
+      "icon": "icon.ico",
+      "target": "nsis"
+    },
+    "nsis": {
+      "artifactName": "AVeRA-Setup-${version}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico"
+    }
   }
 }

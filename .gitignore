@@ -1,4 +1,5 @@
 node_modules/
+/release/
 .env
 .env.*
 !.env.example
@@ -12,7 +13,13 @@ grade5-portal-database.sqlite-wal
 *.xls
 *.xlsx
 !grade5-portal-database-template.xlsx
+!Grading Sheet.xlsx
+!SF9.xlsx
+!data/who-growth-reference-2007/
+!data/who-growth-reference-2007/*.xlsx
 grade5-portal-database.xlsx
+/downloads/generated-reports/
 SF1.xls
 *.profiles/
+*.profiles.school-logos/
 npm-debug.log*

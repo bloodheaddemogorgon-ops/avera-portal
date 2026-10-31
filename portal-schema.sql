@@ -12,5 +12,12 @@ create table if not exists public.portal_profile_photos (
   updated_at timestamptz not null default now()
 );
 
-revoke all on table public.portal_state, public.portal_profile_photos
+create table if not exists public.portal_school_logos (
+  user_id text primary key,
+  extension text not null check (extension in ('jpg', 'png', 'webp')),
+  logo_data bytea not null,
+  updated_at timestamptz not null default now()
+);
+
+revoke all on table public.portal_state, public.portal_profile_photos, public.portal_school_logos
   from public, anon, authenticated;

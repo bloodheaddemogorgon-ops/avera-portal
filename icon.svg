@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="AVeRA Class Adviser's Portal">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d28d9"/>
+      <stop offset="0.55" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.15" r="0.9">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
+  <path d="M256 424C214 390 140 382 82 396V224C140 210 214 218 256 252Z" fill="#fff"/>
+  <path d="M256 424C298 390 372 382 430 396V224C372 210 298 218 256 252Z" fill="#dff7ff"/>
+  <path d="M256 252V424" stroke="#4f46e5" stroke-opacity="0.35" stroke-width="6"/>
+  <g fill="none" stroke="#6d28d9" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round">
+    <path d="M122 276C158 272 196 278 224 294"/>
+    <path d="M122 316C158 312 196 318 224 334"/>
+    <path d="M288 294C316 278 354 272 390 276"/>
+    <path d="M288 334C316 318 354 312 390 316"/>
+  </g>
+  <circle cx="256" cy="128" r="62" fill="url(#badge)"/>
+  <circle cx="256" cy="128" r="62" fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="8"/>
+  <path d="M227 129l21 22 40-46" fill="none" stroke="#312e81" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
