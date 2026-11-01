@@ -3844,7 +3844,7 @@ body.portal-active .portal-entry-links{display:none}
           :result.sync==="offline"?"Offline mode. Portal records are saved locally and will synchronize when online."
             :"Connected locally. Online synchronization is pending."
       :"Connected. Portal records are saved to the configured database.";
-    $("syncDataButton").hidden=result.storage!=="dual";
+    $("syncDataButton").hidden=result.storage!=="dual"||result.sync==="conflict";
     $("syncConflictActions").hidden=!(result.storage==="dual"&&result.sync==="conflict"
       &&currentUser&&currentUser.isAdmin);
     if(result.storage!=="dual"){
@@ -3854,7 +3854,7 @@ body.portal-active .portal-entry-links{display:none}
     }else if(result.sync==="conflict"){
       $("syncDataNotice").textContent=currentUser&&currentUser.isAdmin
         ?"A conflict is paused. Review both copies before choosing one."
-        :"Synchronization is paused. An administrator must review the two saved copies.";
+        :"Synchronization is paused. Sign in with an administrator account to choose which saved copy to keep. This replaces the other copy.";
     }else if(result.sync==="offline"){
       $("syncDataNotice").textContent="The online database is unavailable. Local changes are kept and will retry automatically.";
     }else{
