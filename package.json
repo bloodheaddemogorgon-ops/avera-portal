@@ -1,6 +1,6 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.27",
+  "version": "1.0.28",
   "private": true,
   "description": "Grade 5 Class Portal desktop application",
   "main": "desktop/main.js",
