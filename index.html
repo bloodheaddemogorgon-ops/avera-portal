@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-portal-entry="main">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Class Adviser's Portal</title>
+<title>GraceDesk · Every record, one desk.</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f6f7fb;--card:#fff;--ink:#1b2236;--muted:#69718a;--line:#e3e6ef;--field:#f6f7fb;--accent:#2f7f70;--accent-ink:#fff;--soft:#e4f2ee;--err:#c2410c;--shadow:0 1px 2px rgba(20,28,50,.04),0 12px 40px rgba(20,28,50,.07);
@@ -1129,10 +1129,13 @@ body:not(.portal-active) .brand::after{
   pointer-events:none;
 }
 body:not(.portal-active) .brand>*{position:relative;z-index:1}
-body:not(.portal-active) .brand .mark{width:64px;height:64px;margin:0 0 28px;border-radius:20px}
+body:not(.portal-active) .brand .mark{width:104px;height:104px;margin:0 0 24px;border-radius:28px}
 body:not(.portal-active) .brand h1{max-width:520px;font-size:clamp(2rem,4vw,3.15rem);line-height:1.12;letter-spacing:-.055em}
-body:not(.portal-active) .brand h1 span[aria-label="AVeRA"]{color:var(--accent)}
+body:not(.portal-active) .brand h1 span[aria-label="GraceDesk"]{color:var(--accent)}
 body:not(.portal-active) .brand p{margin-top:12px;color:var(--muted);font-size:1.04rem}
+.brand-acronym{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin:10px 0 0;padding-left:12px;border-left:3px solid var(--accent);color:var(--muted);font-size:.9rem;font-weight:500;letter-spacing:.01em;line-height:1.5}
+.brand-acronym b{color:var(--accent);font-size:1.12em;font-weight:800}
+.brand-acronym .amp{color:var(--muted);opacity:.7}
 body:not(.portal-active) #authCard{
   width:100%;
   padding:clamp(24px,3vw,36px);
@@ -1158,6 +1161,18 @@ body:not(.portal-active) #authCard .tab{
   font-size:.9rem;
   transition:background .18s,color .18s,box-shadow .18s;
 }
+body:not(.portal-active) #authCard .auth-step-label{
+  margin:0 0 8px;
+  color:var(--muted);
+  font-size:.72rem;
+  font-weight:800;
+  letter-spacing:.09em;
+  line-height:1.3;
+  text-transform:uppercase;
+}
+body:not(.portal-active) #authCard .auth-mode-heading{margin:0 0 8px}
+body:not(.portal-active) #authCard .auth-mode-heading h2{margin:0;font-size:1.05rem;line-height:1.3}
+body:not(.portal-active) #authCard .auth-mode-heading p{margin:3px 0 0;color:var(--muted);font-size:.78rem}
 body:not(.portal-active) #authCard .tab[aria-selected="true"]{
   background:var(--card);
   color:var(--ink);
@@ -1263,6 +1278,16 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 .student-detail-group h3{margin:0 0 4px;color:var(--accent);font-size:.8rem;letter-spacing:.06em;text-transform:uppercase}
 .student-detail-group .details-grid{grid-template-columns:repeat(3,minmax(150px,1fr));min-width:0}
 .student-detail-group .detail-item dd{font-weight:600}
+.student-parent-link-controls{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:12px}
+.student-parent-link-controls .form-field{flex:1 1 260px;min-width:0;margin:0}
+.student-parent-link-controls .form-field label{margin:0 0 6px;font-size:.82rem}
+.student-parent-link-controls select{width:100%;min-height:44px;padding:8px 34px 8px 11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
+.student-parent-link-controls .btn{width:auto;margin:0}
+.student-parent-link-help{margin:8px 0 0;color:var(--muted);font-size:.82rem}
+.portal-entry-links{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:2px 0 18px;font-size:.8rem}
+.portal-entry-links a{padding:7px 10px;border:1px solid var(--line);border-radius:9px;color:var(--accent);font-weight:700;text-decoration:none}
+.portal-entry-links a:hover,.portal-entry-links a[aria-current="page"]{background:var(--soft)}
+body.portal-active .portal-entry-links{display:none}
 @media(max-width:800px){.student-detail-group .details-grid{grid-template-columns:1fr 1fr}.student-detail-head{flex-wrap:wrap}}
 @media(max-width:700px){.student-identity .student-sub{display:block}.roster-toolbar{padding:10px 14px}}
 .empty-state{padding:40px 22px}
@@ -1283,7 +1308,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   body:not(.portal-active) main:has(#authCard:not([hidden])){width:min(520px,100%);grid-template-columns:minmax(0,1fr);gap:16px}
   body:not(.portal-active) .brand{min-height:0;padding:22px 24px;border-radius:22px}
   body:not(.portal-active) .brand::after{right:-55px;bottom:-100px;width:210px}
-  body:not(.portal-active) .brand .mark{width:48px;height:48px;margin-bottom:14px;border-radius:15px}
+  body:not(.portal-active) .brand .mark{width:76px;height:76px;margin-bottom:14px;border-radius:22px}
   body:not(.portal-active) .brand h1{font-size:clamp(1.7rem,7vw,2.25rem)}
   body:not(.portal-active) .brand p{margin-top:7px;font-size:.92rem}
   body:not(.portal-active) #authCard{padding:24px}
@@ -1539,21 +1564,227 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   body.difficulty-index-printing .difficulty-index-summary h2{font-size:9pt}
   body.difficulty-index-printing .difficulty-index-summary-item,body.difficulty-index-printing .difficulty-index-formula{font-size:7.5pt}
 }
+#sf10Page{--sf10-accent:#237b69;display:grid;gap:20px}
+#sf10Page[hidden]{display:none}
+#sf10Page .page-heading{margin-bottom:0}
+.sf10-toolbar{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:14px;padding:16px 18px;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));border-radius:18px;background:linear-gradient(125deg,color-mix(in srgb,var(--soft) 58%,var(--card)),var(--card) 75%);box-shadow:0 6px 22px color-mix(in srgb,var(--ink) 5%,transparent)}
+.sf10-toolbar .form-field{flex:1 1 270px;max-width:480px;margin:0}
+.sf10-toolbar .form-field label,.sf10-field label{display:block;margin:0 0 6px;color:var(--muted);font-size:.72rem;font-weight:800;letter-spacing:.045em;text-transform:uppercase}
+.sf10-toolbar select,.sf10-field input,.sf10-field select,.sf10-field textarea{width:100%;min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);font:inherit;font-size:.86rem}
+.sf10-field input[type="number"]{font-variant-numeric:tabular-nums}
+.sf10-toolbar select:focus,.sf10-field input:focus,.sf10-field select:focus,.sf10-field textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--soft)}
+.sf10-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.sf10-save-status{flex:1 1 100%;min-height:20px;margin:0;color:var(--muted);font-size:.78rem;text-align:right}
+.sf10-save-status.error{color:var(--err)}
+.sf10-roster-notice{flex:1 1 100%;margin:0;color:var(--muted);font-size:.78rem}
+.sf10-roster-notice:empty{display:none}
+.sf10-note{margin:-8px 2px 0;color:var(--muted);font-size:.8rem}
+.sf10-card{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--card);box-shadow:0 8px 28px color-mix(in srgb,var(--ink) 5%,transparent)}
+.sf10-card-header{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:linear-gradient(110deg,color-mix(in srgb,var(--soft) 50%,var(--card)),var(--card) 78%)}
+.sf10-card-header h2,.sf10-card-header h3{margin:0;font-size:1rem;letter-spacing:-.02em}
+.sf10-card-header p{margin:3px 0 0;color:var(--muted);font-size:.8rem}
+.sf10-step{display:grid;flex:none;width:34px;height:34px;place-items:center;border-radius:11px;background:var(--soft);color:var(--accent);font-size:.8rem;font-weight:850}
+.sf10-section-body{padding:18px 20px}
+.sf10-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.sf10-fields.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sf10-fields-spaced{margin-top:14px}
+.sf10-divider{height:1px;margin:18px 0;background:var(--line)}
+.sf10-subheading{margin:0 0 12px;font-size:.88rem}
+.sf10-field{min-width:0}
+.sf10-field.full{grid-column:1/-1}
+.sf10-field textarea{min-height:74px;resize:vertical}
+.sf10-checks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.sf10-check{display:flex;align-items:flex-start;gap:9px;min-height:46px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:var(--field);font-size:.82rem;font-weight:650;line-height:1.35}
+.sf10-check input{flex:none;width:17px;height:17px;margin:1px 0 0;accent-color:var(--accent)}
+.sf10-grade-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.sf10-grade-card{min-width:0;border:1px solid var(--line);border-radius:15px;background:var(--card);overflow:hidden}
+.sf10-grade-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--soft) 42%,var(--card))}
+.sf10-grade-heading h3{margin:0;font-size:.93rem}
+.sf10-grade-heading span{color:var(--muted);font-size:.72rem;font-weight:750}
+.sf10-grade-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:13px}
+.sf10-grade-meta .sf10-field label{font-size:.64rem}
+.sf10-table-wrap{overflow-x:auto;border-top:1px solid var(--line);scrollbar-width:thin}
+.sf10-table{width:100%;min-width:700px;border-collapse:collapse;font-size:.74rem}
+.sf10-table th,.sf10-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+.sf10-table th{background:var(--field);color:var(--muted);font-size:.64rem;font-weight:800;letter-spacing:.025em}
+.sf10-table td:first-child{min-width:155px;font-weight:650}
+.sf10-table input{width:100%;min-width:58px;min-height:34px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;background:var(--field);color:var(--ink);font:inherit}
+.sf10-table input[type="number"]{text-align:center}
+.sf10-table input:focus{outline:2px solid var(--soft);border-color:var(--accent)}
+.sf10-table .sf10-average-row td{background:color-mix(in srgb,var(--soft) 46%,var(--card));font-weight:800}
+.sf10-remedial{padding:13px;border-top:1px solid var(--line)}
+.sf10-remedial h4{margin:0 0 9px;font-size:.76rem}
+.sf10-remedial-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.sf10-cert-list{display:grid;gap:14px}
+.sf10-cert-card{padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--field)}
+.sf10-cert-card h3{margin:0 0 12px;font-size:.86rem}
+.sf10-cert-card .sf10-fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+.sf10-empty-roster{display:none;margin:0;color:var(--muted);font-size:.78rem}
+@media(max-width:900px){.sf10-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.sf10-checks{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){#sf10Page{gap:14px}.sf10-toolbar{align-items:stretch;padding:14px}.sf10-toolbar .form-field{max-width:none}.sf10-actions .btn{flex:1 1 130px}.sf10-save-status{text-align:left}.sf10-section-body{padding:14px}.sf10-grade-grid{grid-template-columns:minmax(0,1fr)}.sf10-fields,.sf10-fields.two,.sf10-grade-meta,.sf10-remedial-dates,.sf10-cert-card .sf10-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.sf10-checks{grid-template-columns:minmax(0,1fr)}}
+@media print{
+  body.sf10-printing *{visibility:hidden!important}
+  body.sf10-printing #sf10Page,body.sf10-printing #sf10Page *{visibility:visible!important}
+  body.sf10-printing #sf10Page{display:block!important;position:absolute;inset:0;width:100%;padding:0;background:#fff;color:#111}
+  body.sf10-printing #sf10Page .sf10-toolbar,body.sf10-printing #sf10Page .sf10-note{display:none!important}
+  body.sf10-printing #sf10Page .page-heading{margin:0 0 12px}
+  body.sf10-printing #sf10Page .sf10-card,body.sf10-printing #sf10Page .sf10-grade-card,body.sf10-printing #sf10Page .sf10-cert-card{break-inside:avoid;box-shadow:none;background:#fff}
+  body.sf10-printing #sf10Page .sf10-grade-grid{grid-template-columns:1fr 1fr}
+  body.sf10-printing #sf10Page .sf10-table-wrap{overflow:visible}
+  body.sf10-printing #sf10Page .sf10-table{min-width:0;font-size:7pt}
+  body.sf10-printing #sf10Page .sf10-table th,body.sf10-printing #sf10Page .sf10-table td{padding:3px}
+  body.sf10-printing #sf10Page .sf10-table input,body.sf10-printing #sf10Page .sf10-field input,body.sf10-printing #sf10Page .sf10-field select{min-height:18px;padding:1px 3px;border:0;border-bottom:1px solid #999;border-radius:0;background:#fff;color:#111;font-size:7pt}
+  body.sf10-printing #sf10Page .sf10-grade-card{break-inside:auto}
+  body.sf10-printing #sf10Page .sf10-grade-meta{gap:4px;padding:7px}
+  body.sf10-printing #sf10Page .sf10-grade-heading{padding:6px 8px;background:#eee}
+  body.sf10-printing #sf10Page .sf10-section-body{padding:9px}
+}
+#sf10Page{display:block;gap:0;max-width:none}
+#sf10Page[hidden]{display:none}
+#sf10Page .page-heading{margin-bottom:14px}
+.sf10-toolbar{position:relative;display:grid;grid-template-columns:minmax(230px,1fr) auto;align-items:end;gap:8px 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:none}
+.sf10-toolbar .form-field{margin:0}
+.sf10-toolbar .form-field label{margin:0 0 5px}
+.sf10-toolbar select{min-height:38px;padding:7px 10px}
+.sf10-save-status{grid-column:1/-1;min-height:16px;text-align:left}
+.sf10-roster-notice{grid-column:1/-1}
+.sf10-note{margin:10px 0;color:var(--muted)}
+.sf10-pages{display:grid;justify-items:center;gap:22px;overflow-x:auto;padding:5px 0 18px}
+.sf10-page-tabs{display:flex;gap:8px;margin:12px 0 10px;padding:5px;border:1px solid var(--line);border-radius:13px;background:var(--card)}
+.sf10-page-tab{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 15px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-size:.86rem;font-weight:700;cursor:pointer;transition:background .16s,color .16s,border-color .16s}
+.sf10-page-tab span{font-size:.77rem;font-weight:600;opacity:.8}
+.sf10-page-tab[aria-selected="true"]{border-color:color-mix(in srgb,var(--accent) 25%,var(--line));background:var(--soft);color:var(--accent)}
+.sf10-page-tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sf10-sheet[hidden]{display:none}
+.sf10-sheet{width:8.1in;min-height:13.55in;padding:.13in .16in .12in;border:1px solid #555;background:#fff;color:#111;box-shadow:0 6px 24px rgba(22,33,45,.16);font-family:Arial,"Arial Narrow",sans-serif;font-size:7.2pt;line-height:1.13}
+.sf10-sheet *{box-sizing:border-box}
+.sf10-sheet-header{position:relative;display:grid;grid-template-columns:1fr 4fr 1fr;align-items:center;min-height:.78in;padding:2px 0 5px;text-align:center}
+.sf10-form-code{position:absolute;bottom:2px;left:2px;font-size:7pt;font-weight:700}
+.sf10-form-page{position:absolute;top:3px;right:2px;font-size:7pt}
+.sf10-header-logo{display:block;object-fit:contain}
+.sf10-header-seal{grid-column:1;grid-row:1;justify-self:start;width:.72in;height:.72in;margin-left:10px}
+.sf10-header-deped{grid-column:3;grid-row:1;justify-self:end;width:1.05in;height:.55in;margin-right:5px}
+.sf10-sheet-header-copy{grid-column:2}
+.sf10-sheet-header-copy p{margin:0 0 2px;font-size:8pt}
+.sf10-sheet-header-copy h2{margin:5px 0 2px;font-size:10pt;line-height:1.1}
+.sf10-sheet-header-copy small{font-size:7pt}
+.sf10-form-band{margin:4px 0 2px;padding:3px 4px;border:1px solid #222;background:#e8e8e8;font-size:7.3pt;font-weight:700;text-align:center;text-transform:uppercase}
+.sf10-form-section-title{margin:3px 0 0;padding:3px 4px;border:1px solid #222;border-bottom:0;font-size:7pt;font-weight:700;text-align:center;text-transform:uppercase}
+.sf10-person-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-top:1px solid #222;border-left:1px solid #222}
+.sf10-person-grid .sf10-form-cell{min-height:29px}
+.sf10-form-cell{min-width:0;padding:3px 4px;border-right:1px solid #222;border-bottom:1px solid #222}
+.sf10-span-2{grid-column:span 2}
+.sf10-form-cell label,.sf10-field label{display:block;margin:0;color:#111;font-size:6.2pt;font-weight:400;line-height:1.05;text-transform:none;letter-spacing:0}
+.sf10-form-cell input,.sf10-form-cell select,.sf10-form-cell textarea,.sf10-field input,.sf10-field select,.sf10-field textarea{display:block;width:100%;min-width:0;min-height:15px;margin:1px 0 0;padding:1px 2px;border:0;border-bottom:1px solid #aaa;border-radius:0;background:#fff;color:#111;font:inherit;font-size:7pt;line-height:1.1;box-shadow:none}
+.sf10-form-cell input:focus,.sf10-form-cell select:focus,.sf10-form-cell textarea:focus,.sf10-field input:focus,.sf10-field select:focus,.sf10-field textarea:focus{outline:1px solid #555;outline-offset:0;box-shadow:none}
+.sf10-form-cell select{-webkit-appearance:none;appearance:none}
+.sf10-eligibility{border:1px solid #222}
+.sf10-eligibility .sf10-form-section-title{margin:0;border:0;border-bottom:1px solid #222}
+.sf10-eligibility-grid{display:grid;grid-template-columns:1.1fr 1.1fr 1.8fr}
+.sf10-eligibility-check{display:flex;align-items:center;gap:3px;min-height:23px}
+.sf10-eligibility-check input{flex:none;width:10px;height:10px;margin:0;accent-color:#111}
+.sf10-eligibility-other{display:grid;grid-template-columns:1fr 1fr 1fr}
+.sf10-eligibility-other .sf10-form-cell{min-height:29px}
+.sf10-learning-records{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.sf10-grade-card{min-width:0;border:1px solid #222;border-radius:0;background:#fff;overflow:hidden}
+.sf10-grade-heading{display:none}
+.sf10-grade-heading h3{margin:0;font-size:7pt;font-weight:700;text-transform:uppercase}
+.sf10-grade-heading span{display:none}
+.sf10-grade-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:0}
+.sf10-grade-meta .sf10-field{min-height:26px;padding:3px 4px;border-right:1px solid #222;border-bottom:1px solid #222}
+.sf10-grade-meta .sf10-field:nth-child(4n){border-right:0}
+.sf10-grade-meta .sf10-field.sf10-meta-span-2{grid-column:span 2}
+.sf10-grade-meta .sf10-field.sf10-meta-span-3{grid-column:span 3}
+.sf10-grade-meta .sf10-field.sf10-meta-span-4{grid-column:span 4;border-right:0}
+.sf10-grade-meta .sf10-field label{font-size:5.8pt}
+.sf10-grade-meta .sf10-field input{min-height:13px;font-size:6.5pt}
+.sf10-table-wrap{overflow:visible;border:0}
+.sf10-table{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;font-size:6pt;line-height:1.05}
+.sf10-table th,.sf10-table td{height:16px;padding:1px 2px;border:1px solid #555;text-align:center;vertical-align:middle}
+.sf10-table th{background:#eee;color:#111;font-size:5.6pt;font-weight:700;letter-spacing:0}
+.sf10-table td:first-child{text-align:left;font-weight:400}
+.sf10-table input{width:100%;min-width:0;min-height:12px;padding:0 1px;border:0;border-radius:0;background:transparent;color:#111;font:inherit;text-align:center}
+.sf10-table td:first-child input{text-align:left}
+.sf10-table input:focus{outline:1px solid #555}
+.sf10-grade-table col.sf10-subject-col{width:28%}
+.sf10-grade-table col.sf10-grade-col{width:9%}
+.sf10-grade-table col.sf10-remarks-col{width:27%}
+.sf10-remedial-table col.sf10-subject-col{width:34%}
+.sf10-remedial-table col.sf10-grade-col{width:12%}
+.sf10-remedial-table col.sf10-remarks-col{width:30%}
+.sf10-grade-table tbody td:not(:first-child),.sf10-remedial-table tbody td:not(:first-child){height:22px;padding:0 2px}
+.sf10-grade-table tbody td input,.sf10-remedial-table tbody td input{display:block;width:100%;height:18px;min-height:18px;max-width:none;box-sizing:border-box;margin:0;padding:0 2px;border:0;border-radius:0;line-height:18px}
+.sf10-table .sf10-average-row td{background:#f1f1f1;font-weight:700}
+.sf10-grade-meta+.sf10-table-wrap{border-top:0}
+.sf10-remedial{padding:0;border-top:0}
+.sf10-remedial h4{margin:0;padding:3px 4px;border:1px solid #555;border-top:0;font-size:6pt;text-transform:uppercase}
+.sf10-remedial-dates{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0}
+.sf10-remedial-dates .sf10-field{padding:2px 4px;border-right:1px solid #555;border-bottom:1px solid #555}
+.sf10-remedial-dates .sf10-field:last-child{border-right:0}
+.sf10-back-extra{margin-top:5px}
+.sf10-extra-row{height:17px}
+.sf10-cert-list{display:grid;gap:4px}
+.sf10-cert-card{padding:0;border:1px solid #222;border-radius:0;background:#fff}
+.sf10-cert-card h3{margin:0;padding:3px;border-bottom:1px solid #222;font-size:6.5pt;text-align:center;text-transform:uppercase}
+.sf10-cert-card p{margin:0;padding:4px;font-size:6pt;line-height:1.25}
+.sf10-cert-card .sf10-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+.sf10-cert-card .sf10-fields .sf10-field{min-height:25px;padding:3px 4px;border-top:1px solid #aaa;border-right:1px solid #aaa}
+.sf10-cert-card .sf10-fields .sf10-field label{font-size:5.5pt}
+.sf10-cert-card .sf10-fields .sf10-field input{min-height:12px;font-size:6pt}
+.sf10-cert-signatures{display:grid;grid-template-columns:1fr 1fr 1fr;min-height:30px}
+.sf10-cert-signatures span{padding:14px 3px 2px;border-top:1px solid #aaa;border-right:1px solid #aaa;text-align:center;font-size:5.7pt}
+.sf10-cert-signatures span:last-child{border-right:0}
+.sf10-sheet-footer{display:flex;justify-content:space-between;margin-top:5px;font-size:5.5pt}
+.sf10-additional-records{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px}
+.sf10-additional-record{border:1px solid #222}
+.sf10-additional-record .sf10-grade-meta{grid-template-columns:1fr 1fr}
+.sf10-additional-record .sf10-extra-subject{width:100%;min-width:0;border:0;background:#fff;font:inherit;font-size:5.8pt}
+.sf10-additional-record .sf10-grade-meta{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sf10-additional-record .sf10-grade-meta .sf10-field:nth-child(2n){border-right:1px solid #222}
+.sf10-additional-record .sf10-grade-meta .sf10-field:nth-child(4n){border-right:0}
+.sf10-cert-statement{padding:4px 6px;border-bottom:1px solid #aaa;line-height:1.55}
+.sf10-cert-statement input{display:inline-block;width:100px;min-height:14px;padding:0 2px;border:0;border-bottom:1px solid #555;border-radius:0;background:transparent;font:inherit;vertical-align:baseline}
+.sf10-cert-card .sf10-fields .sf10-field:last-child{border-right:0}
+.sf10-cert-card .sf10-cert-signatures span:nth-child(2){border-right:0}
+@media(max-width:680px){.sf10-toolbar{grid-template-columns:1fr}.sf10-actions .btn{flex:1 1 130px}.sf10-save-status,.sf10-roster-notice{grid-column:auto}.sf10-sheet{flex:none}.sf10-pages{justify-items:start}.sf10-page-tabs{display:grid;grid-template-columns:1fr 1fr}.sf10-page-tab{justify-content:center;padding:8px}.sf10-note{font-size:.74rem}}
+@media print{
+  @page sf10form{size:legal portrait;margin:.18in}
+  body.sf10-printing{display:block!important;min-height:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
+  body.sf10-printing *{visibility:hidden!important}
+  body.sf10-printing #sf10Page,body.sf10-printing #sf10Page *{visibility:visible!important}
+  body.sf10-printing #sf10Page{display:block!important;position:absolute;inset:0;width:100%;max-width:none;padding:0;background:#fff;color:#111}
+  body.sf10-printing #sf10Page>.page-heading,body.sf10-printing #sf10Page>.sf10-toolbar,body.sf10-printing #sf10Page>.sf10-note{display:none!important}
+  body.sf10-printing #sf10Page .sf10-page-tabs{display:none!important}
+  body.sf10-printing #sf10Page .sf10-pages{display:block;overflow:visible;padding:0}
+  body.sf10-printing #sf10Page .sf10-sheet[hidden]{display:block!important}
+  body.sf10-printing #sf10Page .sf10-sheet{page:sf10form;width:100%;min-height:13.5in;margin:0;border:0;box-shadow:none;break-after:page;page-break-after:always}
+  body.sf10-printing #sf10Page .sf10-sheet:last-child{break-after:auto;page-break-after:auto}
+  body.sf10-printing #sf10Page .sf10-table-wrap{overflow:visible}
+  body.sf10-printing #sf10Page .sf10-sheet input,body.sf10-printing #sf10Page .sf10-sheet select{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
 </style>
 </head>
 <body>
 <main>
   <header class="brand">
-    <div class="mark has-logo"><img src="/icon.png" alt="AVeRA app icon"></div>
-    <h1><span aria-label="AVeRA">AVeRA</span> Class Adviser's Portal</h1>
+    <div class="mark has-logo"><img src="/icon.png" alt="GraceDesk app icon"></div>
+    <h1><span aria-label="GraceDesk">GraceDesk</span></h1>
+    <div class="brand-acronym" aria-label="Grade Records, Assessment and Classroom Essentials">
+      <span><b>G</b>rade</span><span><b>R</b>ecords,</span><span><b>A</b>ssessment</span><span class="amp">&amp;</span><span><b>C</b>lassroom</span><span><b>E</b>ssentials</span>
+    </div>
     <p id="tagline">Welcome back. Sign in to your classroom.</p>
   </header>
 
   <section class="card" id="authCard" aria-live="polite">
     <div id="auth">
+      <div class="auth-mode-heading">
+        <p class="auth-step-label">Account access</p>
+        <h2 id="authModeTitle">Teacher sign in</h2>
+        <p id="authModeDescription">Use your teacher account to continue.</p>
+      </div>
       <div class="tabs" role="tablist">
         <button class="tab" role="tab" data-mode="in" aria-selected="true">Sign in</button>
-        <button class="tab" role="tab" data-mode="up" aria-selected="false">Sign up</button>
+        <button class="tab" role="tab" data-mode="up" aria-selected="false">Create account</button>
       </div>
       <form id="form" novalidate>
         <div id="nameWrap" hidden>
@@ -1602,6 +1833,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           <p class="field-hint" id="teacherStrandHint">Required for Grades 11–12. When strand-specific subjects are not mapped, only Core Subjects are enabled.</p>
           <p class="err" data-for="strand"></p>
         </div>
+        <div id="parentClassCodeWrap" hidden>
+          <label for="parentClassCode">Class code</label>
+          <input id="parentClassCode" autocomplete="off" maxlength="100" aria-describedby="parentClassCodeHint">
+          <p class="field-hint" id="parentClassCodeHint">Ask your child's teacher for the class code to connect your account to the correct classroom.</p>
+          <p class="err" data-for="classCode"></p>
+        </div>
         <button class="btn" type="submit" id="submit">Sign in</button>
         <p class="msg" id="msg" role="alert"></p>
       </form>
@@ -1612,10 +1849,15 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       <p class="msg" style="display:block; margin-top:16px; color:var(--err);">JavaScript is required to load this portal.</p>
     </noscript>
   </section>
+  <nav class="portal-entry-links" aria-label="Choose a portal">
+    <a class="portal-entry-link" data-entry="main" href="/">Classroom Portal</a>
+    <a class="portal-entry-link" data-entry="parents" href="/parents">Parents Portal</a>
+    <a class="portal-entry-link" data-entry="admin" href="/admin">Admin Portal</a>
+  </nav>
   <div id="portal" class="portal-view" hidden>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Main menu">
-        <div class="side-brand"><div class="mark has-logo" aria-hidden="true"><img id="sideBrandLogo" src="/icon.png" alt=""></div><span id="sideBrandTitle">Class Adviser's Portal</span></div>
+        <div class="side-brand"><div class="mark has-logo" aria-hidden="true"><img id="sideBrandLogo" src="/icon.png" alt=""></div><span id="sideBrandTitle">GraceDesk</span></div>
         <div class="account-chip"><strong id="sideName"></strong><span id="sideRole"></span></div>
         <div class="admin-class-switcher" id="adminClassSwitcher" hidden>
           <label for="adminActiveClass">Admin class access</label>
@@ -1639,6 +1881,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
             </button>
             <button class="nav-link" id="navTermGrades" type="button">
               <span class="nav-icon" aria-hidden="true">▦</span>Term Grade (SF9)
+            </button>
+            <button class="nav-link" id="navSf10" type="button" hidden>
+              <span class="nav-icon" aria-hidden="true">▦</span>SF 10
             </button>
             <button class="nav-link" id="navGradeSummary" type="button">
               <span class="nav-icon" aria-hidden="true">▤</span>Summary of Grades
@@ -1704,14 +1949,14 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         <div class="sidebar-bottom">
           <button class="logout-link" type="button" data-logout>Sign out</button>
           <img class="sidebar-footer-icon" src="/icon.png" alt="" aria-hidden="true">
-          <span class="sidebar-footer-version">Version 1.0.22</span>
+          <span class="sidebar-footer-version">GraceDesk · Version 1.0.26</span>
         </div>
       </aside>
       <button class="sidebar-scrim" id="sidebarScrim" type="button" aria-label="Close menu"></button>
       <section class="workspace" id="workspace">
         <header class="topbar">
           <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">☰<span class="sr-only">Open navigation menu</span></button>
-          <div class="topbar-title"><span id="topbarPageSubtitle">Class Adviser's Portal</span><strong id="topbarPageTitle">Classroom dashboard</strong></div>
+          <div class="topbar-title"><span id="topbarPageSubtitle">GraceDesk</span><strong id="topbarPageTitle">Classroom dashboard</strong></div>
           <div class="topbar-account">
             <button class="topbar-profile" id="topProfileButton" type="button" aria-label="Open teacher profile">
               <span class="topbar-profile-avatar" id="topProfileAvatar" aria-hidden="true">
@@ -1727,7 +1972,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         <div class="page-content">
           <div class="update-banner" id="updateBanner" role="status" hidden>
             <span class="update-banner-icon" aria-hidden="true">⬆</span>
-            <span class="update-banner-text" id="updateBannerText">A new version of AVeRA is available.</span>
+            <span class="update-banner-text" id="updateBannerText">GraceDesk version X is available.</span>
             <button class="update-banner-action" id="updateBannerAction" type="button">Update now</button>
             <button class="update-banner-close" id="updateBannerClose" type="button" aria-label="Dismiss update notice">×</button>
           </div>
@@ -2194,6 +2439,85 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
               <div class="grade-interpretation" id="gradeInterpretation"></div>
             </form>
             <p class="notice" id="gradeNotice" role="status" aria-live="polite"></p>
+          </section>
+          <section id="sf10Page" aria-labelledby="sf10Title" hidden>
+            <div class="page-heading">
+              <div><h1 id="sf10Title">School Form 10</h1><p>Learner Permanent Academic Record for Elementary School · SF10-ES</p></div>
+            </div>
+            <div class="sf10-toolbar">
+              <div class="form-field"><label for="sf10LearnerSelect">Learner record</label><select id="sf10LearnerSelect"><option value="">Enter learner manually</option></select></div>
+              <div class="sf10-actions">
+                <button class="btn ghost" id="sf10Print" type="button">Print / Save PDF</button>
+                <button class="btn primary" id="sf10Save" type="button">Save draft</button>
+              </div>
+              <p class="sf10-save-status" id="sf10SaveStatus" role="status" aria-live="polite"></p>
+              <p class="sf10-roster-notice" id="sf10RosterNotice" role="status" aria-live="polite"></p>
+            </div>
+            <p class="sf10-note">Drafts are saved in this browser on this device. Use Print / Save PDF to create a printable copy.</p>
+            <div class="sf10-page-tabs" role="tablist" aria-label="SF 10 pages">
+              <button class="sf10-page-tab" id="sf10FrontTab" type="button" role="tab" aria-selected="true" aria-controls="sf10FrontPage" tabindex="0">Page 1 <span>Front</span></button>
+              <button class="sf10-page-tab" id="sf10BackTab" type="button" role="tab" aria-selected="false" aria-controls="sf10BackPage" tabindex="-1">Page 2 <span>Back</span></button>
+            </div>
+            <form id="sf10Form" autocomplete="off">
+              <div class="sf10-pages">
+                <section class="sf10-sheet" id="sf10FrontPage" role="tabpanel" aria-labelledby="sf10FrontTab" aria-label="SF10-ES front page">
+                  <header class="sf10-sheet-header">
+                    <span class="sf10-form-code">SF10-ES</span>
+                    <img class="sf10-header-logo sf10-header-seal" src="/sf10-deped-seal.png" alt="">
+                    <div class="sf10-sheet-header-copy">
+                      <p>Republic of the Philippines</p>
+                      <p>Department of Education</p>
+                      <h2>Learner Permanent Academic Record for Elementary School (SF10-ES)</h2>
+                      <small>(Formerly Form 137)</small>
+                    </div>
+                    <img class="sf10-header-logo sf10-header-deped" src="/sf10-deped-logo.gif" alt="">
+                  </header>
+                  <div class="sf10-form-band">Learner's Personal Information</div>
+                  <div class="sf10-person-grid">
+                    <div class="sf10-form-cell"><label for="sf10LastName">Last Name</label><input id="sf10LastName" data-sf10-field="learner.lastName" autocomplete="family-name"></div>
+                    <div class="sf10-form-cell"><label for="sf10FirstName">First Name</label><input id="sf10FirstName" data-sf10-field="learner.firstName" autocomplete="given-name"></div>
+                    <div class="sf10-form-cell"><label for="sf10NameExtension">Name Extn. (Jr, I, II)</label><input id="sf10NameExtension" data-sf10-field="learner.nameExtension"></div>
+                    <div class="sf10-form-cell"><label for="sf10MiddleName">Middle Name</label><input id="sf10MiddleName" data-sf10-field="learner.middleName"></div>
+                    <div class="sf10-form-cell sf10-span-2"><label for="sf10Lrn">Learner Reference Number (LRN)</label><input id="sf10Lrn" data-sf10-field="learner.lrn" inputmode="numeric" maxlength="12"></div>
+                    <div class="sf10-form-cell"><label for="sf10Birthdate">Birthdate (mm/dd/yyyy)</label><input id="sf10Birthdate" type="date" data-sf10-field="learner.birthdate"></div>
+                    <div class="sf10-form-cell"><label for="sf10Sex">Sex</label><select id="sf10Sex" data-sf10-field="learner.sex"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+                  </div>
+                  <div class="sf10-eligibility">
+                    <div class="sf10-form-section-title">Eligibility for Elementary School Enrollment</div>
+                    <div class="sf10-eligibility-grid">
+                      <div class="sf10-form-cell"><label>Credential Presented for Grade 1</label><label class="sf10-eligibility-check"><input type="checkbox" data-sf10-field="eligibility.kinderProgress">Kinder Progress Report</label></div>
+                      <div class="sf10-form-cell"><label>&nbsp;</label><label class="sf10-eligibility-check"><input type="checkbox" data-sf10-field="eligibility.eccdChecklist">ECCD Checklist</label></div>
+                      <div class="sf10-form-cell"><label>&nbsp;</label><label class="sf10-eligibility-check"><input type="checkbox" data-sf10-field="eligibility.kindergartenCertificate">Kindergarten Certificate of Completion</label></div>
+                    </div>
+                    <div class="sf10-eligibility-other">
+                      <div class="sf10-form-cell"><label for="sf10EligibilitySchool">Name of School</label><input id="sf10EligibilitySchool" data-sf10-field="eligibility.school"></div>
+                      <div class="sf10-form-cell"><label for="sf10EligibilitySchoolId">School ID</label><input id="sf10EligibilitySchoolId" data-sf10-field="eligibility.schoolId"></div>
+                      <div class="sf10-form-cell"><label for="sf10EligibilityAddress">Address of School</label><input id="sf10EligibilityAddress" data-sf10-field="eligibility.address"></div>
+                      <div class="sf10-form-cell"><label class="sf10-eligibility-check"><input type="checkbox" data-sf10-field="eligibility.peptPasser">PEPT Passer</label><label for="sf10PeptRating">Rating</label><input id="sf10PeptRating" data-sf10-field="eligibility.peptRating"></div>
+                      <div class="sf10-form-cell"><label for="sf10AssessmentDate">Date of Examination/Assessment (mm/dd/yyyy)</label><input id="sf10AssessmentDate" type="date" data-sf10-field="eligibility.assessmentDate"></div>
+                      <div class="sf10-form-cell"><label for="sf10OtherCredential">Others (Pls. Specify)</label><input id="sf10OtherCredential" data-sf10-field="eligibility.otherCredential"></div>
+                      <div class="sf10-form-cell sf10-span-2"><label for="sf10TestingCenter">Name and Address of Testing Center</label><input id="sf10TestingCenter" data-sf10-field="eligibility.testingCenter"></div>
+                      <div class="sf10-form-cell"><label for="sf10EligibilityRemark">Remark</label><input id="sf10EligibilityRemark" data-sf10-field="eligibility.remark"></div>
+                    </div>
+                  </div>
+                  <div class="sf10-form-band">Scholastic Record</div>
+                  <div id="sf10FrontGrades" class="sf10-learning-records"></div>
+                  <div class="sf10-sheet-footer"><span>* for learners who are ALS completers or PEPT passers</span><span>Revised 2025 based on DepEd Order No. 10, s. 2024</span></div>
+                </section>
+                <section class="sf10-sheet" id="sf10BackPage" role="tabpanel" aria-labelledby="sf10BackTab" aria-label="SF10-ES back page" hidden>
+                  <header class="sf10-sheet-header">
+                    <span class="sf10-form-code">SF10-ES</span>
+                    <span class="sf10-form-page">Page 2 of ____</span>
+                    <div class="sf10-sheet-header-copy"><h2>SCHOLASTIC RECORD</h2></div>
+                  </header>
+                  <div id="sf10BackGrades" class="sf10-learning-records"></div>
+                  <div id="sf10AdditionalRecords" class="sf10-additional-records"></div>
+                  <div class="sf10-form-band">For Transfer Out / Elementary School Completer Only</div>
+                  <div id="sf10Certifications" class="sf10-cert-list"></div>
+                  <div class="sf10-sheet-footer"><span>May add Certification Box if needed</span><span>Revised 2025 based on DepEd Order No. 10, s. 2024</span></div>
+                </section>
+              </div>
+            </form>
           </section>
           <section id="gradeSummaryPage" aria-labelledby="gradeSummaryTitle" hidden>
             <div class="page-heading">
@@ -2867,7 +3191,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
               <section class="data-card settings-card" aria-labelledby="appUpdatesTitle">
                 <div class="settings-card-header">
                   <h2 id="appUpdatesTitle">App updates</h2>
-                  <p>Click Update to download the newest AVeRA. The app restarts by itself when the update is ready. Your data is kept.</p>
+                  <p>Click Update to download the newest GraceDesk. The app restarts by itself when the update is ready. Your data is kept.</p>
                 </div>
                 <div class="settings-card-body">
                   <button class="btn settings-update-link" id="updateButton" type="button">Update</button>
@@ -2875,8 +3199,23 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                     <div class="update-progress-bar" role="progressbar" aria-labelledby="updateNotice" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="updateProgressBar"><span id="updateProgressFill"></span></div>
                     <div class="update-progress-meta"><span id="updateProgressPercent">0%</span><span id="updateProgressSize"></span></div>
                   </div>
-                  <a class="field-hint" id="updateManualLink" href="https://github.com/Bontoy2025/Advisers_Portal/releases" target="_blank" rel="noopener noreferrer" hidden>Download manually from GitHub</a>
+                  <a class="field-hint" id="updateManualLink" href="https://github.com/bloodheaddemogorgon-ops/avera-portal/releases" target="_blank" rel="noopener noreferrer" hidden>Download manually from GitHub</a>
                   <p class="notice" id="updateNotice" role="status" aria-live="polite"></p>
+                </div>
+              </section>
+              <section class="data-card settings-card" aria-labelledby="syncDataTitle">
+                <div class="settings-card-header">
+                  <h2 id="syncDataTitle">Online data sync</h2>
+                  <p>Portal records are saved locally and synchronized with PostgreSQL when the online database is available.</p>
+                </div>
+                <div class="settings-card-body">
+                  <button class="btn settings-update-link" id="syncDataButton" type="button">Synchronize Data Online</button>
+                  <p class="notice" id="syncDataNotice" role="status" aria-live="polite"></p>
+                  <div id="syncConflictActions" hidden>
+                    <p class="field-hint">Both versions are preserved. Choose which complete workbook to keep. This replaces the other copy.</p>
+                    <button class="btn settings-update-link" id="keepLocalSync" type="button">Keep this device's data</button>
+                    <button class="btn ghost settings-update-link" id="keepOnlineSync" type="button">Keep online data</button>
+                  </div>
                 </div>
               </section>
             </div>
@@ -2931,7 +3270,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           </section>
           <section id="parentPage" aria-labelledby="parentPortalTitle" hidden>
             <div class="page-heading parent-welcome">
-              <div><h1 id="parentPortalTitle">Parent Portal</h1><p id="parentWelcomeMessage">Welcome.</p></div>
+              <div><h1 id="parentPortalTitle">Parent Portal</h1><p id="parentWelcomeMessage">Welcome.</p><p class="field-hint" id="parentPortalSyncStatus" role="status" aria-live="polite">Teacher updates sync automatically while this portal is open.</p></div>
+              <div class="heading-actions"><button class="btn ghost" id="refreshParentPortal" type="button">Refresh data</button></div>
             </div>
             <div class="parent-overview">
               <article class="data-card parent-info-card"><span class="parent-info-icon" aria-hidden="true">⌂</span><div><span>Classroom</span><strong id="parentClassroom">Loading class...</strong></div></article>
@@ -3132,7 +3472,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   </form>
 </dialog>
 <dialog class="dialog forced-password-dialog" id="forcedPasswordDialog" aria-labelledby="forcedPasswordTitle">
-  <div class="dialog-header"><div><h2 id="forcedPasswordTitle">Set a new password</h2><p>Your administrator reset your password. Change the temporary password before continuing.</p></div></div>
+  <div class="dialog-header"><div><h2 id="forcedPasswordTitle">Set a new password</h2><p>Change your temporary password before continuing. Use at least 12 characters.</p></div></div>
   <form class="student-form" id="forcedPasswordForm">
     <div class="form-field">
       <label for="forcedCurrentPassword">Temporary password</label>
@@ -3140,11 +3480,11 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     </div>
     <div class="form-field">
       <label for="forcedNewPassword">New password</label>
-      <input id="forcedNewPassword" type="password" autocomplete="new-password" minlength="6" maxlength="256" required>
+      <input id="forcedNewPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
     </div>
     <div class="form-field">
       <label for="forcedConfirmPassword">Confirm new password</label>
-      <input id="forcedConfirmPassword" type="password" autocomplete="new-password" minlength="6" maxlength="256" required>
+      <input id="forcedConfirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" required>
     </div>
     <p class="notice error" id="forcedPasswordError" role="alert"></p>
     <div class="form-actions"><button class="btn" id="saveForcedPassword" type="submit">Change password</button></div>
@@ -3156,7 +3496,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   </div>
   <div class="about-content" id="aboutTermsDescription">
     <h3>About this app</h3>
-    <p>This application was designed by a Grade Adviser of Balintawak Elementary School to support teachers in managing classroom records and learner information more efficiently. By consolidating essential record-keeping functions into a single platform, the app aims to reduce administrative workload and promote more effective classroom management.</p>
+    <p><strong>GraceDesk — Every record, one desk.</strong> This application was designed by a Grade Adviser of Balintawak Elementary School to support teachers in managing classroom records and learner information more efficiently. By consolidating essential record-keeping functions into a single platform, the app aims to reduce administrative workload and promote more effective classroom management.</p>
     <p>The development of this application was assisted by AI-based tools; however, full responsibility for its content, operation, and use rests with the developer and its users. This application is independently developed and is not affiliated with, endorsed by, or representative of the Department of Education (DepEd).</p>
 
     <h3>Disclaimer</h3>
@@ -3182,14 +3522,25 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 
 <script>
 (function(){
+  var entryType=document.documentElement.dataset.portalEntry||"main";
   var mode="in";
+  var accountType=entryType==="parents"?"parent":"teacher";
+  function localISODate(d){
+    d=d||new Date();
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  }
   var currentUser=null;
   var parentPortalData=null;
+  var parentPortalRefreshInProgress=false;
   var parentSelectedLearnerIndex=0;
   var adminClasses=[];
   var adminAccountsData=[];
   var gradeStudents=[];
+  var sf10Students=[];
+  var sf10ActiveRecordKey="manual";
+  var sf10Initialized=false;
   var rosterStudents=[];
+  var rosterParents=[];
   var inactiveStudentIds=new Set();
   var handledSections=[];
   var sectionGrades={};
@@ -3250,6 +3601,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   var activeGradeSelection={studentId:"",term:"Term 1"};
   var gradesDirty=false;
   var activeTermLocked=false;
+  var onlineSyncState="disabled";
   var activeEClassGradeSubjects=new Set();
   var gradeRecordLoading=false;
   var gradeRecordAvailable=false;
@@ -3401,18 +3753,55 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   });
 
   function render(){
-    document.documentElement.dataset.role="teacher";
+    document.documentElement.dataset.role=accountType;
     var up=mode==="up";
-    $("tagline").textContent=up?"Create an account for your classroom.":"Sign in to your classroom.";
-    document.querySelectorAll(".tab").forEach(function(b){b.setAttribute("aria-selected",String(b.dataset.mode===mode))});
+    var isParent=accountType==="parent";
+    var isParentsEntry=entryType==="parents";
+    var isAdminEntry=entryType==="admin";
+    var portalName=isParentsEntry?"Parents Portal":isAdminEntry?"Admin Portal":"GraceDesk";
+    document.title=portalName+" · GraceDesk";
+    document.querySelector(".brand h1 span").textContent=portalName;
+    document.querySelector(".brand h1 span").setAttribute("aria-label",portalName);
+    document.querySelector(".brand-acronym").hidden=entryType!=="main";
+    document.querySelectorAll(".portal-entry-link").forEach(function(link){
+      if(link.dataset.entry===entryType)link.setAttribute("aria-current","page");
+      else link.removeAttribute("aria-current");
+    });
+    $("tagline").textContent=isParentsEntry
+      ?"Sign in to view your child's learning."
+      :isAdminEntry
+        ?"Sign in to manage all classes and accounts."
+        :isParent
+      ?up?"Create an account to follow your child's learning.":"Sign in to view your child's learning."
+      :up?"Create an account for your classroom.":"Sign in to your classroom.";
+    $("authModeTitle").textContent=isAdminEntry
+      ?"Administrator sign in"
+      :(isParent?"Parent / Guardian":"Teacher")+" "+(up?"create account":"sign in");
+    $("authModeDescription").textContent=isAdminEntry
+      ?"Use an existing administrator account to continue."
+      :isParent
+      ?up?"Register with the class code shared by your child's teacher.":"View attendance, reading progress, and grades shared by the teacher."
+      :up?"Create your account and set up your classroom.":"Manage your classroom and learner records.";
+    document.querySelectorAll("#auth [role='tablist'] .tab").forEach(function(b){
+      b.setAttribute("aria-selected",String(b.dataset.mode===mode));
+    });
+    document.querySelector("#auth [role='tablist']").hidden=isAdminEntry;
+    document.querySelector("#auth [data-mode='up']").hidden=isAdminEntry;
     $("nameWrap").hidden=!up;
-    $("teacherGradeWrap").hidden=!up;
+    $("teacherGradeWrap").hidden=!up||isParent;
     var gradeLevel=$("teacherGrade").value;
     var isSeniorHigh=gradeLevel==="Grade 11"||gradeLevel==="Grade 12";
-    $("teacherStrandWrap").hidden=!up||!isSeniorHigh;
+    $("teacherStrandWrap").hidden=!up||isParent||!isSeniorHigh;
     if(!isSeniorHigh)$("teacherStrand").value="";
-    $("authHint").textContent="Teachers create a classroom when they sign up.";
-    $("submit").textContent=up?"Create my account":"Sign in";
+    $("parentClassCodeWrap").hidden=!up||!isParent;
+    $("authHint").textContent=isAdminEntry
+      ?"Use an existing administrator account. Administrator accounts cannot be created here."
+      :isParent
+      ?up?"Your child's learner record will appear after their teacher links it to your account."
+        :"New to the portal? Choose Create account and enter the class code from the teacher."
+      :up?"Your classroom is created as part of teacher registration."
+        :"New to the portal? Choose Create account to get started.";
+    $("submit").textContent=up?(isParent?"Create parent account":"Create my account"):"Sign in";
     $("pw").autocomplete=up?"new-password":"current-password";
     clearErrs();
   }
@@ -3447,30 +3836,68 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     return result;
   }
 
-  document.querySelectorAll(".tab").forEach(function(b){b.onclick=function(){mode=b.dataset.mode;render()}});
+  function applyStorageHealth(result){
+    onlineSyncState=result.storage==="dual"?result.sync:"disabled";
+    $("storageStatus").textContent=result.storage==="dual"
+      ?result.sync==="synced"?"Connected. Portal records are saved locally and synchronized online."
+        :result.sync==="conflict"?"Local and online data changed independently. Sync is paused to protect both copies; contact an administrator."
+          :result.sync==="offline"?"Offline mode. Portal records are saved locally and will synchronize when online."
+            :"Connected locally. Online synchronization is pending."
+      :"Connected. Portal records are saved to the configured database.";
+    $("syncDataButton").hidden=result.storage!=="dual";
+    $("syncConflictActions").hidden=!(result.storage==="dual"&&result.sync==="conflict"
+      &&currentUser&&currentUser.isAdmin);
+    if(result.storage!=="dual"){
+      $("syncDataNotice").textContent="Dual storage is not enabled on this server.";
+    }else if(result.sync==="synced"){
+      $("syncDataNotice").textContent="Local and online portal records are synchronized.";
+    }else if(result.sync==="conflict"){
+      $("syncDataNotice").textContent=currentUser&&currentUser.isAdmin
+        ?"A conflict is paused. Review both copies before choosing one."
+        :"Synchronization is paused. An administrator must review the two saved copies.";
+    }else if(result.sync==="offline"){
+      $("syncDataNotice").textContent="The online database is unavailable. Local changes are kept and will retry automatically.";
+    }else{
+      $("syncDataNotice").textContent="Local changes are waiting to synchronize.";
+    }
+  }
+
+  document.querySelectorAll(".tab[role='tab']").forEach(function(b){b.onclick=function(){mode=b.dataset.mode;render()}});
   $("showPw").onclick=function(){var p=$("pw"),s=p.type==="password";p.type=s?"text":"password";this.textContent=s?"Hide":"Show"};
 
   $("form").onsubmit=async function(e){
     e.preventDefault();clearErrs();
     var up=mode==="up",ok=true;
+    var role=accountType;
+    var isParent=role==="parent";
     var name=$("name").value.trim(),email=$("email").value.trim().toLowerCase(),pw=$("pw").value;
+    var classCode=$("parentClassCode").value.trim();
     var grade=$("teacherGrade").value.trim();
     var strand=$("teacherStrand").value;
     if(up&&!name){setErr("name","Enter your name.");ok=false}
     if(!/^\S+@\S+\.\S+$/.test(email)){setErr("email","Enter an email like name@example.com.");ok=false}
     if(!pw){setErr("pw","Enter a password.");ok=false}
     else if(up&&pw.length<6){setErr("pw","Use at least 6 characters.");ok=false}
-    if(up&&!grade){setErr("grade","Enter your grade level.");ok=false}
-    if(up&&(grade==="Grade 11"||grade==="Grade 12")&&!strand){setErr("strand","Choose the student's strand.");ok=false}
+    if(up&&isParent&&!classCode){setErr("classCode","Enter the class code shared by your child's teacher.");ok=false}
+    if(up&&!isParent&&!grade){setErr("grade","Enter your grade level.");ok=false}
+    if(up&&!isParent&&(grade==="Grade 11"||grade==="Grade 12")&&!strand){setErr("strand","Choose the student's strand.");ok=false}
     if(!ok)return;
     var submit=$("submit");
     submit.disabled=true;
-    submit.textContent=up?"Saving account...":"Signing in...";
+    submit.textContent=up?(isParent?"Creating parent account...":"Saving account..."):"Signing in...";
     try{
       var result=await api(up?"/api/auth/register":"/api/auth/login",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name:name,email:email,password:pw,role:"teacher",grade:grade,strand:strand})
+        body:JSON.stringify({
+          name:name,
+          email:email,
+          password:pw,
+          role:role,
+          extra:isParent?classCode:undefined,
+          grade:grade,
+          strand:strand
+        })
       });
       await enter(result.user);
     }catch(error){
@@ -3479,7 +3906,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         :error.message;
     }finally{
       submit.disabled=false;
-      submit.textContent=up?"Create my account":"Sign in";
+      submit.textContent=up?(accountType==="parent"?"Create parent account":"Create my account"):"Sign in";
     }
   };
 
@@ -3654,6 +4081,70 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       section.append(heading,grid);
       view.appendChild(section);
     });
+    var parentSection=document.createElement("section");
+    parentSection.className="student-detail-group";
+    var parentHeading=document.createElement("h3");
+    parentHeading.textContent="Parent access";
+    var parentDescription=document.createElement("p");
+    parentDescription.className="student-parent-link-help";
+    parentDescription.textContent="Link a parent account to share this pupil's attendance, reading progress, and term grades in the Parent Portal.";
+    var parentControls=document.createElement("div");
+    parentControls.className="student-parent-link-controls";
+    var parentField=document.createElement("div");
+    parentField.className="form-field";
+    var parentLabel=document.createElement("label");
+    parentLabel.htmlFor="studentParentAccount";
+    parentLabel.textContent="Parent / Guardian account";
+    var parentSelect=document.createElement("select");
+    parentSelect.id="studentParentAccount";
+    parentSelect.setAttribute("aria-label","Choose a parent account for "+fullName);
+    parentSelect.add(new Option("No parent linked", ""));
+    rosterParents.forEach(function(parent){
+      var label=parent.name+(parent.email?" · "+parent.email:"");
+      parentSelect.add(new Option(label,parent.id));
+    });
+    parentSelect.value=rosterParents.some(function(parent){return parent.id===student.parentUserId})
+      ?student.parentUserId
+      :"";
+    parentField.append(parentLabel,parentSelect);
+    var saveParentButton=document.createElement("button");
+    saveParentButton.type="button";
+    saveParentButton.className="btn ghost";
+    saveParentButton.textContent="Save parent link";
+    saveParentButton.addEventListener("click",async function(){
+      saveParentButton.disabled=true;
+      saveParentButton.textContent="Saving...";
+      $("studentNotice").textContent="";
+      $("studentNotice").classList.remove("error");
+      try{
+        var result=await api("/api/students/"+encodeURIComponent(student.id)+"/parent",{
+          method:"PUT",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({parentUserId:parentSelect.value})
+        });
+        if(!result.saved)throw new Error("The parent link was not saved. Refresh the roster and try again.");
+        student.parentUserId=result.parentUserId||"";
+        var rosterStudent=rosterStudents.find(function(item){return item.id===student.id});
+        if(rosterStudent)rosterStudent.parentUserId=student.parentUserId;
+        $("studentNotice").textContent=student.parentUserId
+          ?"Parent account linked. Their portal will show this pupil's shared records."
+          :"Parent account unlinked.";
+      }catch(error){
+        $("studentNotice").textContent=error.message;
+        $("studentNotice").classList.add("error");
+      }finally{
+        saveParentButton.disabled=false;
+        saveParentButton.textContent="Save parent link";
+      }
+    });
+    parentControls.append(parentField,saveParentButton);
+    var parentHelp=document.createElement("p");
+    parentHelp.className="student-parent-link-help";
+    parentHelp.textContent=rosterParents.length
+      ?"Choose an account registered with this class. Parents can sign up using the class code."
+      :"No parent accounts are registered for this class yet. Share your class code so parents can sign up.";
+    parentSection.append(parentHeading,parentDescription,parentControls,parentHelp);
+    view.appendChild(parentSection);
     setStudentListVisible(false);
     view.scrollIntoView({block:"start"});
   }
@@ -4063,6 +4554,10 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       if(!Array.isArray(rosterStudents)){
         throw new Error("The roster response is outdated. Restart the portal server to load the updated backend.");
       }
+      if(!Array.isArray(result.parents)){
+        throw new Error("The roster response is outdated. Restart the portal server to load parent account links.");
+      }
+      rosterParents=result.parents;
       if(Array.isArray(result.sectionsHandled)){
         handledSections=result.sectionsHandled;
         populateSectionControls(activeStudentSection);
@@ -4094,8 +4589,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 
   async function loadNutritionalStatusRoster(){
     var measurementDateInput=$("nutritionalMeasurementDate");
-    var now=new Date();
-    var today=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+    var today=localISODate();
     $("exportSF8").disabled=true;
     $("editNutritionalMeasurements").disabled=true;
     $("editNutritionalMeasurements").textContent="Edit Measurements";
@@ -4126,14 +4620,14 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       }
       $("nutritionalRosterEmpty").hidden=result.students.length!==0;
       $("nutritionalRosterTable").hidden=result.students.length===0;
-      measurementDateInput.addEventListener("change",function(){
+      measurementDateInput.onchange=function(){
         $("nutritionalRosterRows").querySelectorAll("tr").forEach(function(row){
           if(!row.dataset.measurementDate){
             row.querySelector('[data-nutritional-age="true"]').textContent=
               nutritionalStudentAge(row.dataset.birthdate,measurementDateInput.value);
           }
         });
-      });
+      };
       result.students.forEach(function(student,index){
         var row=document.createElement("tr");
         row.dataset.studentId=student.id;
@@ -4633,6 +5127,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         attendanceDirty=true;
         renderNoClassSummary(result);
       });
+      var stashedMarks={};
       dayTypeSelect.addEventListener("change",function(){
         var noClassDates=new Set(result.noClassDates);
         var isNoClass=dayTypeSelect.value==="no-class";
@@ -4644,19 +5139,30 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         if(isNoClass)reasonInput.focus();
         else{reasonInput.value="";delete result.noClassReasons[date]}
         $("attendanceSavedDays").textContent=String(countClassDays(result));
+        var restored={};
         (attendanceData?attendanceData.students:result.students).forEach(function(student){
-          student.attendance[index]=isNoClass?"":"Present";
-          student.reasons[index]="";
+          if(isNoClass){
+            if(student.attendance[index])stashedMarks[student.id]={status:student.attendance[index],reason:student.reasons[index]||""};
+            student.attendance[index]="";
+            student.reasons[index]="";
+          }else{
+            var saved=stashedMarks[student.id];
+            student.attendance[index]=saved?saved.status:"Present";
+            student.reasons[index]=saved?saved.reason:"";
+            restored[student.id]=saved||{status:"Present",reason:""};
+          }
         });
+        if(!isNoClass)stashedMarks={};
         document.querySelectorAll("#attendanceRows [data-day-index=\""+index+"\"]").forEach(function(control){
+          var mark=restored[control.dataset.studentId]||{status:"Present",reason:""};
           if(control.classList.contains("attendance-no-class-mark")){
             control.hidden=!isNoClass;
           }else if(control.tagName==="SELECT"){
-            control.value=isNoClass?"":"Present";
+            control.value=isNoClass?"":mark.status;
             control.hidden=isNoClass;
           }else if(control.classList.contains("attendance-reason-input")){
-            control.value="";
-            control.hidden=true;
+            control.value=isNoClass?"":mark.reason;
+            control.hidden=isNoClass||!hasReason(mark.status);
             control.required=false;
           }
           var studentRecord=result.students.find(function(student){return student.id===control.dataset.studentId});
@@ -5763,6 +6269,10 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           });
         var result=response.ok?await response.json():await response.json().then(function(error){throw new Error(error.error||"Unable to import the E-Class workbook.")});
         var normalizeName=function(value){return String(value||"").toLowerCase().replace(/[^a-z0-9]/g,"")};
+        if(selectedSection&&selectedSection!=="__all__"&&selectedSection!=="__unassigned__"&&result.section
+          &&normalizeName(result.section)!==normalizeName(selectedSection)){
+          throw new Error("The workbook is for section "+result.section+", but the selected section is "+selectedSection+".");
+        }
         var rowsByName=Object.create(null);
         result.students.forEach(function(entry){
           var key=normalizeName(entry.name);
@@ -5774,7 +6284,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         var unmatched=Object.keys(rowsByName).filter(function(key){
           return !rosterRows.some(function(row){return normalizeName(row.dataset.studentName)===key});
         }).map(function(key){return rowsByName[key].name});
-        if(unmatched.length)throw new Error("These workbook learners were not found in the displayed roster: "+unmatched.join(", "));
+        var skippedNames=unmatched;
+        unmatched.forEach(function(){});
+        if(!rosterRows.length)throw new Error("There are no learners in the displayed roster to import into.");
         if(Array.isArray(result.highestScores)){
           var maximumCells=Array.from(table.tHead.rows[2].cells).filter(function(cell){
             return cell.hasAttribute("data-highest-possible-score");
@@ -5797,7 +6309,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           imported++;
         });
         eClassNotice.classList.remove("error");
-        eClassNotice.textContent="Imported "+imported+" learner record"+(imported===1?"":"s")+" from "+file.name+". Review the inputs, then select Save & Lock Record.";
+        eClassNotice.textContent="Imported "+imported+" learner record"+(imported===1?"":"s")+" ("+selectedTerm+" · "+selectedSubject+(result.grade?" · Grade "+result.grade:"")+(result.section?" · "+result.section:"")+") from "+file.name+". Review the inputs, then select Save & Lock Record.";
       }catch(error){
         eClassNotice.classList.add("error");
         eClassNotice.textContent="Could not import the E-Class workbook: "+error.message;
@@ -6483,8 +6995,304 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     };
   }
 
+  var sf10GradeSubjects=[
+    ["Language","Reading and Literacy","Mathematics","GMRC (Good Manners and Right Conduct)","Makabansa","*Arabic Language","*Islamic Values Education"],
+    ["Filipino","English","Mathematics","GMRC (Good Manners and Right Conduct)","Makabansa","*Arabic Language","*Islamic Values Education"],
+    ["Filipino","English","Mathematics","Science","GMRC (Good Manners and Right Conduct)","Makabansa","*Arabic Language","*Islamic Values Education"],
+    ["Filipino","English","Mathematics","GMRC (Good Manners and Right Conduct)","Araling Panlipunan","EPP","MAPEH","Music & Arts","Physical Education & Health","*Arabic Language","*Islamic Values Education"],
+    ["Filipino","English","Mathematics","Science","GMRC (Good Manners and Right Conduct)","Araling Panlipunan","EPP","MAPEH","Music & Arts","Physical Education & Health","*Arabic Language","*Islamic Values Education"],
+    ["Filipino","English","Mathematics","Science","GMRC (Good Manners and Right Conduct)","Araling Panlipunan","TLE","MAPEH","Music & Arts","Physical Education & Health","*Arabic Language","*Islamic Values Education"]
+  ];
+
+  function sf10FieldMarkup(label,key,type,placeholder,className){
+    var id="sf10_"+key.replace(/[^a-zA-Z0-9]+/g,"_");
+    return '<div class="sf10-field'+(className?" "+className:"")+'"><label for="'+id+'">'+label+'</label><input id="'+id+'" type="'+(type||"text")+'" data-sf10-field="'+key+'"'+(placeholder?' placeholder="'+placeholder+'"':"")+'></div>';
+  }
+
+  function renderSf10GradeCards(){
+    var front=$("sf10FrontGrades");
+    var back=$("sf10BackGrades");
+    front.replaceChildren();
+    back.replaceChildren();
+    sf10GradeSubjects.forEach(function(subjects,index){
+      var grade=index+1;
+      var root=grade<=4?front:back;
+      var card=document.createElement("section");
+      card.className="sf10-grade-card";
+      card.setAttribute("aria-labelledby","sf10GradeTitle"+grade);
+      var subjectRows=subjects.slice();
+      while(subjectRows.length<15)subjectRows.splice(subjectRows.length-2,0,"");
+      var rows=subjectRows.map(function(subject,subjectIndex){
+        var base="grade."+grade+".subjects."+subjectIndex;
+        var subjectName=subject
+          ?subject
+          :'<input aria-label="Grade '+grade+' additional learning area '+(subjectIndex+1)+'" data-sf10-field="'+base+'.name">';
+        return "<tr><td>"+subjectName+"</td>"
+          +[1,2,3,4].map(function(quarter){return '<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="'+subject+" Quarter "+quarter+'" data-sf10-field="'+base+".q"+quarter+'"></td>';}).join("")
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="'+(subject||"Additional learning area")+' final rating" data-sf10-field="'+base+'.final"></td>'
+          +'<td><input aria-label="'+(subject||"Additional learning area")+' remarks" data-sf10-field="'+base+'.remarks"></td></tr>';
+      }).join("");
+      var remedialRows=[0,1,2].map(function(subjectIndex){
+        var base="grade."+grade+".remedial."+subjectIndex;
+        return '<tr><td><input aria-label="Grade '+grade+' remedial learning area '+(subjectIndex+1)+'" data-sf10-field="'+base+'.subject"></td>'
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Remedial final rating" data-sf10-field="'+base+'.final"></td>'
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Remedial class mark" data-sf10-field="'+base+'.mark"></td>'
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Recomputed final grade" data-sf10-field="'+base+'.recomputed"></td>'
+          +'<td><input aria-label="Remedial remarks" data-sf10-field="'+base+'.remarks"></td></tr>';
+      }).join("");
+      card.innerHTML='<header class="sf10-grade-heading"><h3 id="sf10GradeTitle'+grade+'">Grade '+grade+'</h3><span>School year record</span></header>'
+        +'<div class="sf10-grade-meta">'
+        +sf10FieldMarkup("School","grade."+grade+".school","text","","sf10-meta-span-3")
+        +sf10FieldMarkup("School ID","grade."+grade+".schoolId")
+        +sf10FieldMarkup("District","grade."+grade+".district","text","","sf10-meta-span-2")
+        +sf10FieldMarkup("Division","grade."+grade+".division")
+        +sf10FieldMarkup("Region","grade."+grade+".region")
+        +sf10FieldMarkup("Classified as Grade","grade."+grade+".classifiedGrade","text",String(grade))
+        +sf10FieldMarkup("Section","grade."+grade+".section")
+        +sf10FieldMarkup("School Year","grade."+grade+".schoolYear","text","","sf10-meta-span-2")
+        +sf10FieldMarkup("Name of Adviser/Teacher","grade."+grade+".adviser","text","","sf10-meta-span-3")
+        +sf10FieldMarkup("Signature","grade."+grade+".signature")
+        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-grade-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th rowspan="2">Learning Areas</th><th colspan="4">Quarterly Rating</th><th rowspan="2">Final Rating</th><th rowspan="2">Remarks</th></tr><tr><th>1</th><th>2</th><th>3</th><th>4</th></tr></thead><tbody>'
+        +rows+'<tr class="sf10-average-row"><td colspan="5">General Average</td><td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Grade '+grade+' general average" data-sf10-field="grade.'+grade+'.generalAverage"></td><td></td></tr>'
+        +'</tbody></table></div><div class="sf10-remedial"><h4>Remedial Classes</h4><div class="sf10-remedial-dates">'
+        +sf10FieldMarkup("Conducted from","grade."+grade+".remedialFrom","date")
+        +sf10FieldMarkup("To","grade."+grade+".remedialTo","date")
+        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-remedial-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th>Learning Areas</th><th>Final Rating</th><th>Remedial Class Mark</th><th>Recomputed Final Grade</th><th>Remarks</th></tr></thead><tbody>'
+        +remedialRows+'</tbody></table></div></div>';
+      root.appendChild(card);
+    });
+    renderSf10AdditionalRecords();
+  }
+
+  function renderSf10AdditionalRecords(){
+    var root=$("sf10AdditionalRecords");
+    root.replaceChildren();
+    [1,2].forEach(function(recordNumber){
+      var base="additionalRecord."+recordNumber;
+      var rows=Array.from({length:16},function(_,index){
+        var subjectKey=base+".subjects."+index;
+        return '<tr><td><input aria-label="Additional record '+recordNumber+' learning area '+(index+1)+'" data-sf10-field="'+subjectKey+'.name"></td>'
+          +[1,2,3,4].map(function(quarter){return '<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record quarterly rating" data-sf10-field="'+subjectKey+".q"+quarter+'"></td>';}).join("")
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record final rating" data-sf10-field="'+subjectKey+'.final"></td>'
+          +'<td><input aria-label="Additional record remarks" data-sf10-field="'+subjectKey+'.remarks"></td></tr>';
+      }).join("");
+      var remedialRows=Array.from({length:2},function(_,index){
+        var remedialKey=base+".remedial."+index;
+        return '<tr><td><input aria-label="Additional record remedial learning area '+(index+1)+'" data-sf10-field="'+remedialKey+'.subject"></td>'
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record remedial final rating" data-sf10-field="'+remedialKey+'.final"></td>'
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record remedial class mark" data-sf10-field="'+remedialKey+'.mark"></td>'
+          +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record recomputed final grade" data-sf10-field="'+remedialKey+'.recomputed"></td>'
+          +'<td><input aria-label="Additional record remedial remarks" data-sf10-field="'+remedialKey+'.remarks"></td></tr>';
+      }).join("");
+      var card=document.createElement("section");
+      card.className="sf10-additional-record";
+      card.innerHTML='<div class="sf10-grade-meta">'
+        +sf10FieldMarkup("School",base+".school","text","","sf10-meta-span-3")
+        +sf10FieldMarkup("School ID",base+".schoolId")
+        +sf10FieldMarkup("District",base+".district","text","","sf10-meta-span-2")
+        +sf10FieldMarkup("Division",base+".division")
+        +sf10FieldMarkup("Region",base+".region")
+        +sf10FieldMarkup("Classified Grade",base+".classifiedGrade")
+        +sf10FieldMarkup("Section",base+".section")
+        +sf10FieldMarkup("School Year",base+".schoolYear","text","","sf10-meta-span-2")
+        +sf10FieldMarkup("Adviser/Teacher",base+".adviser","text","","sf10-meta-span-3")
+        +sf10FieldMarkup("Signature",base+".signature")
+        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-grade-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th rowspan="2">Learning Areas</th><th colspan="4">Quarterly Rating</th><th rowspan="2">Final Rating</th><th rowspan="2">Remarks</th></tr><tr><th>1</th><th>2</th><th>3</th><th>4</th></tr></thead><tbody>'
+        +rows+'<tr class="sf10-average-row"><td colspan="5">General Average</td><td><input type="number" min="60" max="100" step="1" inputmode="numeric" data-sf10-field="'+base+'.generalAverage"></td><td></td></tr></tbody></table></div>'
+        +'<div class="sf10-remedial"><h4>Remedial Classes</h4><div class="sf10-remedial-dates">'
+        +sf10FieldMarkup("Date Conducted From",base+".remedialFrom","date")
+        +sf10FieldMarkup("To",base+".remedialTo","date")
+        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-remedial-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th>Learning Areas</th><th>Final Rating</th><th>Remedial Class Mark</th><th>Recomputed Final Grade</th><th>Remarks</th></tr></thead><tbody>'
+        +remedialRows+'</tbody></table></div></div>';
+      root.appendChild(card);
+    });
+  }
+
+  function renderSf10Certifications(){
+    var root=$("sf10Certifications");
+    root.replaceChildren();
+    [1,2,3].forEach(function(index){
+      var certification=index+1;
+      var base="certification."+certification;
+      var card=document.createElement("section");
+      card.className="sf10-cert-card";
+      card.innerHTML='<h3>Certification</h3><p class="sf10-cert-statement">I CERTIFY that this is a true record of the learner <input aria-label="Certification learner name" data-sf10-field="'+base+'.learnerName'+'"> with LRN <input aria-label="Certification LRN" data-sf10-field="'+base+'.lrn'+'"> and that he/she is eligible for admission to Grade <input aria-label="Eligible for admission to Grade" data-sf10-field="'+base+'.eligibleGrade'+'">.</p><div class="sf10-fields">'
+        +sf10FieldMarkup("School Name",base+".school")
+        +sf10FieldMarkup("School ID",base+".schoolId")
+        +sf10FieldMarkup("Division",base+".division")
+        +sf10FieldMarkup("Last School Year Attended",base+".lastSchoolYear")
+        +'</div><div class="sf10-cert-signatures"><span>Date<br><input type="date" aria-label="Certification date" data-sf10-field="'+base+'.date"></span><span>Signature of Principal/School Head over Printed Name<br><input aria-label="Principal or school head name" data-sf10-field="'+base+'.principal'+'"></span><span>(Affix School Seal here)</span></div>';
+      root.appendChild(card);
+    });
+  }
+
+  function sf10SetStatus(message,isError){
+    var status=$("sf10SaveStatus");
+    status.textContent=message||"";
+    status.classList.toggle("error",Boolean(isError));
+  }
+
+  function sf10StorageKey(){
+    var userKey=currentUser&&(currentUser.id||currentUser.username||currentUser.email)||"portal-user";
+    var classKey=currentUser&&(currentUser.activeClassId||currentUser.classId||currentUser.classCode)||"default-class";
+    return "gracedesk-sf10-v1:"+String(userKey)+":"+String(classKey);
+  }
+
+  function sf10ReadRecords(){
+    var raw=window.localStorage.getItem(sf10StorageKey());
+    if(!raw)return {};
+    var records;
+    try{
+      records=JSON.parse(raw);
+    }catch(error){
+      throw new Error("The saved SF 10 drafts could not be read. Browser storage contains invalid data.");
+    }
+    if(!records||typeof records!=="object"||Array.isArray(records)){
+      throw new Error("The saved SF 10 drafts have an unexpected format.");
+    }
+    return records;
+  }
+
+  function sf10CollectFields(){
+    var data={};
+    $("sf10Form").querySelectorAll("[data-sf10-field]").forEach(function(field){
+      data[field.dataset.sf10Field]=field.type==="checkbox"?field.checked:field.value;
+    });
+    return data;
+  }
+
+  function sf10ApplyFields(data){
+    $("sf10Form").querySelectorAll("[data-sf10-field]").forEach(function(field){
+      var value=data[field.dataset.sf10Field];
+      if(field.type==="checkbox")field.checked=value===true;
+      else field.value=value===undefined||value===null?"":String(value);
+    });
+  }
+
+  function sf10PersistRecord(recordKey){
+    try{
+      var records=sf10ReadRecords();
+      records[recordKey||sf10ActiveRecordKey]={fields:sf10CollectFields(),updatedAt:new Date().toISOString()};
+      window.localStorage.setItem(sf10StorageKey(),JSON.stringify(records));
+      var savedAt=new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+      sf10SetStatus("Draft saved in this browser at "+savedAt+".",false);
+      return true;
+    }catch(error){
+      sf10SetStatus("Could not save this SF 10 draft: "+error.message,true);
+      return false;
+    }
+  }
+
+  function sf10RosterFields(student){
+    var fields={
+      "learner.lastName":student.lastName||"",
+      "learner.firstName":student.firstName||"",
+      "learner.middleName":student.middleName||"",
+      "learner.lrn":student.lrn||"",
+      "learner.birthdate":student.birthdate?String(student.birthdate).slice(0,10):"",
+      "learner.sex":student.gender||""
+    };
+    sf10GradeSubjects.forEach(function(_,index){fields["grade."+(index+1)+".classifiedGrade"]=String(index+1)});
+    return fields;
+  }
+
+  function sf10LoadRecord(recordKey){
+    sf10ActiveRecordKey=recordKey||"manual";
+    var student=sf10Students.find(function(candidate){return String(candidate.id)===sf10ActiveRecordKey});
+    try{
+      var records=sf10ReadRecords();
+      var record=records[sf10ActiveRecordKey];
+      if(record&&record.fields){
+        sf10ApplyFields(record.fields);
+        sf10SetStatus("Saved draft loaded from this browser.",false);
+      }else{
+        sf10ApplyFields(student?sf10RosterFields(student):{});
+        sf10SetStatus("No saved draft for this learner yet.",false);
+      }
+    }catch(error){
+      sf10ApplyFields(student?sf10RosterFields(student):{});
+      sf10SetStatus("Could not load the saved draft: "+error.message,true);
+    }
+  }
+
+  function selectSf10Page(page,focusTab){
+    var showFront=page!=="back";
+    $("sf10FrontPage").hidden=!showFront;
+    $("sf10BackPage").hidden=showFront;
+    $("sf10FrontTab").setAttribute("aria-selected",String(showFront));
+    $("sf10BackTab").setAttribute("aria-selected",String(!showFront));
+    $("sf10FrontTab").tabIndex=showFront?0:-1;
+    $("sf10BackTab").tabIndex=showFront?-1:0;
+    if(focusTab)(showFront?$("sf10FrontTab"):$("sf10BackTab")).focus();
+  }
+
+  function initializeSf10Form(){
+    if(sf10Initialized)return;
+    renderSf10GradeCards();
+    renderSf10Certifications();
+    $("sf10FrontTab").addEventListener("click",function(){selectSf10Page("front",false)});
+    $("sf10BackTab").addEventListener("click",function(){selectSf10Page("back",false)});
+    $("sf10FrontTab").addEventListener("keydown",function(event){
+      if(event.key==="ArrowRight"){event.preventDefault();selectSf10Page("back",true)}
+    });
+    $("sf10BackTab").addEventListener("keydown",function(event){
+      if(event.key==="ArrowLeft"){event.preventDefault();selectSf10Page("front",true)}
+    });
+    $("sf10Form").addEventListener("input",function(){sf10PersistRecord()});
+    $("sf10Form").addEventListener("change",function(){sf10PersistRecord()});
+    $("sf10Form").addEventListener("submit",function(event){event.preventDefault();sf10PersistRecord()});
+    $("sf10LearnerSelect").addEventListener("change",function(){
+      sf10PersistRecord(sf10ActiveRecordKey);
+      sf10LoadRecord(this.value||"manual");
+    });
+    $("sf10Save").addEventListener("click",function(){sf10PersistRecord()});
+    $("sf10Print").addEventListener("click",function(){
+      sf10PersistRecord();
+      document.body.classList.add("sf10-printing");
+      window.print();
+    });
+    window.addEventListener("afterprint",function(){document.body.classList.remove("sf10-printing")});
+    selectSf10Page("front",false);
+    sf10Initialized=true;
+  }
+
+  async function loadSf10Roster(){
+    initializeSf10Form();
+    var learnerSelect=$("sf10LearnerSelect");
+    var selectedKey=learnerSelect.value||sf10ActiveRecordKey||"manual";
+    $("sf10RosterNotice").textContent="";
+    learnerSelect.disabled=true;
+    learnerSelect.replaceChildren(new Option("Enter learner manually","manual"));
+    try{
+      var result=await api("/api/students");
+      if(!Array.isArray(result.students)){
+        throw new Error("The roster response did not contain a student list.");
+      }
+      sf10Students=filterStudentsForActiveSection(result.students);
+      sf10Students.forEach(function(student){
+        var name=[student.lastName,student.firstName,student.middleName].filter(Boolean).join(", ");
+        learnerSelect.add(new Option(name+" — "+(student.lrn||"No LRN"),String(student.id)));
+      });
+      var hasSelected=selectedKey==="manual"||sf10Students.some(function(student){return String(student.id)===selectedKey});
+      learnerSelect.value=hasSelected?selectedKey:"manual";
+      if(!sf10Students.length){
+        $("sf10RosterNotice").textContent="No learners were found in the active class. You can still complete the form manually.";
+      }else if(!hasSelected&&selectedKey!=="manual"){
+        $("sf10RosterNotice").textContent="The previous learner is not in this class roster. Choose a learner or continue with a manual record.";
+      }
+      learnerSelect.disabled=false;
+      sf10LoadRecord(learnerSelect.value);
+    }catch(error){
+      sf10Students=[];
+      learnerSelect.value="manual";
+      learnerSelect.disabled=false;
+      sf10LoadRecord("manual");
+      $("sf10RosterNotice").textContent="Could not load the class roster: "+error.message+" You can still complete the form manually.";
+    }
+  }
+
   function showDashboardPage(page){
-    if((page==="assessmentDifficultyIndex"||page==="assessmentItemAnalysis"||page==="assessmentLeastMastered")
+    if((page==="sf10"||page==="assessmentDifficultyIndex"||page==="assessmentItemAnalysis"||page==="assessmentLeastMastered")
       &&(!currentUser||!currentUser.isAdmin)){
       page="students";
     }
@@ -6499,6 +7307,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var showNutritionalStatus=page==="nutritionalStatus";
     var showInventory=page==="inventory";
     var showEClass=page==="eClass";
+    var showSf10=page==="sf10";
     if((showReading||showRma)&&(!currentUser||!currentUser.isAdmin))return;
     var leavingReading=!$("readingProgressPage").hidden&&!showReading;
     var leavingRma=!$("rmaPage").hidden&&!showRma;
@@ -6521,6 +7330,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       ||(showInventory&&!$("inventoryPage").hidden)
       ||(showAttendance&&!$("attendancePage").hidden)
       ||(showEClass&&!$("eClassPage").hidden)
+      ||(showSf10&&!$("sf10Page").hidden)
       ||(showAdminAccounts&&!$("adminAccountsPage").hidden)
       ||(page==="profile"&&!$("teacherProfilePage").hidden)
       ||(showSettings&&!$("settingsPage").hidden))return;
@@ -6537,12 +7347,13 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       teacherPasswordDirty=false;
       $("teacherPasswordForm").reset();
     }
-    $("studentsPage").hidden=showAttendance||showEClass||showGrades||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||showInventory||page==="profile"||showSettings||showAdminAccounts;
+    $("studentsPage").hidden=showAttendance||showEClass||showGrades||showSf10||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||showInventory||page==="profile"||showSettings||showAdminAccounts;
     $("nutritionalStatusPage").hidden=!showNutritionalStatus;
     $("inventoryPage").hidden=!showInventory;
     $("attendancePage").hidden=!showAttendance;
     $("eClassPage").hidden=!showEClass;
     $("termGradesPage").hidden=!showGrades;
+    $("sf10Page").hidden=!showSf10;
     $("gradeSummaryPage").hidden=!showSummary;
     $("assessmentMpsPage").hidden=!showAssessmentMps;
     $("assessmentMpsSummaryPage").hidden=!showAssessmentMpsSummary;
@@ -6556,7 +7367,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("teacherProfilePage").hidden=!showProfile;
     $("settingsPage").hidden=!showSettings;
     $("adminAccountsPage").hidden=!showAdminAccounts;
-    [["navStudents",!showAttendance&&!showEClass&&!showGrades&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showInventory&&!showProfile&&!showSettings&&!showAdminAccounts],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navInventory",showInventory],["navTeacherProfile",showProfile],["navSettings",showSettings],["navAdminAccounts",showAdminAccounts]]
+    [["navStudents",!showAttendance&&!showEClass&&!showGrades&&!showSf10&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showInventory&&!showProfile&&!showSettings&&!showAdminAccounts],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navSf10",showSf10],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navInventory",showInventory],["navTeacherProfile",showProfile],["navSettings",showSettings],["navAdminAccounts",showAdminAccounts]]
       .forEach(function(entry){
         if(entry[1])$(entry[0]).setAttribute("aria-current","page");
         else $(entry[0]).removeAttribute("aria-current");
@@ -6566,23 +7377,24 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     if(showProfile)$("teacherProfilePage").scrollTop=0;
     if(showSettings)$("settingsPage").scrollTop=0;
     var pageLabels={
-      students:["Class Adviser's Portal","Classroom dashboard"],
-      attendance:["Class Adviser's Portal","Attendance"],
-      eClass:["Class Adviser's Portal","E-Class"],
-      grades:["Class Adviser's Portal","Term Grade (SF9)"],
-      summary:["Class Adviser's Portal","Summary of Grades"],
-      assessmentMps:["Class Adviser's Portal","Assessment Dashboard · MPS"],
-      assessmentMpsSummary:["Class Adviser's Portal","Assessment Dashboard · MPS Summary"],
-      assessmentDifficultyIndex:["Class Adviser's Portal","Assessment Dashboard · Difficulty Index"],
-      assessmentItemAnalysis:["Class Adviser's Portal","Assessment Dashboard · Item Analysis"],
-      assessmentLeastMastered:["Class Adviser's Portal","Assessment Dashboard · Least Mastered Competencies"],
-      philIri:["Class Adviser's Portal","Phil-IRI"],
-      rma:["Class Adviser's Portal","RMA"],
-      nutritionalStatus:["Class Adviser's Portal","Nutritional Status"],
-      inventory:["Class Adviser's Portal","Inventory"],
-      profile:["Class Adviser's Portal","Teacher Profile"],
-      settings:["Class Adviser's Portal","Settings"],
-      adminAccounts:["Class Adviser's Portal","Manage User Logins"],
+      students:["GraceDesk","Classroom dashboard"],
+      attendance:["GraceDesk","Attendance"],
+      eClass:["GraceDesk","E-Class"],
+      grades:["GraceDesk","Term Grade (SF9)"],
+      sf10:["GraceDesk","SF 10"],
+      summary:["GraceDesk","Summary of Grades"],
+      assessmentMps:["GraceDesk","Assessment Dashboard · MPS"],
+      assessmentMpsSummary:["GraceDesk","Assessment Dashboard · MPS Summary"],
+      assessmentDifficultyIndex:["GraceDesk","Assessment Dashboard · Difficulty Index"],
+      assessmentItemAnalysis:["GraceDesk","Assessment Dashboard · Item Analysis"],
+      assessmentLeastMastered:["GraceDesk","Assessment Dashboard · Least Mastered Competencies"],
+      philIri:["GraceDesk","Phil-IRI"],
+      rma:["GraceDesk","RMA"],
+      nutritionalStatus:["GraceDesk","Nutritional Status"],
+      inventory:["GraceDesk","Inventory"],
+      profile:["GraceDesk","Teacher Profile"],
+      settings:["GraceDesk","Settings"],
+      adminAccounts:["GraceDesk","Manage User Logins"],
     };
     var pageLabel=pageLabels[page]||pageLabels.students;
     $("topbarPageSubtitle").textContent=pageLabel[0];
@@ -6614,6 +7426,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     });
     else if(showNutritionalStatus)loadNutritionalStatusRoster();
     else if(showInventory)loadInventory();
+    else if(showSf10)loadSf10Roster();
     else if(showEClass)renderEClassTable();
     else if(showProfile){
       $("teacherProfileTitle").focus({preventScroll:true});
@@ -6632,7 +7445,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       $("adminAccountsTitle").focus({preventScroll:true});
       loadAdminAccounts();
     }
-    else if(!showEClass)loadStudents();
+    else if(!showEClass&&!showSf10)loadStudents();
   }
 
   function mpsDescriptor(score){
@@ -7310,7 +8123,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("philIriScoreDate").oninput=function(){philIriScoreEditVersion+=1};
     form.onsubmit=function(event){event.preventDefault()};
     $("savePhilIriAutoScore").disabled=students.length===0;
-    if(!$("philIriScoreDate").value)$("philIriScoreDate").value=new Date().toISOString().slice(0,10);
+    if(!$("philIriScoreDate").value)$("philIriScoreDate").value=localISODate();
     loadSelectedPhilIriScores();
   }
 
@@ -7384,7 +8197,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           ?"":data[input.dataset.scoreField];
       });
       $("savePhilIriAutoScore").disabled=false;
-      $("philIriScoreDate").value=data.assessedDate||new Date().toISOString().slice(0,10);
+      $("philIriScoreDate").value=data.assessedDate||localISODate();
       updatePhilIriScoreResults(data);
       if(saved.autoScoring){
         $("philIriScoreNotice").textContent="Loaded saved "+saved.period+" "+saved.assessmentType+" "+saved.language+" scores.";
@@ -8084,7 +8897,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       result.interventions.forEach(function(value){intervention.add(new Option(value,value))});
       if(result.interventions.includes(selectedIntervention))intervention.value=selectedIntervention;
       if(currentUser&&currentUser.name&&!$("philIriAssessor").value)$("philIriAssessor").value=currentUser.name;
-      if(!$("philIriDate").value)$("philIriDate").value=new Date().toISOString().slice(0,10);
+      if(!$("philIriDate").value)$("philIriDate").value=localISODate();
       $("philIriSchoolDescription").textContent=result.profile.schoolId
         ?"School ID "+result.profile.schoolId+" · "+(result.profile.schoolName||"School name not set")+". Results are combined only across classes with this School ID."
         :"Add your School ID to Teacher Profile to unlock school consolidated reports.";
@@ -8390,7 +9203,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var student=philIriSelectedStudent();
     var entry=philIriSelectedReading();
     var data=entry&&entry.data||{};
-    $("philIriDate").value=data.assessedDate||$("philIriDate").value||new Date().toISOString().slice(0,10);
+    $("philIriDate").value=data.assessedDate||$("philIriDate").value||localISODate();
     $("philIriAssessor").value=data.assessor||$("philIriAssessor").value||currentUser&&currentUser.name||"";
     $("philIriExistingResult").textContent=entry&&entry.assessedDate
       ?"Saved "+$("philIriType").value+" on "+entry.assessedDate+(data.assessor?" by "+data.assessor:"")+"."
@@ -9402,6 +10215,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   function setPortalPage(user){
     currentUser=user;
     rosterStudents=[];
+    rosterParents=[];
     mpsLearners=[];
     mpsReportContext="";
     activeStudentSection="__all__";
@@ -9413,7 +10227,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("portal").hidden=false;
     $("sideName").textContent=user.name;
     $("topName").textContent=user.name;
-    $("sideBrandTitle").textContent=user.role==="parent"?"Parent's Portal":"Class Adviser's Portal";
+    $("sideBrandTitle").textContent=user.role==="parent"?"Parent's Portal":"GraceDesk";
     $("navSectionLabel").textContent=user.role==="parent"?"Learner information":"Classroom";
     $("topProfileInitials").textContent=user.name.trim().split(/\s+/).slice(0,2).map(function(part){return part.charAt(0).toUpperCase()}).join("")||"T";
     setTeacherProfilePhoto(false);
@@ -9428,6 +10242,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("navAttendance").hidden=false;
     $("navEClass").hidden=false;
     $("navTermGrades").hidden=false;
+    $("navSf10").hidden=!user.isAdmin;
+    $("navSf10").setAttribute("aria-disabled",String(!user.isAdmin));
+    $("navSf10").title=user.isAdmin?"Open SF 10":"Available to administrators only";
     $("navGradeSummary").hidden=false;
     $("navPhilIri").hidden=false;
     $("navRma").hidden=false;
@@ -9451,6 +10268,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("attendancePage").hidden=true;
     $("eClassPage").hidden=true;
     $("termGradesPage").hidden=true;
+    $("sf10Page").hidden=true;
     $("gradeSummaryPage").hidden=true;
     $("philIriPage").hidden=true;
     $("readingProgressPage").hidden=true;
@@ -9482,7 +10300,22 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 
   async function enter(user){
     var session=await api("/api/auth/session");
+    var sessionUser=session.user;
+    var wrongPortal=(entryType==="parents"&&sessionUser.role!=="parent")
+      ||(entryType==="admin"&&(sessionUser.role!=="teacher"||!sessionUser.isAdmin))
+      ||(entryType==="main"&&(sessionUser.role!=="teacher"||sessionUser.isAdmin));
+    if(wrongPortal){
+      await api("/api/auth/logout",{method:"POST"});
+      throw new Error(entryType==="parents"
+        ?"This account is not a parent account. Sign in through the Parents Portal."
+        :entryType==="admin"
+          ?"This account does not have administrator access. Sign in through the Teacher Portal if it is a teacher account."
+          :"Only teacher accounts can use the Teacher Portal. Sign in through the Parents Portal or Admin Portal instead.");
+    }
     user.id=session.user.userId;
+    user.role=sessionUser.role;
+    user.isAdmin=sessionUser.isAdmin;
+    user.mustChangePassword=sessionUser.mustChangePassword;
     if(session.user.classCode)user.classCode=session.user.classCode;
     user.activeClassId=session.user.activeClassId;
     if(user.mustChangePassword){
@@ -9538,6 +10371,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         $("parentClassroom").textContent=parentPortal.classroomNumber||"Not available";
         $("parentTeacher").textContent=parentPortal.teacherName||"Not available";
         parentPortalData=parentPortal;
+        $("parentPortalSyncStatus").textContent="Connected. Teacher updates sync automatically while this portal is open.";
         $("parentSidebarNav").hidden=parentPortal.learners.length===0;
         $("parentChildrenCount").textContent=parentPortal.learners.length+" linked "+(parentPortal.learners.length===1?"learner":"learners");
         $("parentLearnerPicker").replaceChildren();
@@ -9575,15 +10409,22 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   async function refreshParentPortalData(button,successMessage){
-    if(button.disabled)return;
+    if(!currentUser||currentUser.role!=="parent"||!parentPortalData||parentPortalRefreshInProgress)return;
+    if(button&&button.disabled)return;
+    parentPortalRefreshInProgress=true;
     var selectedLearner=parentPortalData&&parentPortalData.learners[parentSelectedLearnerIndex];
-    button.disabled=true;
-    var originalText=button.textContent;
-    button.textContent="Refreshing...";
+    var originalText=button?button.textContent:"";
+    if(button){
+      button.disabled=true;
+      button.textContent="Refreshing...";
+    }
     $("parentPortalNotice").textContent="";
     $("parentPortalNotice").classList.remove("error");
     try{
       var updatedPortal=await api("/api/parent/portal");
+      if(!updatedPortal||!Array.isArray(updatedPortal.learners)){
+        throw new Error("Parent portal data could not be refreshed. Restart the portal server and try again.");
+      }
       if(updatedPortal.learners.some(function(learner){return !Array.isArray(learner.attendance)})){
         throw new Error("Restart the portal server to load attendance records.");
       }
@@ -9610,13 +10451,20 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           renderParentLearner(Number(this.value));
         };
       }
-      $("parentPortalNotice").textContent=successMessage;
+      $("parentPortalSyncStatus").textContent="Last synced "+new Date().toLocaleTimeString([],{
+        hour:"numeric",minute:"2-digit"
+      })+". Teacher updates sync automatically while this portal is open.";
+      if(successMessage)$("parentPortalNotice").textContent=successMessage;
     }catch(error){
       $("parentPortalNotice").textContent=error.message;
       $("parentPortalNotice").classList.add("error");
+      $("parentPortalSyncStatus").textContent="Could not sync the latest teacher updates. Try Refresh data.";
     }finally{
-      button.disabled=false;
-      button.textContent=originalText;
+      parentPortalRefreshInProgress=false;
+      if(button){
+        button.disabled=false;
+        button.textContent=originalText;
+      }
     }
   }
 
@@ -9635,6 +10483,22 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   $("refreshParentReading").onclick=function(){
     refreshParentPortalData(this,"Reading progress refreshed.");
   };
+  $("refreshParentPortal").onclick=function(){
+    refreshParentPortalData(this,"Parent portal data refreshed.");
+  };
+  window.setInterval(function(){
+    if(currentUser&&currentUser.role==="parent"&&document.visibilityState==="visible"){
+      refreshParentPortalData(null);
+    }
+  },30000);
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="visible"&&currentUser&&currentUser.role==="parent"){
+      refreshParentPortalData(null);
+    }
+  });
+  window.addEventListener("focus",function(){
+    if(currentUser&&currentUser.role==="parent")refreshParentPortalData(null);
+  });
 
   function closeSidebar(){
     $("portal").classList.remove("sidebar-open");
@@ -9705,6 +10569,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   $("navAttendance").onclick=function(){showDashboardPage("attendance")};
   $("navEClass").onclick=function(){showDashboardPage("eClass")};
   $("navTermGrades").onclick=function(){showDashboardPage("grades")};
+  $("navSf10").onclick=function(){showDashboardPage("sf10")};
   $("navGradeSummary").onclick=function(){showDashboardPage("summary")};
   $("termGradeToggle").onclick=function(){
     var expanded=this.getAttribute("aria-expanded")==="true";
@@ -9992,13 +10857,13 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     api.onUpdateStatus(onStatus);
     function refreshUpdateAlert(){
       var isTeacher=!$("topSettingsButton").hidden;
-      var dismissed=pendingVersion&&window.sessionStorage.getItem("avera-update-dismissed")===pendingVersion;
+      var dismissed=pendingVersion&&window.sessionStorage.getItem("gracedesk-update-dismissed")===pendingVersion;
       var active=Boolean(pendingVersion)&&isTeacher&&!updateInProgress;
       $("topSettingsButton").classList.toggle("has-update-dot",active);
       $("navSettings").classList.toggle("has-update-dot",active);
       $("updateBanner").hidden=!(active&&!dismissed);
       if(active){
-        $("updateBannerText").textContent="AVeRA version "+pendingVersion+" is available.";
+        $("updateBannerText").textContent="GraceDesk version "+pendingVersion+" is available.";
         $("topSettingsButton").title="Open settings — update available";
       }else{
         $("topSettingsButton").title="Open settings";
@@ -10021,7 +10886,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     }).catch(function(){});
     $("updateBannerAction").onclick=function(){showDashboardPage("settings")};
     $("updateBannerClose").onclick=function(){
-      if(pendingVersion)window.sessionStorage.setItem("avera-update-dismissed",pendingVersion);
+      if(pendingVersion)window.sessionStorage.setItem("gracedesk-update-dismissed",pendingVersion);
       refreshUpdateAlert();
     };
     button.onclick=async function(){
@@ -10038,7 +10903,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           button.textContent="Downloading…";
           await api.downloadUpdate();
           setProgress(100,0,0);
-          show("Download complete. Installing version "+result.version+". AVeRA will close and reopen automatically…");
+          show("Download complete. Installing version "+result.version+". GraceDesk will close and reopen automatically…");
           button.textContent="Installing…";
           await api.installUpdate();
         }
@@ -10051,6 +10916,31 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       }
     };
   })();
+  $("syncDataButton").onclick=function(){
+    $("syncDataButton").disabled=true;
+    refreshStorageStatus().finally(function(){$("syncDataButton").disabled=false});
+  };
+  async function resolveOnlineSyncConflict(resolution){
+    $("keepLocalSync").disabled=true;
+    $("keepOnlineSync").disabled=true;
+    try{
+      await api("/api/admin/sync/resolve",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({resolution:resolution})
+      });
+      await refreshStorageStatus();
+    }catch(error){
+      $("syncDataNotice").textContent=error.message;
+      $("syncDataNotice").classList.add("error");
+      await refreshStorageStatus();
+    }finally{
+      $("keepLocalSync").disabled=false;
+      $("keepOnlineSync").disabled=false;
+    }
+  }
+  $("keepLocalSync").onclick=function(){resolveOnlineSyncConflict("local")};
+  $("keepOnlineSync").onclick=function(){resolveOnlineSyncConflict("online")};
   $("performanceModeToggle").onclick=function(){
     applyPerformanceMode(!performanceModeEnabled);
     $("performanceNotice").classList.remove("error");
@@ -12153,10 +13043,10 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("authCard").hidden=false;
     $("studentForm").reset();
     $("form").reset();
-    role="teacher";mode="in";closeSidebar();render();
+    mode="in";closeSidebar();render();
   }
   document.querySelectorAll("[data-logout]").forEach(function(button){button.onclick=signOut});
-  $("studentBirthdate").max=new Date().toISOString().slice(0,10);
+  $("studentBirthdate").max=localISODate();
   function refreshAttendanceYears(){
     var yearSelect=$("attendanceYear");
     var currentYear=new Date().getFullYear();
@@ -12180,24 +13070,34 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   $("attendanceYear").value=String(currentYear);
   updateAttendanceNav();
   render();
-  fetch("/api/health")
-    .then(function(response){
+  var authSessionChecked=false;
+  async function refreshStorageStatus(){
+    try{
+      var response=await fetch("/api/health");
       var contentType=response.headers.get("content-type")||"";
       if(!response.ok||!contentType.toLowerCase().includes("application/json")){
         throw new Error("The backend is unavailable.");
       }
-      return response.json();
-    })
-    .then(function(result){
-      if(result.status!=="ok"||!["sqlite","supabase"].includes(result.storage))throw new Error("The portal database is unavailable.");
-      $("storageStatus").textContent="Connected. Portal records are saved to the configured database.";
-      api("/api/auth/session").then(function(result){return enter(result.user)}).catch(function(error){
+      var result=await response.json();
+      if(result.status!=="ok"||!["sqlite","supabase","dual"].includes(result.storage)){
+        throw new Error("The portal database is unavailable.");
+      }
+      applyStorageHealth(result);
+      if(!authSessionChecked){
+        authSessionChecked=true;
+        api("/api/auth/session").then(function(result){return enter(result.user)}).catch(function(error){
         if(error.status!==401)$("msg").textContent=error.message;
-      });
-    })
-    .catch(function(){
+        });
+      }
+      return result;
+    }catch(error){
       $("storageStatus").textContent="Backend not connected. Run start-portal.bat or npm start, then open the address shown in the terminal.";
-    });
+      $("syncDataNotice").textContent="The backend could not report online synchronization status.";
+      return null;
+    }
+  }
+  refreshStorageStatus();
+  window.setInterval(refreshStorageStatus,15000);
 })();
 </script>
 </body>

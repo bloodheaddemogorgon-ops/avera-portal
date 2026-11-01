@@ -50,7 +50,7 @@ const SF9_PRINT_SELECTIONS = new Set([
 
 ipcMain.handle("download-sf9-pdf", async (event, selection) => {
   if (!portalUrl || !event.senderFrame.url.startsWith(portalUrl)) {
-    throw new Error("This request must come from AVeRA.");
+    throw new Error("This request must come from GraceDesk.");
   }
   if (!SF9_PRINT_SELECTIONS.has(selection)) {
     throw new Error("Choose a valid SF9 print selection.");
@@ -104,15 +104,21 @@ function sendUpdateStatus(status) {
   }
 }
 
+let activeCheck = null;
+
+function runUpdateCheck() {
+  if (!activeCheck) {
+    activeCheck = getAutoUpdater().checkForUpdates().finally(() => { activeCheck = null; });
+  }
+  return activeCheck;
+}
+
 async function checkForUpdatesInBackground() {
   if (!app.isPackaged || updateBusy) return;
-  updateBusy = true;
   try {
-    await getAutoUpdater().checkForUpdates();
+    await runUpdateCheck();
   } catch (error) {
     console.error("Background update check failed:", error.message);
-  } finally {
-    updateBusy = false;
   }
 }
 
@@ -141,7 +147,7 @@ function getAutoUpdater() {
 
 function assertTrustedSender(event) {
   if (!portalUrl || !event.senderFrame.url.startsWith(portalUrl)) {
-    throw new Error("This request must come from AVeRA.");
+    throw new Error("This request must come from GraceDesk.");
   }
 }
 
@@ -149,20 +155,20 @@ ipcMain.handle("update-check", async (event) => {
   assertTrustedSender(event);
   if (!app.isPackaged) return { state: "unsupported", message: "Updates are available only in the installed app." };
   if (updateBusy) return { state: "busy" };
-  updateBusy = true;
   try {
-    const result = await getAutoUpdater().checkForUpdates();
+    const result = await runUpdateCheck();
     const info = result?.updateInfo;
     return info && result.isUpdateAvailable
       ? { state: "available", version: info.version }
       : { state: "current", version: app.getVersion() };
   } catch (error) {
-    if (/No published versions|Cannot find latest\.yml|HttpError: 404/i.test(error.message)) {
-      return { state: "current", version: app.getVersion() };
+    if (/releases\.atom|No published versions|Cannot find latest\.yml|\b404\b/i.test(error.message)) {
+      return {
+        state: "error",
+        message: "The update source is unavailable. The GitHub repository bloodheaddemogorgon-ops/avera-portal must be public and have a published release containing latest.yml.",
+      };
     }
     throw error;
-  } finally {
-    updateBusy = false;
   }
 });
 
@@ -182,7 +188,10 @@ ipcMain.handle("update-download", async (event) => {
 ipcMain.handle("update-install", (event) => {
   assertTrustedSender(event);
   if (!app.isPackaged) return;
-  setImmediate(() => getAutoUpdater().quitAndInstall(true, true));
+  setImmediate(() => {
+    portalServer?.closeAllConnections?.();
+    getAutoUpdater().quitAndInstall(true, true);
+  });
 });
 
 ipcMain.handle("app-version", (event) => {
@@ -230,7 +239,7 @@ if (!hasSingleInstanceLock) {
       console.error("Could not write the portal server log:", logError);
     }
     dialog.showErrorBox(
-      "AVeRA",
+      "GraceDesk",
       `The portal could not start.\n\n${error.message}\n\nSee ${logFilePath} for details.`,
     );
     app.quit();

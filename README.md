@@ -6,7 +6,15 @@ The portal uses its Node.js backend and a database. It defaults to local SQLite;
 
 1. Double-click `start-portal.bat`. On the first run it checks Node.js and installs dependencies from `package-lock.json` when needed. Alternatively, open a terminal in this folder, run `npm ci`, then run `npm start`.
 2. Keep the terminal window open while using the portal.
-3. Open the exact `http://127.0.0.1:...` address printed in the terminal. The default port is `3003`; if it is occupied, the server tries the following ports and prints the one it selected.
+3. Open the address printed for the portal you need. The teacher, parent, and admin websites each run as a separate server on ports `3004`, `3005`, and `3006`. All three forward API requests to one shared backend on port `3003`.
+
+`npm start` launches four Node.js processes: one shared API/database backend and three separate frontend servers. The default URLs are `http://127.0.0.1:3004` (Teacher Portal), `http://127.0.0.1:3005` (Parents Portal), and `http://127.0.0.1:3006` (Admin Portal). The Admin Portal requires an existing administrator account. The pages share the same API, account/session system, and database; frontend API requests are reverse-proxied to the backend so browser requests remain same-origin.
+
+Sign-in and registration are separated by portal: teachers register and sign in only through the Teacher Portal, and parents/guardians do so only through the Parents Portal. Each portal uses its own session cookie even though local browser cookies are shared across ports. The Admin Portal is sign-in only; admin accounts cannot be self-registered and must be created or granted by an existing administrator.
+
+For initial setup, a private environment file outside synced folders can provide `ADMIN_EMAIL` and `ADMIN_PASSWORD`; set `PORTAL_ADMIN_SECRET_FILE` to its path. On the first API request, the backend creates or grants that administrator account and stores only a bcrypt hash with cost 12. First sign-in is restricted until the temporary password is changed to one of at least 12 characters. Administrator password resets and changes also use bcrypt cost 12; legacy PBKDF2 administrator hashes are upgraded after a successful sign-in. Then delete the private credential file and remove `PORTAL_ADMIN_SECRET_FILE`. The portal cluster does not pass the database URL or bootstrap credentials to frontend processes.
+
+Ports can be changed with `PORTAL_API_PORT`, `PORTAL_TEACHER_PORT`, `PORTAL_PARENTS_PORT`, and `PORTAL_ADMIN_PORT`. The API service can also be started separately with `npm run start:api`; start one frontend separately with `npm run start:teacher`, `npm run start:parents`, or `npm run start:admin`. When running a frontend separately, set `PORTAL_API_URL` if the API is not at `http://127.0.0.1:3003`. For desktop use, `npm run desktop` continues to run the integrated local portal.
 
 ## Install as a Windows desktop app
 
@@ -25,24 +33,46 @@ On a new computer, install Node.js 22.5 or newer and start the portal with `star
 ### If the browser cannot connect
 
 - Start the app with `start-portal.bat` or `npm start` from the folder containing `server.js`; keep that terminal open.
-- Open the exact `http://127.0.0.1:...` URL printed by the server. The default port is `3003`; if occupied, the server tries ports through `3023`. Do not assume the address is still `3003`.
-- Visit that same address followed by `/api/health`. A healthy local backend returns `{"status":"ok","storage":"sqlite"}`; a healthy Supabase backend returns `{"status":"ok","storage":"supabase"}`. If the browser shows the frontend but its API requests fail, check that the address is from this Node server, not a directly opened `index.html`, VS Code Live Preview, GitHub repository page, or GitHub Pages.
+- Open the portal URL printed at startup: teacher `http://127.0.0.1:3004`, parents `http://127.0.0.1:3005`, or admin `http://127.0.0.1:3006`. Visit `http://127.0.0.1:3003/api/health` to check the shared backend. A healthy local backend returns `{"status":"ok","storage":"sqlite"}`; a healthy Supabase backend returns `{"status":"ok","storage":"supabase"}`. If a portal cannot reach the API, confirm all four server processes are running and that `PORTAL_API_URL` points to the shared backend.
 - Without Supabase, the first application request creates the SQLite database and migrates an available workbook. With Supabase, it migrates the existing local SQLite database when available, otherwise the selected workbook or default template. Existing account, learner, grade, and attendance data is not included in the GitHub repository.
 - If `/api/health` returns an error, check the server terminal for the database connection or migration error. For SQLite, confirm the template workbook is present and the folder is writable. For Supabase, verify `SUPABASE_DB_URL` and that the database is reachable. Set `PORTAL_MIGRATION_WORKBOOK` to import a specific workbook.
-- The portal binds to `127.0.0.1` by default for local use. Public binding is refused unless both `PORTAL_TLS_KEY` and `PORTAL_TLS_CERT` point to a trusted TLS private key and certificate; then set `HOST=0.0.0.0` and, when required, `PORT`. The server advertises an `https://` URL and marks session cookies `Secure`. GitHub Pages cannot run this Node.js backend.
-- Sign-in is throttled after 10 failed attempts for the same email address or 40 failed attempts from the same source IP within a rolling 15-minute window. These limits are held in process memory and reset when the server restarts. When using a reverse proxy, requests share the proxy's source-IP limit because forwarded IP headers are not trusted; configure rate limiting at the trusted proxy if needed.
+- All four servers bind to `127.0.0.1` by default for local use. Public binding is refused unless both `PORTAL_TLS_KEY` and `PORTAL_TLS_CERT` point to a trusted TLS private key and certificate; then set `HOST=0.0.0.0`. The servers use HTTPS and mark session cookies `Secure`. GitHub Pages cannot run this Node.js backend.
+- Sign-in is throttled after 10 failed attempts for the same email address or 40 failed attempts from the same source IP within a rolling 15-minute window. These limits are held in process memory and reset when the server restarts. When using a reverse proxy, requests share the proxy's source-IP limit unless `PORTAL_TRUST_PROXY=true` is set behind a trusted TLS-terminating proxy; then the last `X-Forwarded-For` value is used as the client address.
 
-## Supabase backend
+## PostgreSQL and offline synchronization
+
+Neon and other plain PostgreSQL providers work too: paste the pooled connection string into `SUPABASE_DB_URL`.
 
 1. In Supabase, open **Project Settings → Database → Connection string** and copy a PostgreSQL connection string. Use the exact transaction pooler connection string shown for your project when deploying on a hosting provider.
-2. Copy `.env.example` to `.env` and set `SUPABASE_DB_URL` to that connection string. Keep the database password private; do not put the connection string in browser code or commit `.env`.
-3. Run `npm start`. The server creates the required tables automatically; `portal-schema.sql` is also available to run manually in the Supabase SQL Editor. The server reports `Using Supabase PostgreSQL backend` at startup.
+2. Copy `.env.example` to `.env`, set `SUPABASE_DB_URL` to that connection string, and set `PORTAL_STORAGE_MODE=dual`. Keep the database password private; do not put the connection string in browser code or commit `.env`.
+3. Run `npm start`. The backend keeps SQLite as the local source of truth and synchronizes saved portal workbook data to PostgreSQL when connected. The local portal remains usable while the online database is unavailable; changes stay queued and retry every 15 seconds. The health endpoint reports the current sync state.
 
-The backend keeps the existing portal API and stores its compressed workbook state and teacher profile pictures in Supabase PostgreSQL. Database reads and updates are server-side, and updates run in a transaction to prevent concurrent server instances from overwriting each other's changes. The browser never receives the database credentials.
+The first empty PostgreSQL database is seeded from the local SQLite state. PostgreSQL transactions use row locking and a revision check. If two offline installations diverge, synchronization pauses and preserves both the local and online workbook snapshots; it does not silently overwrite either. An administrator can inspect `GET /api/admin/sync/status`, then resolve a conflict with `POST /api/admin/sync/resolve` and JSON `{"resolution":"local"}` or `{"resolution":"online"}`. If the online revision changes while a conflict is being reviewed, resolution returns `409` and preserves the newer copy for another review.
 
-On first connection to an empty Supabase project, the server imports the existing local SQLite state when available. Otherwise it imports the selected migration workbook, or the default workbook/template. To select a workbook explicitly, set `PORTAL_MIGRATION_WORKBOOK` before starting. Once Supabase has a saved state, it is authoritative and local files are not re-imported. Passwords remain PBKDF2 hashes. SF1/SF2 import and SF2 export continue to use Excel files.
+Without `PORTAL_STORAGE_MODE=dual`, setting `SUPABASE_DB_URL` retains the existing PostgreSQL-only mode. With no connection URL, SQLite-only mode remains unchanged. PostgreSQL connection credentials stay server-side; TLS certificate verification is required by the connection pool.
 
-The Supabase connection role needs permission to create and update these two tables in the `public` schema. The setup revokes table access from `anon` and `authenticated` roles. The server connects with the database connection string, not a browser-facing anon or service-role key.
+## Deploy online (Neon + Render)
+
+1. Create a Neon project and copy its **pooled** connection string (`...-pooler...neon.tech/...`).
+2. Push this repository to GitHub, then in Render choose **New → Blueprint** and select the repository. `render.yaml` defines one `advisers-portal` web service that runs the API (loopback only) and serves all three portals via `render-start.js`.
+3. When prompted, enter `SUPABASE_DB_URL` (the Neon string) and, for first-time setup, `ADMIN_EMAIL` and `ADMIN_PASSWORD` (a temporary password of at least 12 characters you will change at first sign-in; remove both variables afterwards).
+4. After the deploy, open `https://<service>.onrender.com/api/health`; it should return `{"status":"ok","storage":"supabase"}`.
+5. Portals: teacher `https://<service>.onrender.com/`, parents `/parents`, admin `/admin`. Cookies are kept separate per portal.
+
+`PORTAL_TRUST_PROXY=true` (set by `render.yaml`) is for TLS-terminating proxies only. Render's free tier sleeps after inactivity, so the first request can take about a minute. Do not set `PORTAL_STORAGE_MODE=dual` on the hosted service.
+
+The Supabase connection role needs permission to create/update the portal tables and add the `revision` column. The setup revokes table access from `anon` and `authenticated` roles. Use a server-side database role, not a browser-facing anon or service-role key.
+
+**Offline synchronization scope:** the synchronized workbook contains accounts, class/learner records, grades, assessments, and attendance. Teacher profile pictures and school-logo files remain in the local profile folders in dual mode and are not currently queued for offline synchronization.
+
+### Deployment security checklist
+
+- Replace the example connection URL with a private PostgreSQL connection string stored only in the server's environment.
+- Use a dedicated database role with only the required schema/table permissions; keep database TLS certificate verification enabled.
+- Configure the portal's HTTPS certificate and reverse proxy before exposing the portals publicly. Do not expose the database port or connection URL to browsers.
+- Restrict access to local SQLite/profile folders and encrypt device storage and backups.
+- Back up both the PostgreSQL database and each device's SQLite database. Review `/api/admin/sync/status` and resolve any `conflict` state before treating devices as synchronized.
+- The application has server-side validation, parameterized SQL, backend role checks, and sign-in throttling. Existing teacher and parent hashes use PBKDF2-SHA-256; administrator hashes use bcrypt cost 12. The workbook is a single shared state blob rather than tenant-keyed PostgreSQL rows, so PostgreSQL row-level tenant policies are not implemented by dual mode.
 
 ## SQLite backend
 
@@ -119,7 +149,7 @@ The Attendance page also has a **Summary Of Attendance** tab. It lists every lea
 
 ## Admin account management
 
-Accounts with Admin Access have an **Admin** tab below **Teacher Profile**. The tab lists parent and teacher sign-in accounts, can enable or disable login access, and can reset another account's password. A reset sets the temporary password to that account's email address and invalidates its existing sessions. At the next sign-in, the user must choose a different password before accessing portal data. Administrators cannot reset or disable their own account from this page.
+Accounts with Admin Access have an **Admin** tab below **Teacher Profile**. The tab lists parent and teacher sign-in accounts, can enable or disable login access, and can reset another account's password. Disabling an account invalidates all of its existing sessions; re-enabling it requires signing in again. A password reset sets the temporary password to that account's email address and invalidates its existing sessions. At the next sign-in, the user must choose a different password before accessing portal data. Administrators cannot reset or disable their own account from this page.
 
 ## Nutritional Status
 

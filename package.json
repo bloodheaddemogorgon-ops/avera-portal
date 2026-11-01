@@ -1,6 +1,6 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.22",
+  "version": "1.0.27",
   "private": true,
   "description": "Grade 5 Class Portal desktop application",
   "main": "desktop/main.js",
@@ -8,7 +8,11 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "start": "node server.js",
+    "start": "node portal-cluster.js",
+    "start:api": "node server.js --api",
+    "start:teacher": "node portal-frontend.js teacher",
+    "start:parents": "node portal-frontend.js parents",
+    "start:admin": "node portal-frontend.js admin",
     "desktop": "electron .",
     "dist:win": "electron-builder --win nsis --publish never",
     "release": "node scripts/release.js",
@@ -17,6 +21,7 @@
   },
   "dependencies": {
     "@e965/xlsx": "^0.20.3",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^18.0.8",
     "electron-updater": "^6.8.11",
     "exceljs": "^4.4.0",
@@ -36,8 +41,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "Bontoy2025",
-        "repo": "Advisers_Portal"
+        "owner": "bloodheaddemogorgon-ops",
+        "repo": "avera-portal"
       }
     ],
     "productName": "AVeRA",

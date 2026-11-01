@@ -1648,6 +1648,86 @@ async function createEmptyTestWorkbook(databasePath) {
   await workbook.xlsx.writeFile(databasePath);
 }
 
+test("bootstrap administrator credentials are hashed, temporary, and do not reset changed passwords", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "admin-bootstrap-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  const email = "bootstrap.admin@example.com";
+  const temporaryPassword = "125211";
+  const changedPassword = "a-long-initial-admin-password-2026";
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+
+  const serverOptions = {
+    databasePath,
+    migrationWorkbookPath,
+    bootstrapAdminEmail: email,
+    bootstrapAdminPassword: temporaryPassword,
+  };
+  let server = createServer(serverOptions);
+  const listen = async () => {
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    return `http://127.0.0.1:${server.address().port}`;
+  };
+  const close = async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  };
+  context.after(async () => {
+    await close();
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  let baseUrl = await listen();
+  const login = async (password) => fetch(`${baseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, role: "teacher" }),
+  });
+  const bootstrapLogin = await login(temporaryPassword);
+  assert.equal(bootstrapLogin.status, 200);
+  const bootstrapResult = await bootstrapLogin.json();
+  assert.equal(bootstrapResult.user.isAdmin, true);
+  assert.equal(bootstrapResult.user.mustChangePassword, true);
+  const cookie = bootstrapLogin.headers.get("set-cookie").split(";")[0];
+  const blockedAdminRequest = await fetch(`${baseUrl}/api/admin/accounts`, {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(blockedAdminRequest.status, 403);
+
+  const weakPasswordChange = await fetch(`${baseUrl}/api/auth/change-password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ currentPassword: temporaryPassword, newPassword: "weak-pass" }),
+  });
+  assert.equal(weakPasswordChange.status, 400);
+  const passwordChange = await fetch(`${baseUrl}/api/auth/change-password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ currentPassword: temporaryPassword, newPassword: changedPassword }),
+  });
+  assert.equal(passwordChange.status, 200);
+
+  const savedWorkbook = readPortalDatabaseWorkbook(databasePath);
+  const users = savedWorkbook.getWorksheet("Users");
+  const headers = new Map(users.getRow(1).values.slice(1).map((value, index) => [
+    String(value).toLowerCase(),
+    index + 1,
+  ]));
+  const adminRowNumber = Array.from({ length: users.rowCount - 1 }, (_, index) => index + 2)
+    .find((rowNumber) => String(users.getRow(rowNumber).getCell(headers.get("email")).value).toLowerCase() === email);
+  assert.ok(adminRowNumber, "the bootstrap administrator was persisted");
+  const passwordHash = String(users.getRow(adminRowNumber).getCell(headers.get("password hash")).value);
+  assert.match(passwordHash, /^\$2[aby]\$12\$/);
+  assert.equal(passwordHash.includes(temporaryPassword), false);
+
+  await close();
+  server = createServer(serverOptions);
+  baseUrl = await listen();
+  assert.equal((await login(temporaryPassword)).status, 401);
+  assert.equal((await login(changedPassword)).status, 200);
+});
+
 async function createMigrationTestWorkbook(databasePath) {
   await fs.copyFile(sourceWorkbook, databasePath);
   const workbook = new ExcelJS.Workbook();
@@ -1713,13 +1793,20 @@ test("registrations persist in the workbook and can sign in after a restart", as
   const portalPageResponse = await fetch(baseUrl);
   assert.equal(portalPageResponse.status, 200);
   const portalPage = await portalPageResponse.text();
+  for (const [entryPath, entryName] of [["/parents", "parents"], ["/admin", "admin"]]) {
+    const entryResponse = await fetch(`${baseUrl}${entryPath}`);
+    assert.equal(entryResponse.status, 200);
+    assert.match(await entryResponse.text(), new RegExp(`<html lang="en" data-portal-entry="${entryName}">`));
+  }
+  assert.match(portalPage, /href="\/parents">Parents Portal/);
+  assert.match(portalPage, /href="\/admin">Admin Portal/);
   assert.match(portalPage, /id="sideBrandLogo" src="\/icon\.png" alt=""/);
   assert.match(portalPage, /class="sidebar-footer-icon" src="\/icon\.png" alt="" aria-hidden="true"/);
   assert.match(portalPage, /#workspace:has\(#eClassPage:not\(\[hidden\]\)\)>\.portal-footer\{display:none\}/);
   assert.match(portalPage, /\.page-content:has\(#eClassPage:not\(\[hidden\]\)\)\{max-width:none;margin:0;padding:0\}/);
   assert.match(portalPage, /#eClassPage \.eclass-table-wrap\{margin:0\}/);
   assert.match(portalPage, /\.sidebar-footer-icon\{display:block;width:48px;height:48px;margin:14px auto 0/);
-  assert.ok(portalPage.includes(`class="sidebar-footer-version">Version ${require("../package.json").version}</span>`));
+  assert.ok(portalPage.includes(`class="sidebar-footer-version">GraceDesk · Version ${require("../package.json").version}</span>`));
   assert.match(portalPage, /\.teacher-profile-card\{display:flex;max-width:920px;align-items:center/);
   assert.match(portalPage, /\.teacher-profile-form\{max-width:920px;padding:0 22px 22px\}/);
   assert.match(portalPage, /\.teacher-profile-form \.form-field\.full\{grid-column:1\/-1\}/);
@@ -1733,6 +1820,14 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(sidebarIconResponse.status, 200);
   assert.match(sidebarIconResponse.headers.get("content-type"), /^image\/png/);
   assert.ok((await sidebarIconResponse.arrayBuffer()).byteLength > 0);
+  const sf10SealResponse = await fetch(`${baseUrl}/sf10-deped-seal.png`);
+  assert.equal(sf10SealResponse.status, 200);
+  assert.match(sf10SealResponse.headers.get("content-type"), /^image\/png/);
+  assert.ok((await sf10SealResponse.arrayBuffer()).byteLength > 0);
+  const sf10DepEdLogoResponse = await fetch(`${baseUrl}/sf10-deped-logo.gif`);
+  assert.equal(sf10DepEdLogoResponse.status, 200);
+  assert.match(sf10DepEdLogoResponse.headers.get("content-type"), /^image\/gif/);
+  assert.ok((await sf10DepEdLogoResponse.arrayBuffer()).byteLength > 0);
   const gradeInterpretationSource = portalPage.match(/function getGradeInterpretation\(grade\)\{[\s\S]*?\n  \}/);
   assert.ok(gradeInterpretationSource, "general-average interpretation helper exists");
   const getGradeInterpretation = vm.runInNewContext(`${gradeInterpretationSource[0]}; getGradeInterpretation`);
@@ -1752,9 +1847,14 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /Blank: Present; CC or X: Absent; T: Tardy; E: Excused/);
   assert.match(portalPage, /status==="Absent"\?"CC":status==="Tardy"\?"T"/);
   assert.doesNotMatch(portalPage, /status==="Half-day"/);
-  assert.doesNotMatch(portalPage, /data-role="parent"/);
+  assert.doesNotMatch(portalPage, /id="authAccountType"/);
+  assert.match(portalPage, /var accountType=entryType==="parents"\?"parent":"teacher"/);
+  assert.match(portalPage, /id="parentClassCodeWrap" hidden/);
+  assert.match(portalPage, /Parent access/);
+  assert.match(portalPage, /studentParentAccount/);
+  assert.match(portalPage, /\/api\/students\/"\+encodeURIComponent\(student\.id\)\+"\/parent/);
   assert.doesNotMatch(portalPage, /id="extraWrap"|id="extraLabel"|id="extraHint"/);
-  assert.match(portalPage, /body:JSON\.stringify\(\{name:name,email:email,password:pw,role:"teacher",grade:grade,strand:strand\}\)/);
+  assert.match(portalPage, /role:role,[\s\S]*?extra:isParent\?classCode:undefined/);
   assert.match(portalPage, /querySelectorAll\("\.attendance-day-select"\)\)[\s\S]*?select\.value!==""/);
   assert.match(portalPage, /id="teacherGradeWrap" hidden/);
   assert.match(portalPage, /id="teacherStrandWrap" hidden/);
@@ -1833,7 +1933,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /Disable login[\s\S]*?Enable login/);
   assert.match(portalPage, /\$\("navAdminAccounts"\)\.hidden=!user\.isAdmin/);
   assert.match(portalPage, /Reset password[\s\S]*?temporary password will be their email address/);
-  assert.match(portalPage, /id="forcedPasswordDialog"[\s\S]*?Change the temporary password before continuing/);
+  assert.match(portalPage, /id="forcedPasswordDialog"[\s\S]*?Change your temporary password before continuing/);
+  assert.match(portalPage, /id="forcedNewPassword"[^>]*minlength="12"/);
   assert.match(portalPage, /api\("\/api\/auth\/change-password"/);
   assert.match(portalPage, /attendance-metric-label">TOTAL NUMBER OF DAYS</);
   const countClassDaysSource = portalPage.match(/function countClassDays\(result\)\{[\s\S]*?\n  \}/);
@@ -2323,7 +2424,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match((await teacherWithoutGrade.json()).error, /grade level/i);
   const teacherRegistration = await request("/api/auth/register", teacherCredentials);
   assert.equal(teacherRegistration.status, 201);
-  const teacherCookie = teacherRegistration.headers.get("set-cookie").split(";")[0];
+  let teacherCookie = teacherRegistration.headers.get("set-cookie").split(";")[0];
   const teacherResult = await teacherRegistration.json();
   assert.equal(teacherResult.user.name, teacherCredentials.name);
   assert.equal(teacherResult.user.role, "teacher");
@@ -3009,10 +3110,23 @@ test("registrations persist in the workbook and can sign in after a restart", as
     role: "teacher",
   });
   assert.equal(adminLogin.status, 200);
-  const adminCookie = adminLogin.headers.get("set-cookie").split(";")[0];
+  let adminCookie = adminLogin.headers.get("set-cookie").split(";")[0];
   const adminLoginUser = (await adminLogin.json()).user;
   assert.equal(adminLoginUser.role, "teacher", "admin access does not replace Teacher portal access");
   assert.equal(adminLoginUser.isAdmin, true);
+  const upgradedAdminWorkbook = readPortalDatabaseWorkbook(databasePath);
+  const upgradedAdminUsers = upgradedAdminWorkbook.getWorksheet("Users");
+  const upgradedAdminHeaders = new Map(upgradedAdminUsers.getRow(1).values.slice(1).map((value, index) => [
+    String(value).toLowerCase(),
+    index + 1,
+  ]));
+  const upgradedAdminRow = Array.from({ length: upgradedAdminUsers.rowCount - 1 }, (_, index) => index + 2)
+    .find((rowNumber) => String(upgradedAdminUsers.getRow(rowNumber)
+      .getCell(upgradedAdminHeaders.get("email")).value).toLowerCase() === teacherCredentials.email);
+  assert.match(
+    String(upgradedAdminUsers.getRow(upgradedAdminRow).getCell(upgradedAdminHeaders.get("password hash")).value),
+    /^\$2[aby]\$12\$/,
+  );
   const secondAdminLogin = await request("/api/auth/login", {
     email: secondTeacherCredentials.email,
     password: secondTeacherCredentials.password,
@@ -3064,15 +3178,10 @@ test("registrations persist in the workbook and can sign in after a restart", as
     },
   );
   assert.equal(secondAdminDeactivateFirst.status, 200);
-  const preventLastAdminDeactivation = await fetch(
-    `${baseUrl}/api/admin/accounts/${encodeURIComponent(otherClass.teacherId)}`,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Cookie: adminCookie },
-      body: JSON.stringify({ status: "Inactive" }),
-    },
-  );
-  assert.equal(preventLastAdminDeactivation.status, 400, "the last active administrator cannot be deactivated");
+  const invalidatedDeactivatedFirstAdminSession = await fetch(`${baseUrl}/api/auth/session`, {
+    headers: { Cookie: adminCookie },
+  });
+  assert.equal(invalidatedDeactivatedFirstAdminSession.status, 401, "deactivating an account invalidates its existing sessions");
   const secondAdminReactivateFirst = await fetch(
     `${baseUrl}/api/admin/accounts/${encodeURIComponent(adminSession.user.userId)}`,
     {
@@ -3082,6 +3191,14 @@ test("registrations persist in the workbook and can sign in after a restart", as
     },
   );
   assert.equal(secondAdminReactivateFirst.status, 200);
+  const restoredAdminLogin = await request("/api/auth/login", {
+    email: teacherCredentials.email,
+    password: teacherCredentials.password,
+    role: "teacher",
+  });
+  assert.equal(restoredAdminLogin.status, 200, "reactivated accounts can establish a new session");
+  adminCookie = restoredAdminLogin.headers.get("set-cookie").split(";")[0];
+  teacherCookie = adminCookie;
   const deactivateSecondAdmin = await fetch(
     `${baseUrl}/api/admin/accounts/${encodeURIComponent(otherClass.teacherId)}`,
     {
@@ -3091,6 +3208,14 @@ test("registrations persist in the workbook and can sign in after a restart", as
     },
   );
   assert.equal(deactivateSecondAdmin.status, 200);
+  const invalidatedDeactivatedAdminSession = await fetch(`${baseUrl}/api/auth/session`, {
+    headers: { Cookie: secondAdminCookie },
+  });
+  assert.equal(invalidatedDeactivatedAdminSession.status, 401, "deactivating an account invalidates its existing sessions");
+  const blockedDeactivatedAdminEndpoint = await fetch(`${baseUrl}/api/admin/classes`, {
+    headers: { Cookie: secondAdminCookie },
+  });
+  assert.equal(blockedDeactivatedAdminEndpoint.status, 401, "deactivated accounts cannot access protected API routes");
   const reactivateSecondAdmin = await fetch(
     `${baseUrl}/api/admin/accounts/${encodeURIComponent(otherClass.teacherId)}`,
     {
@@ -3479,7 +3604,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(savedAutoScoreData.autoScoring.readingLevel, "Independent");
   assert.equal(savedAutoScoreData.autoScoring.oralReading, 0.97);
   assert.equal(savedAutoScoreData.autoScoring.comprehension, 0.8);
-  assert.equal(savedAutoScoreData.autoScoring.assessor, "Taylor Updated");
+  assert.equal(savedAutoScoreData.autoScoring.assessor, teacherCredentials.name);
   assert.equal(savedAutoScoreData.autoScoring.startingPassage, "Grade 3 passage (2 levels below)");
   assert.equal(savedAutoScoreData.autoScoring.modeResults["Oral Reading"].readingLevel, "Independent");
 
@@ -6359,8 +6484,12 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /Assessment history/);
   assert.match(portalPage, /button\.dataset\.parentTarget==="parentReadingSection"[\s\S]*?refreshParentPortalData\(\$\("refreshParentReading"\)/);
   assert.match(portalPage, /id="refreshParentReading" type="button">Refresh reading progress/);
+  assert.match(portalPage, /id="refreshParentPortal" type="button">Refresh data/);
   assert.match(portalPage, /async function refreshParentPortalData\(button,successMessage\)/);
   assert.match(portalPage, /var updatedPortal=await api\("\/api\/parent\/portal"\)/);
+  assert.match(portalPage, /window\.setInterval\(function\(\)\{[\s\S]*?refreshParentPortalData\(null\)[\s\S]*?\},30000\)/);
+  assert.match(portalPage, /document\.addEventListener\("visibilitychange"/);
+  assert.match(portalPage, /window\.addEventListener\("focus"/);
   assert.match(portalPage, /renderParentLearner\(nextIndex<0\?0:nextIndex\)/);
   const teacherParentPortal = await fetch(`${baseUrl}/api/parent/portal`, {
     headers: { Cookie: teacherCookie },
@@ -6773,12 +6902,12 @@ test("registrations persist in the workbook and can sign in after a restart", as
 
   assert.ok(row, "registered user is present in the Users sheet");
   assert.equal(row.number, 3, "accounts are written into the workbook's existing user rows");
-  assert.match(String(row.getCell(headerMap.get("password hash (pbkdf2)")).value), /^pbkdf2\$/);
+  assert.match(String(row.getCell(headerMap.get("password hash")).value), /^pbkdf2\$/);
   assert.equal(row.getCell(headerMap.get("sign-ins")).value, 1);
   assert.ok(row.getCell(headerMap.get("last sign-in")).value instanceof Date);
   assert.ok(teacherRow, "teacher registration is present in the Users sheet");
   assert.equal(teacherRow.number, 2);
-  assert.match(String(teacherRow.getCell(headerMap.get("password hash (pbkdf2)")).value), /^pbkdf2\$/);
+  assert.match(String(teacherRow.getCell(headerMap.get("password hash")).value), /^\$2[aby]\$12\$/);
   const classSheet = workbook.getWorksheet("Classes");
   const classHeaders = new Map();
   classSheet.getRow(1).eachCell((cell, column) => classHeaders.set(String(cell.value).toLowerCase(), column));
@@ -7079,6 +7208,53 @@ test("registrations persist in the workbook and can sign in after a restart", as
   });
   assert.equal(savedSectionProfileResponse.status, 200);
   assert.deepEqual((await savedSectionProfileResponse.json()).sectionGrades, sf1SectionImport.sectionGrades);
+});
+
+test("trusted proxy mode marks session cookies Secure and rate-limits by forwarded client address", async (context) => {
+  const startServer = async (trustProxy) => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "grade5-portal-"));
+    const databasePath = path.join(directory, "database.sqlite");
+    const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+    await createEmptyTestWorkbook(migrationWorkbookPath);
+    const instance = createServer({ databasePath, migrationWorkbookPath, trustProxy });
+    await new Promise((resolve) => instance.listen(0, "127.0.0.1", resolve));
+    context.after(async () => {
+      await new Promise((resolve, reject) => {
+        instance.close((error) => error ? reject(error) : resolve());
+        instance.closeAllConnections();
+      });
+      await fs.rm(directory, { recursive: true, force: true });
+    });
+    return `http://127.0.0.1:${instance.address().port}`;
+  };
+  const register = (baseUrl, email, classroom, headers) => fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify({
+      name: "Proxy Teacher", email, password: "secure-pass-123", role: "teacher", extra: classroom, grade: "Grade 5",
+    }),
+  });
+
+  const trusted = await startServer(true);
+  const secureResponse = await register(trusted, "proxy.one@example.com", "21", { "X-Forwarded-Proto": "https" });
+  assert.equal(secureResponse.status, 201);
+  assert.match(secureResponse.headers.get("set-cookie"), /; Secure/);
+
+  const untrusted = await startServer(false);
+  const insecureResponse = await register(untrusted, "proxy.two@example.com", "22", { "X-Forwarded-Proto": "https" });
+  assert.equal(insecureResponse.status, 201);
+  assert.doesNotMatch(insecureResponse.headers.get("set-cookie"), /; Secure/, "forwarded headers are ignored unless the proxy is trusted");
+
+  const login = (headers, email) => fetch(`${trusted}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify({ email, password: "wrong-password", role: "teacher" }),
+  });
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await login({ "X-Forwarded-For": "203.0.113.9" }, `nobody${attempt}@example.com`);
+  }
+  assert.equal((await login({ "X-Forwarded-For": "203.0.113.9" }, "nobody-final@example.com")).status, 429);
+  assert.notEqual((await login({ "X-Forwarded-For": "198.51.100.7" }, "nobody-other@example.com")).status, 429, "other clients behind the proxy are not locked out");
 });
 
 test("registration rejects a class code that is not in the workbook", async (context) => {

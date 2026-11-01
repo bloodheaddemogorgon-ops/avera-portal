@@ -1,6 +1,11 @@
 "use strict";
 
-require("dotenv").config();
+const dotenv = require("dotenv");
+dotenv.config();
+if (process.env.PORTAL_ADMIN_SECRET_FILE) {
+  const secretEnv = dotenv.config({ path: process.env.PORTAL_ADMIN_SECRET_FILE });
+  if (secretEnv.error) throw new Error("Could not load the configured administrator secret file.");
+}
 
 const { AsyncLocalStorage } = require("node:async_hooks");
 const crypto = require("node:crypto");
@@ -13,6 +18,7 @@ const https = require("node:https");
 const os = require("node:os");
 const path = require("node:path");
 const { promisify } = require("node:util");
+const bcrypt = require("bcryptjs");
 const ExcelJS = require("exceljs");
 const JSZip = require("jszip");
 const XLSX = require("@e965/xlsx");
@@ -23,6 +29,22 @@ const { calculateBmiForAge } = require("./who-growth-reference");
 
 const DOWNLOADS_DIRECTORY = path.join(os.homedir(), "Downloads");
 const DEFAULT_DATABASE_PATH = path.join(__dirname, "grade5-portal-database.sqlite");
+// Supabase defines the anon/authenticated roles; plain PostgreSQL (e.g. Neon) does not.
+const POSTGRES_REVOKE_PUBLIC_ACCESS_SQL = `
+  DO $$
+  DECLARE role_name text;
+  BEGIN
+    REVOKE ALL ON TABLE portal_state, portal_profile_photos, portal_school_logos FROM PUBLIC;
+    FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+        EXECUTE format(
+          'REVOKE ALL ON TABLE portal_state, portal_profile_photos, portal_school_logos FROM %I',
+          role_name
+        );
+      END IF;
+    END LOOP;
+  END
+  $$`;
 const APPLICATION_WORKBOOK_PATH = path.join(__dirname, "grade5-portal-database.xlsx");
 const DOWNLOADS_DATABASE_PATH = path.join(DOWNLOADS_DIRECTORY, "grade5-portal-database.xlsx");
 const LEGACY_DATABASE_PATH = path.join(DOWNLOADS_DIRECTORY, "grade5-portal-database-template.xlsx");
@@ -44,6 +66,14 @@ const MIGRATION_WORKBOOK_PATH = process.env.PORTAL_MIGRATION_WORKBOOK
           ? LEGACY_DATABASE_PATH
           : path.join(__dirname, "grade5-portal-database-template.xlsx");
 const INDEX_PATH = path.join(__dirname, "index.html");
+const PORTAL_ENTRY_PATHS = new Map([
+  ["/", "main"],
+  ["/index.html", "main"],
+  ["/parents", "parents"],
+  ["/parents.html", "parents"],
+  ["/admin", "admin"],
+  ["/admin.html", "admin"],
+]);
 const APP_VERSION = require("./package.json").version;
 const MAX_SF1_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_SF2_FILE_BYTES = 10 * 1024 * 1024;
@@ -333,6 +363,7 @@ const SF2_MARK_BY_STATUS = new Map([
 const PASSWORD_ITERATIONS = 210000;
 const PASSWORD_BYTES = 32;
 const SESSION_COOKIE = "grade5_session";
+const PORTAL_SESSION_ENTRIES = new Set(["teacher", "parents", "admin"]);
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 const GRADE_TERMS = ["Term 1", "Term 2", "Term 3"];
 const READING_PERIODS = ["BOSY", "MOSY", "EOSY"];
@@ -1042,11 +1073,11 @@ function getUserSheet(workbook) {
 
 function setPasswordDocumentation(workbook, passwordColumn) {
   const usersSheet = workbook.getWorksheet("Users");
-  usersSheet.getRow(1).getCell(passwordColumn).value = "Password hash (PBKDF2)";
+  usersSheet.getRow(1).getCell(passwordColumn).value = "Password hash";
   const readme = workbook.getWorksheet("README");
   if (readme && readme.getCell("A24").value) {
     readme.getCell("A24").value =
-      "Account passwords are stored as PBKDF2 hashes. The portal creates user records only when an account is registered.";
+      "Administrator passwords are stored as bcrypt hashes with cost 12. Existing teacher and parent passwords use PBKDF2-SHA-256.";
   }
 }
 
@@ -1593,7 +1624,16 @@ async function hashPassword(password) {
   return `pbkdf2$${PASSWORD_ITERATIONS}$${salt.toString("base64")}$${derivedKey.toString("base64")}`;
 }
 
+async function hashAdminPassword(password) {
+  return bcrypt.hash(password, 12);
+}
+
 async function verifyPassword(password, storedPassword) {
+  const bcryptHash = storedPassword.match(/^\$2[aby]\$(\d{2})\$/);
+  if (bcryptHash) {
+    const cost = Number(bcryptHash[1]);
+    return cost >= 12 && cost <= 15 ? bcrypt.compare(password, storedPassword) : false;
+  }
   const [, iterationsText, saltText, keyText] = storedPassword.split("$");
   if (!storedPassword.startsWith("pbkdf2$")) return false;
   const iterations = Number(iterationsText);
@@ -1789,6 +1829,18 @@ function openPortalDatabase(databasePath) {
         schema_version INTEGER NOT NULL,
         workbook_state BLOB NOT NULL,
         updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS portal_sync_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        remote_revision INTEGER NOT NULL DEFAULT 0,
+        pending INTEGER NOT NULL DEFAULT 0 CHECK (pending IN (0, 1)),
+        conflict INTEGER NOT NULL DEFAULT 0 CHECK (conflict IN (0, 1)),
+        conflict_local_state BLOB,
+        conflict_remote_state BLOB,
+        conflict_remote_revision INTEGER,
+        last_sync_at TEXT,
+        last_sync_error TEXT,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
     return database;
@@ -2250,6 +2302,7 @@ function parseEClassWorkbook(buffer, selection) {
   const normalize = (value) => String(value || "").toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
   const selectedSubject = normalize(selection.subject);
   const selectedGroup = normalize(selection.mapehGroup);
+  let otherTerm = "";
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" });
@@ -2258,9 +2311,10 @@ function parseEClassWorkbook(buffer, selection) {
     const subjectText = String(cell(rows[9] || [], 26) || "");
     if (!/class\s*record/i.test(termText) && !rows.some((row) =>
       String(cell(row, 1)).toLocaleLowerCase() === "learners' names")) continue;
-    const workbookTerm = termText.match(/term\s*[123]/i)?.[0] || "";
+    const workbookTerm = sheetName.match(/term\s*[123]/i)?.[0] || termText.match(/term\s*[123]/i)?.[0] || "";
     if (workbookTerm && normalize(workbookTerm) !== normalize(selection.term)) {
-      throw new HttpError(400, `The workbook is for ${workbookTerm}, not ${selection.term}.`);
+      otherTerm = otherTerm || workbookTerm;
+      continue;
     }
     const workbookSubject = normalize(subjectText);
     const subjectMatches = !workbookSubject || (
@@ -2296,13 +2350,34 @@ function parseEClassWorkbook(buffer, selection) {
       students.push({ row: rowIndex + 1, name, scores: learnerScores });
     }
     if (!students.length) throw new HttpError(400, "No learner records were found in the E-Class workbook.");
-    return { term: selection.term, subject: selection.subject, mapehGroup: selection.mapehGroup, highestScores: scores, students };
+    const labelValue = (label) => {
+      for (const row of rows.slice(0, highestRow)) {
+        for (let column = 0; column < row.length; column += 1) {
+          if (normalize(row[column]) !== label) continue;
+          for (let next = column + 1; next < row.length; next += 1) {
+            if (String(row[next] ?? "").trim()) return String(row[next]).trim();
+          }
+        }
+      }
+      return "";
+    };
+    return {
+      term: selection.term,
+      subject: selection.subject,
+      mapehGroup: selection.mapehGroup,
+      grade: labelValue("gradelevel"),
+      section: labelValue("section"),
+      highestScores: scores,
+      students,
+    };
   }
+  if (otherTerm) throw new HttpError(400, `The workbook has no ${selection.term} sheet (found ${otherTerm}).`);
   throw new HttpError(400, "No E-Class record sheet was found in the workbook.");
 }
 
 function createServer(options = {}) {
   const databasePath = options.databasePath || DATABASE_PATH;
+  const localDatabaseExistedAtStartup = fileSystem.existsSync(databasePath);
   const migrationWorkbookPath = options.migrationWorkbookPath || MIGRATION_WORKBOOK_PATH;
   const generatedReportsDirectory = options.generatedReportsDirectory || GENERATED_REPORTS_DIRECTORY;
   const appearancePreferencesPath = options.appearancePreferencesPath || null;
@@ -2312,10 +2387,29 @@ function createServer(options = {}) {
   if ((tlsKeyPath && !tlsCertPath) || (!tlsKeyPath && tlsCertPath)) {
     throw new Error("PORTAL_TLS_KEY and PORTAL_TLS_CERT must be provided together.");
   }
+  // Enable only behind a trusted TLS-terminating reverse proxy that sets X-Forwarded-* headers.
+  const trustProxy = options.trustProxy ?? process.env.PORTAL_TRUST_PROXY === "true";
   const migrationWorkbookWasSpecified = Boolean(
     options.migrationWorkbookPath || process.env.PORTAL_MIGRATION_WORKBOOK,
   );
   const supabaseDatabaseUrl = options.supabaseDatabaseUrl || process.env.SUPABASE_DB_URL;
+  const dualStorage = (options.storageMode || process.env.PORTAL_STORAGE_MODE) === "dual";
+  const bootstrapAdminEmail = typeof options.bootstrapAdminEmail === "string"
+    ? options.bootstrapAdminEmail.trim().toLowerCase()
+    : "";
+  const bootstrapAdminPassword = typeof options.bootstrapAdminPassword === "string"
+    ? options.bootstrapAdminPassword
+    : "";
+  if (Boolean(bootstrapAdminEmail) !== Boolean(bootstrapAdminPassword)) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must both be configured to bootstrap an administrator.");
+  }
+  if (bootstrapAdminEmail
+    && (!/^\S+@\S+\.\S+$/.test(bootstrapAdminEmail)
+      || bootstrapAdminEmail.length > 254
+      || bootstrapAdminPassword.length < 6
+      || bootstrapAdminPassword.length > 256)) {
+    throw new Error("The configured bootstrap administrator credentials are invalid.");
+  }
   const postgresConnectionUrl = supabaseDatabaseUrl ? new URL(supabaseDatabaseUrl) : null;
   if (postgresConnectionUrl) {
     for (const parameter of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) {
@@ -2331,7 +2425,10 @@ function createServer(options = {}) {
       idleTimeoutMillis: 30000,
     })
     : null);
-  const storage = postgresPool ? "supabase" : "sqlite";
+  if (dualStorage && !postgresPool) {
+    throw new Error("PORTAL_STORAGE_MODE=dual requires SUPABASE_DB_URL.");
+  }
+  const storage = dualStorage ? "dual" : postgresPool ? "supabase" : "sqlite";
   const transactionContext = new AsyncLocalStorage();
   const profilePhotoDirectories = databasePath === DEFAULT_DATABASE_PATH
     ? [
@@ -2349,7 +2446,14 @@ function createServer(options = {}) {
   const authRateLimiter = options.authRateLimiter || createAuthRateLimiter();
   let database = null;
   let databaseInitialization = null;
+  let bootstrapAdminInitialization = null;
+  let remoteInitialization = null;
   let appearanceTheme = null;
+  let syncTimer = null;
+  let syncTask = null;
+  let syncInProgress = false;
+  let serverClosing = false;
+  let remoteAvailable = false;
 
   async function getAppearanceTheme() {
     if (!appearancePreferencesPath) return appearanceTheme;
@@ -2377,6 +2481,197 @@ function createServer(options = {}) {
     appearanceTheme = theme;
   }
 
+  function getLocalSyncState() {
+    return database.prepare(
+      "SELECT remote_revision, pending, conflict, conflict_remote_revision, last_sync_at, last_sync_error FROM portal_sync_state WHERE id = 1",
+    ).get();
+  }
+
+  function setLocalSyncError(error) {
+    if (!database) return;
+    const errorCode = typeof error?.code === "string" ? error.code.slice(0, 40) : "ONLINE_DATABASE_UNAVAILABLE";
+    database.prepare(
+      "UPDATE portal_sync_state SET last_sync_error = ?, updated_at = ? WHERE id = 1",
+    ).run(errorCode, new Date().toISOString());
+  }
+
+  async function initializeRemoteDatabase() {
+    if (remoteInitialization) return remoteInitialization;
+    const initialization = (async () => {
+      await postgresPool.query(`
+        CREATE TABLE IF NOT EXISTS portal_state (
+          id smallint PRIMARY KEY CHECK (id = 1),
+          schema_version integer NOT NULL,
+          workbook_state bytea NOT NULL,
+          revision bigint NOT NULL DEFAULT 1,
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      await postgresPool.query(
+        "ALTER TABLE portal_state ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 1",
+      );
+      await postgresPool.query(`
+        CREATE TABLE IF NOT EXISTS portal_profile_photos (
+          user_id text PRIMARY KEY,
+          extension text NOT NULL CHECK (extension IN ('jpg', 'png', 'webp')),
+          photo_data bytea NOT NULL,
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      await postgresPool.query(`
+        CREATE TABLE IF NOT EXISTS portal_school_logos (
+          user_id text PRIMARY KEY,
+          extension text NOT NULL CHECK (extension IN ('jpg', 'png', 'webp')),
+          logo_data bytea NOT NULL,
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      await postgresPool.query(
+        POSTGRES_REVOKE_PUBLIC_ACCESS_SQL,
+      );
+      let remoteResult = await postgresPool.query(
+        "SELECT workbook_state, revision FROM portal_state WHERE id = 1",
+      );
+      const localResult = database.prepare(
+        "SELECT workbook_state FROM portal_state WHERE id = 1",
+      ).get();
+      const syncState = getLocalSyncState();
+      if (!remoteResult.rows.length) {
+        await postgresPool.query(
+          `INSERT INTO portal_state (id, schema_version, workbook_state, revision, updated_at)
+           VALUES (1, 1, $1, 1, now())
+           ON CONFLICT (id) DO NOTHING`,
+          [localResult.workbook_state],
+        );
+        remoteResult = await postgresPool.query(
+          "SELECT workbook_state, revision FROM portal_state WHERE id = 1",
+        );
+        if (!remoteResult.rows.length) {
+          throw new Error("The online portal database has no saved state after initialization.");
+        }
+      }
+
+      const remoteState = remoteResult.rows[0].workbook_state;
+      const remoteRevision = Number(remoteResult.rows[0].revision);
+      if (!Number.isSafeInteger(remoteRevision) || remoteRevision < 1) {
+        throw new Error("The online portal database has an invalid revision.");
+      }
+      if (syncState.conflict) {
+        remoteAvailable = true;
+        return;
+      }
+      if (syncState.pending && syncState.remote_revision !== remoteRevision) {
+        const now = new Date().toISOString();
+        database.prepare(
+          `UPDATE portal_sync_state
+           SET conflict = 1, pending = 0, conflict_local_state = ?,
+               conflict_remote_state = ?, conflict_remote_revision = ?,
+               last_sync_error = 'SYNC_CONFLICT', updated_at = ?
+           WHERE id = 1`,
+        ).run(localResult.workbook_state, remoteState, remoteRevision, now);
+        remoteAvailable = true;
+        return;
+      }
+      if (syncState.pending) {
+        remoteAvailable = true;
+        return;
+      }
+      if (!localDatabaseExistedAtStartup) {
+        database.prepare(
+          "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
+        ).run(remoteState, new Date().toISOString());
+        database.prepare(
+          `UPDATE portal_sync_state
+           SET remote_revision = ?, pending = 0, conflict = 0,
+               conflict_local_state = NULL, conflict_remote_state = NULL,
+               conflict_remote_revision = NULL, last_sync_at = ?, last_sync_error = NULL,
+               updated_at = ?
+           WHERE id = 1`,
+        ).run(remoteRevision, new Date().toISOString(), new Date().toISOString());
+        remoteAvailable = true;
+        return;
+      }
+
+      if (syncState.remote_revision > 0) {
+        if (syncState.remote_revision !== remoteRevision) {
+          database.prepare(
+            `UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1`,
+          ).run(remoteState, new Date().toISOString());
+          database.prepare(
+            `UPDATE portal_sync_state
+             SET remote_revision = ?, last_sync_at = ?, last_sync_error = NULL, updated_at = ?
+             WHERE id = 1`,
+          ).run(remoteRevision, new Date().toISOString(), new Date().toISOString());
+        }
+        remoteAvailable = true;
+        return;
+      }
+
+      const statesMatch = JSON.stringify(decodeWorkbookState(localResult.workbook_state).model)
+        === JSON.stringify(decodeWorkbookState(remoteState).model);
+      if (statesMatch) {
+        database.prepare(
+          `UPDATE portal_sync_state
+           SET remote_revision = ?, pending = 0, last_sync_at = ?,
+               last_sync_error = NULL, updated_at = ?
+           WHERE id = 1`,
+        ).run(remoteRevision, new Date().toISOString(), new Date().toISOString());
+      } else {
+        database.prepare(
+          `UPDATE portal_sync_state
+           SET conflict = 1, conflict_local_state = ?, conflict_remote_state = ?,
+               conflict_remote_revision = ?, pending = 0,
+               last_sync_error = 'SYNC_CONFLICT', updated_at = ?
+           WHERE id = 1`,
+        ).run(localResult.workbook_state, remoteState, remoteRevision, new Date().toISOString());
+      }
+      remoteAvailable = true;
+    })();
+    remoteInitialization = initialization.catch((error) => {
+      remoteInitialization = null;
+      remoteAvailable = false;
+      setLocalSyncError(error);
+      throw error;
+    });
+    return remoteInitialization;
+  }
+
+  async function initializeDualDatabase() {
+    await fs.mkdir(path.dirname(databasePath), { recursive: true });
+    database = openPortalDatabase(databasePath);
+    const existingState = database.prepare(
+      "SELECT workbook_state FROM portal_state WHERE id = 1",
+    ).get();
+    if (!existingState) {
+      if (!fileSystem.existsSync(migrationWorkbookPath)) {
+        throw new Error(
+          `The SQLite database is empty and the migration workbook was not found: ${migrationWorkbookPath}`,
+        );
+      }
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(migrationWorkbookPath);
+      getUserSheet(workbook);
+      if (!workbook.getWorksheet("Classes") || !workbook.getWorksheet("SignInLog")) {
+        throw new Error("The migration workbook is missing required portal worksheets.");
+      }
+      database.prepare(
+        "INSERT INTO portal_state (id, schema_version, workbook_state, updated_at) VALUES (1, 1, ?, ?)",
+      ).run(encodeWorkbookState(workbook), new Date().toISOString());
+      console.log(`Migrated portal data from ${path.resolve(migrationWorkbookPath)} into SQLite.`);
+    }
+    database.prepare(
+      "INSERT OR IGNORE INTO portal_sync_state (id) VALUES (1)",
+    ).run();
+    try {
+      await initializeRemoteDatabase();
+    } catch (error) {
+      console.warn("Online database unavailable; local changes will be queued for synchronization.", error.code || "connection error");
+    }
+    if (getLocalSyncState().pending && !getLocalSyncState().conflict) {
+      scheduleDualSync();
+    }
+  }
+
   async function logPortalError(referenceId, error) {
     const logEntry = `[${new Date().toISOString()}] [${referenceId}] Portal request failed\n${error?.stack || error}\n`;
     console.error(logEntry);
@@ -2392,15 +2687,23 @@ function createServer(options = {}) {
   async function initializeDatabase() {
     if (databaseInitialization) return databaseInitialization;
     const initialization = (async () => {
+      if (dualStorage) {
+        await initializeDualDatabase();
+        return;
+      }
       if (postgresPool) {
         await postgresPool.query(`
           CREATE TABLE IF NOT EXISTS portal_state (
             id smallint PRIMARY KEY CHECK (id = 1),
             schema_version integer NOT NULL,
             workbook_state bytea NOT NULL,
+            revision bigint NOT NULL DEFAULT 1,
             updated_at timestamptz NOT NULL DEFAULT now()
           )
         `);
+        await postgresPool.query(
+          "ALTER TABLE portal_state ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 1",
+        );
         await postgresPool.query(`
           CREATE TABLE IF NOT EXISTS portal_profile_photos (
             user_id text PRIMARY KEY,
@@ -2418,7 +2721,7 @@ function createServer(options = {}) {
           )
         `);
         await postgresPool.query(
-          "REVOKE ALL ON TABLE portal_state, portal_profile_photos, portal_school_logos FROM PUBLIC, anon, authenticated",
+          POSTGRES_REVOKE_PUBLIC_ACCESS_SQL,
         );
         const existingState = await postgresPool.query(
           "SELECT workbook_state FROM portal_state WHERE id = 1",
@@ -2492,7 +2795,7 @@ function createServer(options = {}) {
 
   async function readDatabaseWorkbook() {
     await initializeDatabase();
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       const client = transactionContext.getStore() || postgresPool;
       const result = await client.query(
         "SELECT workbook_state FROM portal_state WHERE id = 1",
@@ -2509,19 +2812,235 @@ function createServer(options = {}) {
 
   async function saveDatabaseWorkbook(workbook) {
     await initializeDatabase();
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       const client = transactionContext.getStore() || postgresPool;
       const result = await client.query(
-        "UPDATE portal_state SET workbook_state = $1, updated_at = $2 WHERE id = 1",
+        "UPDATE portal_state SET workbook_state = $1, revision = revision + 1, updated_at = $2 WHERE id = 1",
         [encodeWorkbookState(workbook), new Date().toISOString()],
       );
       if (result.rowCount !== 1) throw new Error("The Supabase portal database has no saved state.");
+      return;
+    }
+    if (dualStorage) {
+      const state = encodeWorkbookState(workbook);
+      const now = new Date().toISOString();
+      const result = database.prepare(
+        "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
+      ).run(state, now);
+      if (result.changes !== 1) throw new Error("The SQLite portal database has no saved state.");
+      database.prepare(
+        `UPDATE portal_sync_state
+         SET pending = 1,
+             conflict_local_state = CASE WHEN conflict = 1 THEN ? ELSE conflict_local_state END,
+             updated_at = ?
+         WHERE id = 1`,
+      ).run(state, now);
       return;
     }
     const result = database.prepare(
       "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
     ).run(encodeWorkbookState(workbook), new Date().toISOString());
     if (result.changes !== 1) throw new Error("The SQLite portal database has no saved state.");
+  }
+
+  function readSyncStatus() {
+    if (!dualStorage || !database) {
+      return { mode: storage, state: "disabled" };
+    }
+    const syncState = getLocalSyncState();
+    return {
+      mode: "dual",
+      state: syncState.conflict
+        ? "conflict"
+        : syncState.pending
+          ? remoteAvailable ? "pending" : "offline"
+          : remoteAvailable ? "synced" : "offline",
+      localRevision: syncState.remote_revision,
+      lastSyncedAt: syncState.last_sync_at,
+    };
+  }
+
+  function scheduleDualSync() {
+    if (!dualStorage || syncTimer || serverClosing) return;
+    syncTimer = setTimeout(() => {
+      syncTimer = null;
+      syncTask = synchronizeLocalDatabase();
+      syncTask.catch((error) => {
+        const referenceId = crypto.randomUUID();
+        logPortalError(referenceId, error).catch((logError) => {
+          console.error("Could not write the online synchronization error log:", logError);
+        });
+      }).finally(() => {
+        syncTask = null;
+      });
+    }, 100);
+    syncTimer.unref?.();
+  }
+
+  async function synchronizeLocalDatabase() {
+    if (!dualStorage || syncInProgress || serverClosing) return;
+    syncInProgress = true;
+    try {
+      await initializeDatabase();
+      if (!remoteInitialization) {
+        try {
+          await initializeRemoteDatabase();
+        } catch (error) {
+          remoteAvailable = false;
+          setLocalSyncError(error);
+          return;
+        }
+      }
+
+      const synchronization = workbookQueue.then(async () => {
+        const syncState = getLocalSyncState();
+        if (syncState.conflict || !syncState.pending) return;
+        const localState = database.prepare(
+          "SELECT workbook_state FROM portal_state WHERE id = 1",
+        ).get();
+        if (!localState) throw new Error("The local portal database has no saved state.");
+
+        const client = await postgresPool.connect();
+        let transactionStarted = false;
+        try {
+          await client.query("BEGIN");
+          transactionStarted = true;
+          const remoteResult = await client.query(
+            "SELECT workbook_state, revision FROM portal_state WHERE id = 1 FOR UPDATE",
+          );
+          if (!remoteResult.rows.length) {
+            throw new Error("The online portal database has no saved state.");
+          }
+          const remoteRevision = Number(remoteResult.rows[0].revision);
+          if (remoteRevision !== syncState.remote_revision) {
+            await client.query("COMMIT");
+            transactionStarted = false;
+            const now = new Date().toISOString();
+            database.prepare(
+              `UPDATE portal_sync_state
+               SET conflict = 1, pending = 0, conflict_local_state = ?,
+                   conflict_remote_state = ?, conflict_remote_revision = ?,
+                   last_sync_error = 'SYNC_CONFLICT', updated_at = ?
+               WHERE id = 1`,
+            ).run(
+              localState.workbook_state,
+              remoteResult.rows[0].workbook_state,
+              remoteRevision,
+              now,
+            );
+            remoteAvailable = true;
+            return;
+          }
+          await client.query(
+            `UPDATE portal_state
+             SET workbook_state = $1, revision = revision + 1, updated_at = now()
+             WHERE id = 1`,
+            [localState.workbook_state],
+          );
+          await client.query("COMMIT");
+          transactionStarted = false;
+          const now = new Date().toISOString();
+          database.prepare(
+            `UPDATE portal_sync_state
+             SET remote_revision = remote_revision + 1, pending = 0, conflict = 0,
+                 conflict_local_state = NULL, conflict_remote_state = NULL,
+                 conflict_remote_revision = NULL, last_sync_at = ?,
+                 last_sync_error = NULL, updated_at = ?
+             WHERE id = 1`,
+          ).run(now, now);
+          remoteAvailable = true;
+        } catch (error) {
+          if (transactionStarted) await client.query("ROLLBACK");
+          throw error;
+        } finally {
+          client.release();
+        }
+      });
+      workbookQueue = synchronization.then(() => undefined, () => undefined);
+      try {
+        await synchronization;
+      } catch (error) {
+        remoteAvailable = false;
+        setLocalSyncError(error);
+        throw error;
+      }
+    } finally {
+      syncInProgress = false;
+    }
+  }
+
+  async function resolveDualSyncConflict(resolution) {
+    if (!dualStorage) throw new HttpError(409, "Online conflict resolution is not enabled.");
+    return serializeWorkbook(async () => {
+      const syncState = getLocalSyncState();
+      if (!syncState.conflict) throw new HttpError(409, "There is no online synchronization conflict to resolve.");
+      const client = await postgresPool.connect();
+      let transactionStarted = false;
+      try {
+        await client.query("BEGIN");
+        transactionStarted = true;
+        const remoteResult = await client.query(
+          "SELECT workbook_state, revision FROM portal_state WHERE id = 1 FOR UPDATE",
+        );
+        if (!remoteResult.rows.length) throw new Error("The online portal database has no saved state.");
+        const remoteRevision = Number(remoteResult.rows[0].revision);
+        if (remoteRevision !== syncState.conflict_remote_revision) {
+          const localState = database.prepare(
+            "SELECT workbook_state FROM portal_state WHERE id = 1",
+          ).get();
+          await client.query("COMMIT");
+          transactionStarted = false;
+          database.prepare(
+            `UPDATE portal_sync_state
+             SET conflict_local_state = ?, conflict_remote_state = ?,
+                 conflict_remote_revision = ?, last_sync_error = 'SYNC_CONFLICT',
+                 updated_at = ?
+             WHERE id = 1`,
+          ).run(
+            localState.workbook_state,
+            remoteResult.rows[0].workbook_state,
+            remoteRevision,
+            new Date().toISOString(),
+          );
+          return { state: "conflict" };
+        }
+
+        if (resolution === "local") {
+          const localState = database.prepare(
+            "SELECT workbook_state FROM portal_state WHERE id = 1",
+          ).get();
+          await client.query(
+            `UPDATE portal_state
+             SET workbook_state = $1, revision = revision + 1, updated_at = now()
+             WHERE id = 1`,
+            [localState.workbook_state],
+          );
+        } else {
+          database.prepare(
+            "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
+          ).run(remoteResult.rows[0].workbook_state, new Date().toISOString());
+        }
+        await client.query("COMMIT");
+        transactionStarted = false;
+        const nextRevision = remoteRevision + (resolution === "local" ? 1 : 0);
+        const now = new Date().toISOString();
+        database.prepare(
+          `UPDATE portal_sync_state
+           SET remote_revision = ?, pending = 0, conflict = 0,
+               conflict_local_state = NULL, conflict_remote_state = NULL,
+               conflict_remote_revision = NULL, last_sync_at = ?,
+               last_sync_error = NULL, updated_at = ?
+           WHERE id = 1`,
+        ).run(nextRevision, now, now);
+        remoteAvailable = true;
+        return { state: "synced", resolution };
+      } catch (error) {
+        if (transactionStarted) await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    });
   }
 
 function getInventorySheet(workbook) {
@@ -2695,6 +3214,21 @@ async function deleteInventoryItem(session, id) {
 
   function serializeWorkbook(operation) {
     const result = workbookQueue.then(async () => {
+      if (dualStorage) {
+        await initializeDatabase();
+        database.exec("BEGIN IMMEDIATE");
+        try {
+          const value = await operation();
+          database.exec("COMMIT");
+          if (getLocalSyncState().pending && !getLocalSyncState().conflict) {
+            scheduleDualSync();
+          }
+          return value;
+        } catch (error) {
+          database.exec("ROLLBACK");
+          throw error;
+        }
+      }
       if (!postgresPool) return operation();
       await initializeDatabase();
       const client = await postgresPool.connect();
@@ -2715,6 +3249,55 @@ async function deleteInventoryItem(session, id) {
     return result;
   }
 
+  function ensureBootstrapAdmin() {
+    if (!bootstrapAdminEmail) return Promise.resolve();
+    if (bootstrapAdminInitialization) return bootstrapAdminInitialization;
+    const initialization = serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { sheet, columns } = getUserSheet(workbook);
+      let row = findUser(sheet, columns, bootstrapAdminEmail);
+      if (row && cellText(row.getCell(columns.role).value).toLowerCase() !== "teacher") {
+        throw new Error("The configured bootstrap administrator must use a teacher account.");
+      }
+      if (row && cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true") {
+        return;
+      }
+      if (row && cellText(row.getCell(columns.status).value).toLowerCase() !== "active") {
+        throw new Error("The configured bootstrap administrator account is inactive.");
+      }
+
+      const passwordHash = await hashAdminPassword(bootstrapAdminPassword);
+      if (!row) {
+        const values = [];
+        values[columns.id] = nextUserId(sheet, columns.id, "teacher");
+        values[columns.role] = "Teacher";
+        values[columns.name] = "Administrator";
+        values[columns.email] = bootstrapAdminEmail;
+        values[columns.password] = passwordHash;
+        values[columns.classId] = "";
+        values[columns.status] = "Active";
+        values[columns.created] = new Date();
+        values[columns.signIns] = 0;
+        values[columns.emailCheck] = "OK";
+        values[columns.adminAccess] = "true";
+        values[columns.mustChangePassword] = "true";
+        row = writeRow(sheet, [columns.id, columns.email], values);
+      } else {
+        row.getCell(columns.password).value = passwordHash;
+        row.getCell(columns.adminAccess).value = "true";
+        row.getCell(columns.mustChangePassword).value = "true";
+      }
+      setPasswordDocumentation(workbook, columns.password);
+      await saveDatabaseWorkbook(workbook);
+      console.info("The configured administrator account is ready and must change its temporary password.");
+    });
+    bootstrapAdminInitialization = initialization.catch((error) => {
+      bootstrapAdminInitialization = null;
+      throw error;
+    });
+    return bootstrapAdminInitialization;
+  }
+
   async function checkWorkbook() {
     const workbook = await readDatabaseWorkbook();
     getUserSheet(workbook);
@@ -2726,20 +3309,46 @@ async function deleteInventoryItem(session, id) {
     }
   }
 
+  // Only the last forwarded value is trusted: it is appended by the platform's own proxy.
+  function getLastForwardedValue(request, headerName) {
+    const header = request.headers[headerName];
+    const value = Array.isArray(header) ? header.join(",") : header;
+    if (typeof value !== "string") return "";
+    return value.split(",").pop().trim();
+  }
+
+  function isForwardedHttps(request) {
+    return trustProxy && getLastForwardedValue(request, "x-forwarded-proto").toLowerCase() === "https";
+  }
+
+  function getClientAddress(request) {
+    const forwarded = trustProxy ? getLastForwardedValue(request, "x-forwarded-for") : "";
+    return forwarded || request.socket.remoteAddress || "unknown";
+  }
+
   function createSessionCookie(response, sessionId, request) {
-    const secure = request.socket.encrypted ? "; Secure" : "";
+    const secure = request.socket.encrypted || isForwardedHttps(request) ? "; Secure" : "";
+    const cookieName = getSessionCookieName(request);
     response.setHeader(
       "Set-Cookie",
-      `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_DURATION_MS / 1000}${secure}`,
+      `${cookieName}=${sessionId}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_DURATION_MS / 1000}${secure}`,
     );
   }
 
+  function getSessionCookieName(request) {
+    const portalEntry = request.headers["x-portal-entry"];
+    return PORTAL_SESSION_ENTRIES.has(portalEntry)
+      ? `${SESSION_COOKIE}_${portalEntry}`
+      : SESSION_COOKIE;
+  }
+
   function getSession(request) {
+    const cookieName = getSessionCookieName(request);
     const cookieHeader = request.headers.cookie || "";
     const cookie = cookieHeader.split(";").map((part) => part.trim())
-      .find((part) => part.startsWith(`${SESSION_COOKIE}=`));
+      .find((part) => part.startsWith(`${cookieName}=`));
     if (!cookie) return null;
-    const sessionId = cookie.slice(SESSION_COOKIE.length + 1);
+    const sessionId = cookie.slice(cookieName.length + 1);
     const session = sessions.get(sessionId);
     if (!session) return null;
     if (session.expiresAt <= Date.now()) {
@@ -2748,6 +3357,12 @@ async function deleteInventoryItem(session, id) {
     }
     session.expiresAt = Date.now() + SESSION_DURATION_MS;
     return { sessionId, ...session };
+  }
+
+  function revokeUserSessions(userId) {
+    for (const [sessionId, activeSession] of sessions) {
+      if (activeSession.adminUserId === userId) sessions.delete(sessionId);
+    }
   }
 
   function requireTeacherSession(request) {
@@ -2913,6 +3528,7 @@ async function deleteInventoryItem(session, id) {
       }
       row.getCell(columns.status).value = status;
       await saveDatabaseWorkbook(workbook);
+      if (status.toLowerCase() === "inactive") revokeUserSessions(userId);
       return { userId, status };
     });
   }
@@ -2938,12 +3554,13 @@ async function deleteInventoryItem(session, id) {
       }
       if (!userRow) throw new HttpError(404, "The account could not be found.");
       const email = cellText(userRow.getCell(columns.email).value).toLowerCase();
-      userRow.getCell(columns.password).value = await hashPassword(email);
+      const hashPasswordForAccount = cellText(userRow.getCell(columns.adminAccess).value).toLowerCase() === "true"
+        ? hashAdminPassword
+        : hashPassword;
+      userRow.getCell(columns.password).value = await hashPasswordForAccount(email);
       userRow.getCell(columns.mustChangePassword).value = "true";
       await saveDatabaseWorkbook(workbook);
-      for (const [sessionId, activeSession] of sessions) {
-        if (activeSession.adminUserId === userId) sessions.delete(sessionId);
-      }
+      revokeUserSessions(userId);
       return { userId, mustChangePassword: true };
     });
   }
@@ -2956,6 +3573,9 @@ async function deleteInventoryItem(session, id) {
     }
     if (newPassword.length < 6 || newPassword.length > 256) {
       throw new HttpError(400, "Use a new password between 6 and 256 characters.");
+    }
+    if (session.mustChangePassword && newPassword.length < 12) {
+      throw new HttpError(400, "Your new password must be at least 12 characters.");
     }
     if (newPassword === currentPassword) {
       throw new HttpError(400, "Choose a new password different from your temporary password.");
@@ -2976,7 +3596,9 @@ async function deleteInventoryItem(session, id) {
       }
       const matches = await verifyPassword(currentPassword, cellText(userRow.getCell(columns.password).value));
       if (!matches) throw new HttpError(400, "Your temporary password doesn't match.");
-      userRow.getCell(columns.password).value = await hashPassword(newPassword);
+      userRow.getCell(columns.password).value = await (session.isAdmin
+        ? hashAdminPassword(newPassword)
+        : hashPassword(newPassword));
       userRow.getCell(columns.mustChangePassword).value = "false";
       await saveDatabaseWorkbook(workbook);
       const activeSession = sessions.get(session.sessionId);
@@ -3113,6 +3735,10 @@ async function deleteInventoryItem(session, id) {
         );
       }
 
+      const isAdmin = cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true";
+      if (isAdmin && storedPassword.startsWith("pbkdf2$")) {
+        row.getCell(columns.password).value = await hashAdminPassword(account.password);
+      }
       incrementCell(row.getCell(columns.signIns));
       row.getCell(columns.lastSignIn).value = new Date();
       logSignIn(workbook, {
@@ -3134,7 +3760,7 @@ async function deleteInventoryItem(session, id) {
           ...(account.role === "teacher"
             ? { classCode: getClassCode(workbook, cellText(row.getCell(columns.classId).value)) }
             : {}),
-          isAdmin: cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true",
+          isAdmin,
           mustChangePassword: cellText(row.getCell(columns.mustChangePassword).value).toLowerCase() === "true",
         },
       };
@@ -5730,7 +6356,7 @@ document.getElementById("printPreview").addEventListener("click",function(){wind
 var downloadAllPdf=document.getElementById("downloadAllPdf");
 if(downloadAllPdf)downloadAllPdf.addEventListener("click",async function(){
   if(!window.gradePortal||typeof window.gradePortal.downloadSF9Pdf!=="function"){
-    window.alert("Download All Students as PDF is available in the AVeRA desktop app.");
+    window.alert("Download All Students as PDF is available in the GraceDesk desktop app.");
     return;
   }
   var button=this;
@@ -7372,15 +7998,21 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         total: "Total", taker: "Learners who took the test", pass: "Learners who met the cutoff", fail: "Learners below the cutoff",
       };
     sheet.columns = [
-      { width: 6 }, { width: 38 }, { width: 14 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 34 },
+      { width: 7 }, { width: 44 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 40 },
     ];
+    const fontName = "Calibri";
+    const solid = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
+    const border = { style: "thin", color: { argb: "FFC7CCE6" } };
+    const boxed = (cell) => { cell.border = { top: border, left: border, bottom: border, right: border }; };
     sheet.mergeCells("A1:G1");
     sheet.getCell("A1").value = `Phil-IRI Form ${form}`;
-    sheet.getCell("A1").font = { bold: true, size: 11, color: { argb: "FF555555" } };
+    sheet.getCell("A1").font = { name: fontName, bold: true, size: 11, color: { argb: "FF6B7280" } };
+    sheet.getCell("A1").alignment = { horizontal: "right" };
     sheet.mergeCells("A2:G2");
     sheet.getCell("A2").value = text.title;
-    sheet.getCell("A2").font = { bold: true, size: 15 };
-    sheet.getCell("A2").alignment = { horizontal: "center" };
+    sheet.getCell("A2").font = { name: fontName, bold: true, size: 18, color: { argb: "FF312E81" } };
+    sheet.getCell("A2").alignment = { horizontal: "center", vertical: "middle" };
+    sheet.getRow(2).height = 32;
     const dates = students
       .map((student) => student.reading[language]?.assessedDate)
       .filter(Boolean)
@@ -7402,31 +8034,39 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       sheet.getCell(`E${rowNumber}`).value = values[2];
       sheet.getCell(`F${rowNumber}`).value = values[3];
       sheet.mergeCells(`F${rowNumber}:G${rowNumber}`);
-      ["A", "E"].forEach((column) => { sheet.getCell(`${column}${rowNumber}`).font = { bold: true }; });
+      sheet.getRow(rowNumber).height = 22;
+      ["A", "B", "C", "D", "E", "F", "G"].forEach((column) => {
+        const cell = sheet.getCell(`${column}${rowNumber}`);
+        const isLabel = column === "A" || column === "B" || column === "E";
+        cell.font = { name: fontName, size: 11, bold: isLabel, color: { argb: isLabel ? "FF312E81" : "FF111827" } };
+        cell.fill = solid(isLabel ? "FFE0E7FF" : "FFF5F7FF");
+        cell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+        boxed(cell);
+      });
     });
     const headerRow = 8;
     const headers = ["No.", `${text.name}`, text.taken, text.score,
       cutoff === null ? text.below : `${text.below} ${cutoff}`,
       cutoff === null ? text.atLeast : `${text.atLeast} ${cutoff}`, text.start];
-    const border = { style: "thin", color: { argb: "FF8A8A8A" } };
-    const boxed = (cell) => { cell.border = { top: border, left: border, bottom: border, right: border }; };
     headers.forEach((value, index) => {
       const cell = sheet.getRow(headerRow).getCell(index + 1);
       cell.value = value;
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
+      cell.font = { name: fontName, bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+      cell.fill = solid("FF4338CA");
       cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
       boxed(cell);
     });
-    sheet.getRow(headerRow).height = 34;
+    sheet.getRow(headerRow).height = 40;
 
     let rowNumber = headerRow + 1;
     const addGroup = (label, accent, members) => {
       sheet.mergeCells(`A${rowNumber}:G${rowNumber}`);
       const labelCell = sheet.getCell(`A${rowNumber}`);
       labelCell.value = label;
-      labelCell.font = { bold: true };
-      labelCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: accent } };
+      labelCell.font = { name: fontName, bold: true, size: 11, color: { argb: "FF1F2937" } };
+      labelCell.fill = solid(accent);
+      labelCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+      sheet.getRow(rowNumber).height = 22;
       rowNumber += 1;
       members.forEach((member, index) => {
         const taken = member.score !== null;
@@ -7435,11 +8075,24 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           index + 1, member.name, taken ? "✓" : "", taken ? member.score : "",
           taken && !passed ? "✓" : "", passed ? "✓" : "", member.startingPassage,
         ];
+        sheet.getRow(rowNumber).height = 21;
         values.forEach((value, column) => {
           const cell = sheet.getRow(rowNumber).getCell(column + 1);
           cell.value = value;
           boxed(cell);
-          if (column !== 1 && column !== 6) cell.alignment = { horizontal: "center" };
+          cell.font = { name: fontName, size: 11, color: { argb: "FF111827" } };
+          if (index % 2 === 1) cell.fill = solid("FFF8F9FF");
+          if (column === 4 && value) {
+            cell.fill = solid("FFFEE2E2");
+            cell.font = { name: fontName, size: 11, bold: true, color: { argb: "FFB91C1C" } };
+          }
+          if (column === 5 && value) {
+            cell.fill = solid("FFDCFCE7");
+            cell.font = { name: fontName, size: 11, bold: true, color: { argb: "FF166534" } };
+          }
+          cell.alignment = column === 1 || column === 6
+            ? { vertical: "middle", horizontal: "left", indent: 1 }
+            : { vertical: "middle", horizontal: "center" };
         });
         rowNumber += 1;
       });
@@ -7450,8 +8103,8 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         rowNumber += 1;
       }
     };
-    addGroup(text.male.toUpperCase(), "FFDCEBFF", rows.filter((row) => row.gender === "male"));
-    addGroup(text.female.toUpperCase(), "FFFFDDEE", rows.filter((row) => row.gender === "female"));
+    addGroup(text.male.toUpperCase(), "FFBFDBFE", rows.filter((row) => row.gender === "male"));
+    addGroup(text.female.toUpperCase(), "FFFBCFE8", rows.filter((row) => row.gender === "female"));
     const others = rows.filter((row) => row.gender !== "male" && row.gender !== "female");
     if (others.length) addGroup("OTHER", "FFEFEFEF", others);
 
@@ -7465,13 +8118,30 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
     ].forEach(([label, value]) => {
       sheet.mergeCells(`A${rowNumber}:C${rowNumber}`);
       sheet.getCell(`A${rowNumber}`).value = label;
-      sheet.getCell(`A${rowNumber}`).font = { bold: true };
+      sheet.getCell(`A${rowNumber}`).font = { name: fontName, bold: true, size: 11, color: { argb: "FF312E81" } };
+      sheet.getCell(`A${rowNumber}`).alignment = { vertical: "middle", horizontal: "left", indent: 1 };
       sheet.getCell(`D${rowNumber}`).value = value;
-      sheet.getCell(`D${rowNumber}`).alignment = { horizontal: "center" };
+      sheet.getCell(`D${rowNumber}`).font = { name: fontName, bold: true, size: 11 };
+      sheet.getCell(`D${rowNumber}`).alignment = { horizontal: "center", vertical: "middle" };
+      ["A", "B", "C", "D"].forEach((column) => {
+        const cell = sheet.getCell(`${column}${rowNumber}`);
+        cell.fill = solid("FFE0E7FF");
+        boxed(cell);
+      });
+      sheet.getRow(rowNumber).height = 22;
       rowNumber += 1;
     });
     sheet.views = [{ state: "frozen", ySplit: headerRow }];
-    sheet.pageSetup = { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+    sheet.pageSetup = {
+      paperSize: 14,
+      orientation: "landscape",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      horizontalCentered: true,
+      margins: { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 },
+      printTitlesRow: `${headerRow}:${headerRow}`,
+    };
     const part = (value) => String(value || "").trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
     return {
       buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
@@ -9873,9 +10543,15 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (!userRow || cellText(userRow.getCell(columns.role).value).toLowerCase() !== "teacher") {
         throw new HttpError(404, "The teacher profile could not be found.");
       }
+      const isAdmin = cellText(userRow.getCell(columns.adminAccess).value).toLowerCase() === "true";
+      if (isAdmin && newPassword.length < 12) {
+        throw new HttpError(400, "Administrator passwords must be at least 12 characters.");
+      }
       const matches = await verifyPassword(currentPassword, cellText(userRow.getCell(columns.password).value));
       if (!matches) throw new HttpError(400, "Your current password doesn't match.");
-      userRow.getCell(columns.password).value = await hashPassword(newPassword);
+      userRow.getCell(columns.password).value = await (isAdmin
+        ? hashAdminPassword(newPassword)
+        : hashPassword(newPassword));
       userRow.getCell(columns.mustChangePassword).value = "false";
       setPasswordDocumentation(workbook, columns.password);
       await saveDatabaseWorkbook(workbook);
@@ -9889,7 +10565,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   }
 
   async function teacherPhotoExists(userId) {
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(userId)) throw new HttpError(404, "The profile picture was not found.");
       await initializeDatabase();
       const result = await postgresPool.query(
@@ -9910,7 +10586,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   }
 
   async function findTeacherPhoto(userId) {
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(userId)) throw new HttpError(404, "The profile picture was not found.");
       await initializeDatabase();
       const result = await postgresPool.query(
@@ -9935,7 +10611,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
   async function saveTeacherPhoto(session, request) {
     const photo = await readProfilePhoto(request);
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(session.userId)) throw new HttpError(404, "The profile picture was not found.");
       await initializeDatabase();
       await postgresPool.query(
@@ -9963,7 +10639,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   }
 
   async function removeTeacherPhoto(session) {
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(session.userId)) throw new HttpError(404, "The profile picture was not found.");
       await initializeDatabase();
       await postgresPool.query(
@@ -9987,7 +10663,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   }
 
   async function teacherSchoolLogoExists(userId) {
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(userId)) throw new HttpError(404, "The school logo was not found.");
       await initializeDatabase();
       const result = await postgresPool.query(
@@ -10008,7 +10684,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   }
 
   async function findTeacherSchoolLogo(userId) {
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(userId)) throw new HttpError(404, "The school logo was not found.");
       await initializeDatabase();
       const result = await postgresPool.query(
@@ -10033,7 +10709,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
   async function saveTeacherSchoolLogo(session, request) {
     const logo = await readProfilePhoto(request, "school logo");
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(session.userId)) throw new HttpError(404, "The school logo was not found.");
       await initializeDatabase();
       await postgresPool.query(
@@ -10061,7 +10737,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   }
 
   async function removeTeacherSchoolLogo(session) {
-    if (postgresPool) {
+    if (postgresPool && !dualStorage) {
       if (!/^T\d{3,}$/i.test(session.userId)) throw new HttpError(404, "The school logo was not found.");
       await initializeDatabase();
       await postgresPool.query(
@@ -10082,6 +10758,11 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   const requestHandler = async (request, response) => {
     try {
       const url = new URL(request.url, "http://localhost");
+      if (options.apiOnly && !url.pathname.startsWith("/api/")) {
+        sendJson(response, 404, { error: "Page not found." });
+        return;
+      }
+      if (url.pathname.startsWith("/api/")) await ensureBootstrapAdmin();
       const currentSession = url.pathname.startsWith("/api/") ? getSession(request) : null;
       const allowedDuringPasswordChange = (request.method === "GET" && url.pathname === "/api/auth/session")
         || (request.method === "POST" && url.pathname === "/api/auth/logout")
@@ -10093,9 +10774,13 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         sendJson(response, 403, { error: "Change your temporary password before using the portal." });
         return;
       }
-      if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
+      const portalEntry = PORTAL_ENTRY_PATHS.get(url.pathname);
+      if (request.method === "GET" && portalEntry) {
         const html = (await fs.readFile(INDEX_PATH, "utf8")).replace(
-          /(<span class="sidebar-footer-version">Version )[^<]*(<\/span>)/,
+          'data-portal-entry="main"',
+          `data-portal-entry="${portalEntry}"`,
+        ).replace(
+          /(<span class="sidebar-footer-version">GraceDesk · Version )[^<]*(<\/span>)/,
           `$1${APP_VERSION}$2`,
         );
         response.writeHead(200, {
@@ -10119,10 +10804,39 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         return;
       }
 
+      const sf10ImageAssets = {
+        "/sf10-deped-seal.png": { filename: "sf10-deped-seal.png", contentType: "image/png" },
+        "/sf10-deped-logo.gif": { filename: "sf10-deped-logo.gif", contentType: "image/gif" },
+      };
+      const sf10ImageAsset = sf10ImageAssets[url.pathname];
+      if (request.method === "GET" && sf10ImageAsset) {
+        const image = await fs.readFile(path.join(__dirname, sf10ImageAsset.filename));
+        response.writeHead(200, {
+          "Content-Type": sf10ImageAsset.contentType,
+          "Content-Length": image.length,
+          "Cache-Control": "public, max-age=86400",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(image);
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/api/health") {
         try {
-          await serializeWorkbook(checkWorkbook);
-          sendJson(response, 200, { status: "ok", storage });
+          if (dualStorage) {
+            await initializeDatabase();
+            const localState = database.prepare(
+              "SELECT 1 FROM portal_state WHERE id = 1",
+            ).get();
+            if (!localState) throw new Error("The SQLite portal database has no saved state.");
+          } else {
+            await serializeWorkbook(checkWorkbook);
+          }
+          sendJson(response, 200, {
+            status: "ok",
+            storage,
+            ...(dualStorage ? { sync: readSyncStatus().state } : {}),
+          });
         } catch (error) {
           const referenceId = crypto.randomUUID();
           await logPortalError(referenceId, error);
@@ -10159,7 +10873,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
       if (request.method === "POST" && url.pathname === "/api/auth/login") {
         const data = await readJson(request);
-        const ipAddress = request.socket.remoteAddress || "unknown";
+        const ipAddress = getClientAddress(request);
         const reservation = authRateLimiter.reserveAttempt(ipAddress, data.email);
         if (reservation.retryAfterSeconds > 0) {
           response.setHeader("Retry-After", String(reservation.retryAfterSeconds));
@@ -10206,7 +10920,10 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "POST" && url.pathname === "/api/auth/logout") {
         const session = getSession(request);
         if (session) sessions.delete(session.sessionId);
-        response.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+        response.setHeader(
+          "Set-Cookie",
+          `${getSessionCookieName(request)}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`,
+        );
         sendJson(response, 200, { ok: true });
         return;
       }
@@ -10226,6 +10943,30 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "GET" && url.pathname === "/api/admin/classes") {
         requireAdminSession(request);
         sendJson(response, 200, await listAdminClasses());
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/admin/sync/status") {
+        requireAdminSession(request);
+        sendJson(response, 200, readSyncStatus());
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/admin/sync/resolve") {
+        requireAdminSession(request);
+        const { resolution } = await readJson(request);
+        if (resolution !== "local" && resolution !== "online") {
+          throw new HttpError(400, "Choose a valid synchronization resolution.");
+        }
+        const result = await resolveDualSyncConflict(resolution);
+        if (result.state === "conflict") {
+          sendJson(response, 409, {
+            error: "The online data changed again. Review the latest conflict before resolving it.",
+            state: result.state,
+          });
+          return;
+        }
+        sendJson(response, 200, result);
         return;
       }
 
@@ -10907,13 +11648,24 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       cert: fileSystem.readFileSync(tlsCertPath),
     }, requestHandler)
     : http.createServer(requestHandler);
+  const syncRetryInterval = dualStorage
+    ? setInterval(scheduleDualSync, options.syncRetryIntervalMs || 15000)
+    : null;
+  syncRetryInterval?.unref?.();
   server.on("close", () => {
-    database?.close();
-    if (postgresPool) {
-      postgresPool.end().catch((error) => {
-        console.error("Could not close the Supabase database connection pool:", error);
-      });
-    }
+    serverClosing = true;
+    if (syncTimer) clearTimeout(syncTimer);
+    if (syncRetryInterval) clearInterval(syncRetryInterval);
+    const closeResources = () => {
+      database?.close();
+      if (postgresPool) {
+        postgresPool.end().catch((error) => {
+          console.error("Could not close the Supabase database connection pool:", error);
+        });
+      }
+    };
+    if (syncTask) syncTask.then(closeResources, closeResources);
+    else closeResources();
   });
   return server;
 }
@@ -10926,14 +11678,22 @@ if (require.main === module) {
   const isLoopbackHost = ["127.0.0.1", "localhost", "::1"].includes(host);
   const tlsKeyPath = process.env.PORTAL_TLS_KEY;
   const tlsCertPath = process.env.PORTAL_TLS_CERT;
-  if (!isLoopbackHost && (!tlsKeyPath || !tlsCertPath)) {
-    console.error("Refusing insecure public binding. Set PORTAL_TLS_KEY and PORTAL_TLS_CERT, or bind to localhost.");
+  const behindTlsProxy = process.env.PORTAL_TRUST_PROXY === "true";
+  if (!isLoopbackHost && (!tlsKeyPath || !tlsCertPath) && !behindTlsProxy) {
+    console.error("Refusing insecure public binding. Set PORTAL_TLS_KEY and PORTAL_TLS_CERT, bind to localhost, or set PORTAL_TRUST_PROXY=true behind a TLS-terminating proxy.");
     process.exitCode = 1;
   }
 
   function listen(port) {
     if (process.exitCode) return;
-    const server = createServer({ tlsKeyPath, tlsCertPath });
+    const apiOnly = process.argv.includes("--api");
+    const server = createServer({
+      tlsKeyPath,
+      tlsCertPath,
+      apiOnly,
+      bootstrapAdminEmail: process.env.ADMIN_EMAIL || "",
+      bootstrapAdminPassword: process.env.ADMIN_PASSWORD || "",
+    });
     server.once("error", (error) => {
       if (!process.env.PORT && error.code === "EADDRINUSE" && port < maxPort) {
         console.warn(`Port ${port} is already in use; trying ${port + 1}.`);
@@ -10944,12 +11704,14 @@ if (require.main === module) {
       process.exitCode = 1;
     });
     server.listen(port, host, () => {
-      if (process.env.SUPABASE_DB_URL) {
+      if (process.env.PORTAL_STORAGE_MODE === "dual" && process.env.SUPABASE_DB_URL) {
+        console.log("Using dual SQLite and Supabase PostgreSQL storage.");
+      } else if (process.env.SUPABASE_DB_URL) {
         console.log("Using Supabase PostgreSQL backend.");
       } else {
         console.log(`Using SQLite backend: ${path.resolve(DATABASE_PATH)}`);
       }
-      console.log(`Class Adviser's Portal is running at ${tlsKeyPath ? "https" : "http"}://${host}:${port}`);
+      console.log(`${apiOnly ? "Shared API backend" : "Class Adviser's Portal"} is running at ${tlsKeyPath ? "https" : "http"}://${host}:${port}`);
     });
   }
 

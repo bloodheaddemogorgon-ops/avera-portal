@@ -22,9 +22,32 @@ function capture(command, args) {
   return { ok: result.status === 0, out: (result.stdout || "").trim() };
 }
 
+const KEEP_RELEASES = 3;
+const publishConfig = [].concat(require("../package.json").build?.publish || [])[0] || {};
+const repoArgs = publishConfig.owner && publishConfig.repo ? ["--repo", `${publishConfig.owner}/${publishConfig.repo}`] : [];
+
+function pruneOldReleases() {
+  const listed = capture("gh", ["release", "list", "--limit", "200", "--json", "tagName,createdAt", ...repoArgs]);
+  if (!listed.ok) {
+    console.warn("Could not list releases; skipping cleanup of old installers.");
+    return;
+  }
+  let releases;
+  try { releases = JSON.parse(listed.out); } catch { return; }
+  releases.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  for (const old of releases.slice(KEEP_RELEASES)) {
+    console.log(`Deleting old release ${old.tagName}...`);
+    spawnSync("gh", ["release", "delete", old.tagName, "--yes", "--cleanup-tag", ...repoArgs], { cwd: root, stdio: "inherit" });
+  }
+}
+
 if (!capture("gh", ["auth", "status"]).ok) {
   console.error("GitHub CLI is not signed in. Run: gh auth login");
   process.exit(1);
+}
+if (process.argv.includes("--prune-only")) {
+  pruneOldReleases();
+  process.exit(0);
 }
 if (capture("gh", ["release", "view", tag]).ok) {
   console.error(`Release ${tag} already exists. Raise "version" in package.json first.`);
@@ -47,5 +70,6 @@ if (!assets.some((file) => file.endsWith("latest.yml")) || !assets.some((file) =
 }
 
 console.log(`Publishing ${tag}...`);
-run("gh", ["release", "create", tag, ...assets, "--title", `AVeRA ${version}`, "--generate-notes"]);
+run("gh", ["release", "create", tag, ...assets, "--title", `AVeRA ${version}`, "--generate-notes"], { shell: false });
+pruneOldReleases();
 console.log(`Released ${tag}. Installed apps can now update from Settings.`);

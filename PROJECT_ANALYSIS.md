@@ -106,7 +106,7 @@ The application dynamically creates/extends worksheets as required. The main log
 
 | Worksheet/entity | Important fields | Purpose |
 |---|---|---|
-| `Users` | User ID, role, name, email, PBKDF2 password hash, class ID, status, sign-ins, last sign-in, admin access, must-change-password | Teacher/parent accounts and authentication state |
+| `Users` | User ID, role, name, email, password hash (bcrypt for admins; PBKDF2 for teacher/parent accounts), class ID, status, sign-ins, last sign-in, admin access, must-change-password | Teacher/parent accounts and authentication state |
 | `Classes` | Class ID, classroom number, class/join code, teacher ID/name, grade, section, school year and school metadata, student/parent counts | Class ownership and parent enrollment |
 | `Students` | Student ID, class ID, parent ID, teacher ID, LRN, names, gender, birthdate, guardian/family/residence/language/ethnicity fields, nutritional measurements | Learner roster and personal data |
 | `Term Grades` | Grade ID, student/class/teacher IDs, term, subject, grade, updated | Per-subject term grades |
@@ -137,7 +137,7 @@ No security review was performed for this update. The following are design and d
 
 ### Positive controls observed
 
-- PBKDF2-SHA-256 with random 16-byte salts and 210,000 iterations.
+- Administrator passwords use bcrypt cost 12; teacher/parent passwords use PBKDF2-SHA-256 with random 16-byte salts and 210,000 iterations.
 - `HttpOnly` and `SameSite=Strict` session cookie attributes.
 - Electron `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`.
 - Same-origin API design, parameterized PostgreSQL queries, upload size limits, image signature checks, and role/session checks on protected endpoints.
