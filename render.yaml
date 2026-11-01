@@ -13,6 +13,8 @@ services:
         value: "22"
       - key: PORTAL_TRUST_PROXY
         value: "true"
+      - key: PORTAL_STORAGE_MODE
+        value: dual
       - key: SUPABASE_DB_URL
         sync: false
       - key: ADMIN_EMAIL

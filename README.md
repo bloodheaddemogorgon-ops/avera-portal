@@ -56,14 +56,14 @@ Without `PORTAL_STORAGE_MODE=dual`, setting `SUPABASE_DB_URL` retains the existi
 1. Create a Neon project and copy its **pooled** connection string (`...-pooler...neon.tech/...`).
 2. Push this repository to GitHub, then in Render choose **New → Blueprint** and select the repository. `render.yaml` defines one `advisers-portal` web service that runs the API (loopback only) and serves all three portals via `render-start.js`.
 3. When prompted, enter `SUPABASE_DB_URL` (the Neon string) and, for first-time setup, `ADMIN_EMAIL` and `ADMIN_PASSWORD` (a temporary password of at least 12 characters you will change at first sign-in; remove both variables afterwards).
-4. After the deploy, open `https://<service>.onrender.com/api/health`; it should return `{"status":"ok","storage":"supabase"}`.
+4. After the deploy, open `https://<service>.onrender.com/api/health`; it should return `{"status":"ok","storage":"dual","sync":"synced"}` when Neon is available.
 5. Portals: teacher `https://<service>.onrender.com/`, parents `/parents`, admin `/admin`. Cookies are kept separate per portal.
 
 ### Synchronize Data Online (local copy ↔ hosted database)
 
-To use the teacher portal's **Synchronize Data Online** button on a local computer, add `PORTAL_STORAGE_MODE=dual` and the same Neon `SUPABASE_DB_URL` to the local `.env` and restart. The button pulls newer online changes and pushes pending local changes. If both copies changed independently, sync pauses and an administrator chooses **Keep local** or **Keep online** in Settings. The first sync of an existing local database against a fresh online database will show this choice: pick **Keep local** to upload your existing records. The hosted Render service itself must not use `dual` mode.
+The Render Blueprint enables `PORTAL_STORAGE_MODE=dual` for the shared API, so all three hosted portals use the same local SQLite mirror and Neon database. Local installs can also enable the **Synchronize Data Online** button by setting `PORTAL_STORAGE_MODE=dual` and the same Neon `SUPABASE_DB_URL` in their `.env` and restarting. The button pulls newer online changes and pushes pending local changes. If both copies changed independently, sync pauses and an administrator chooses **Keep local** or **Keep online** in Settings. The first sync of an existing local database against a fresh online database will show this choice: pick **Keep local** to upload your existing records.
 
-`PORTAL_TRUST_PROXY=true` (set by `render.yaml`) is for TLS-terminating proxies only. Render's free tier sleeps after inactivity, so the first request can take about a minute. Do not set `PORTAL_STORAGE_MODE=dual` on the hosted service.
+In dual mode, Neon is the durable shared copy; a host's SQLite database is a local mirror. Render's filesystem can be replaced during restarts or deploys, so this mirror is rebuilt from Neon when that happens. Keep the Render service at one instance; multiple independent SQLite mirrors can diverge and trigger conflict handling. Render's free tier sleeps after inactivity, so the first request can take about a minute. `PORTAL_TRUST_PROXY=true` (set by `render.yaml`) is for TLS-terminating proxies only.
 
 The Supabase connection role needs permission to create/update the portal tables and add the `revision` column. The setup revokes table access from `anon` and `authenticated` roles. Use a server-side database role, not a browser-facing anon or service-role key.
 
