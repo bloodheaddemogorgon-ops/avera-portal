@@ -3848,7 +3848,7 @@ body.portal-active .portal-entry-links{display:none}
     $("syncConflictActions").hidden=!(result.storage==="dual"&&result.sync==="conflict"
       &&currentUser&&currentUser.isAdmin);
     if(result.storage!=="dual"){
-      $("syncDataNotice").textContent="Dual storage is not enabled on this server.";
+      $("syncDataNotice").textContent="Online sync is disabled on this server. Configure PORTAL_STORAGE_MODE=dual and SUPABASE_DB_URL, then restart it.";
     }else if(result.sync==="synced"){
       $("syncDataNotice").textContent="Local and online portal records are synchronized.";
     }else if(result.sync==="conflict"){

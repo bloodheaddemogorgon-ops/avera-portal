@@ -8,6 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 const { setTimeout: delay } = require("node:timers/promises");
+const { loadDesktopEnvironment } = require("../desktop/environment");
 const { createPortalFrontendServer } = require("../portal-frontend");
 const { createServer } = require("../server");
 
@@ -86,6 +87,30 @@ async function waitFor(assertion, timeoutMs = 3000) {
   }
   assert.ok(await assertion(), "timed out waiting for background synchronization");
 }
+
+test("desktop loads dual-storage settings from the per-user environment file", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-desktop-env-"));
+  const previousMode = process.env.PORTAL_STORAGE_MODE;
+  const previousDatabaseUrl = process.env.SUPABASE_DB_URL;
+  delete process.env.PORTAL_STORAGE_MODE;
+  delete process.env.SUPABASE_DB_URL;
+  context.after(async () => {
+    if (previousMode === undefined) delete process.env.PORTAL_STORAGE_MODE;
+    else process.env.PORTAL_STORAGE_MODE = previousMode;
+    if (previousDatabaseUrl === undefined) delete process.env.SUPABASE_DB_URL;
+    else process.env.SUPABASE_DB_URL = previousDatabaseUrl;
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  assert.equal(loadDesktopEnvironment(directory), false);
+  await fs.writeFile(
+    path.join(directory, ".env"),
+    "PORTAL_STORAGE_MODE=dual\nSUPABASE_DB_URL=postgresql://test:test@localhost/test\n",
+  );
+  assert.equal(loadDesktopEnvironment(directory), true);
+  assert.equal(process.env.PORTAL_STORAGE_MODE, "dual");
+  assert.equal(process.env.SUPABASE_DB_URL, "postgresql://test:test@localhost/test");
+});
 
 test("separate portal frontends serve distinct entries and proxy to one API", async () => {
   const apiRequests = [];

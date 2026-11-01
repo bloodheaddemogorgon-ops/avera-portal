@@ -200,6 +200,7 @@ ipcMain.handle("app-version", (event) => {
 });
 
 async function startPortal() {
+  require("./environment").loadDesktopEnvironment(app.getPath("userData"));
   const { createServer } = require("../server");
   portalServer = createServer({
     databasePath: path.join(app.getPath("userData"), "grade5-portal-database.sqlite"),
