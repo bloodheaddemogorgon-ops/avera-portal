@@ -49,7 +49,7 @@ if (process.argv.includes("--prune-only")) {
   pruneOldReleases();
   process.exit(0);
 }
-if (capture("gh", ["release", "view", tag]).ok) {
+if (capture("gh", ["release", "view", tag, ...repoArgs]).ok) {
   console.error(`Release ${tag} already exists. Raise "version" in package.json first.`);
   process.exit(1);
 }
@@ -70,6 +70,6 @@ if (!assets.some((file) => file.endsWith("latest.yml")) || !assets.some((file) =
 }
 
 console.log(`Publishing ${tag}...`);
-run("gh", ["release", "create", tag, ...assets, "--title", `AVeRA ${version}`, "--generate-notes"], { shell: false });
+run("gh", ["release", "create", tag, ...assets, "--title", `AVeRA ${version}`, "--generate-notes", ...repoArgs], { shell: false });
 pruneOldReleases();
 console.log(`Released ${tag}. Installed apps can now update from Settings.`);
