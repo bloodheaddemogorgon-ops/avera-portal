@@ -10916,9 +10916,25 @@ body.portal-active .portal-entry-links{display:none}
       }
     };
   })();
-  $("syncDataButton").onclick=function(){
-    $("syncDataButton").disabled=true;
-    refreshStorageStatus().finally(function(){$("syncDataButton").disabled=false});
+  $("syncDataButton").onclick=async function(){
+    var button=$("syncDataButton"),notice=$("syncDataNotice");
+    button.disabled=true;
+    notice.classList.remove("error");
+    notice.textContent="Synchronizing with the online database...";
+    var failure="";
+    try{
+      await api("/api/sync",{method:"POST"});
+    }catch(error){
+      failure=error.message;
+    }
+    await refreshStorageStatus();
+    if(failure){
+      notice.textContent=failure;
+      notice.classList.add("error");
+    }else if(onlineSyncState==="synced"){
+      notice.textContent="Synchronized just now. Local and online portal records match.";
+    }
+    button.disabled=false;
   };
   async function resolveOnlineSyncConflict(resolution){
     $("keepLocalSync").disabled=true;

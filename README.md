@@ -59,6 +59,10 @@ Without `PORTAL_STORAGE_MODE=dual`, setting `SUPABASE_DB_URL` retains the existi
 4. After the deploy, open `https://<service>.onrender.com/api/health`; it should return `{"status":"ok","storage":"supabase"}`.
 5. Portals: teacher `https://<service>.onrender.com/`, parents `/parents`, admin `/admin`. Cookies are kept separate per portal.
 
+### Synchronize Data Online (local copy ↔ hosted database)
+
+To use the teacher portal's **Synchronize Data Online** button on a local computer, add `PORTAL_STORAGE_MODE=dual` and the same Neon `SUPABASE_DB_URL` to the local `.env` and restart. The button pulls newer online changes and pushes pending local changes. If both copies changed independently, sync pauses and an administrator chooses **Keep local** or **Keep online** in Settings. The first sync of an existing local database against a fresh online database will show this choice: pick **Keep local** to upload your existing records. The hosted Render service itself must not use `dual` mode.
+
 `PORTAL_TRUST_PROXY=true` (set by `render.yaml`) is for TLS-terminating proxies only. Render's free tier sleeps after inactivity, so the first request can take about a minute. Do not set `PORTAL_STORAGE_MODE=dual` on the hosted service.
 
 The Supabase connection role needs permission to create/update the portal tables and add the `revision` column. The setup revokes table access from `anon` and `authenticated` roles. Use a server-side database role, not a browser-facing anon or service-role key.

@@ -319,6 +319,52 @@ test("dual storage accepts local writes offline and synchronizes them when onlin
   });
 });
 
+test("Synchronize Data Online endpoint pushes pending changes on demand", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-dual-manual-"));
+  const postgres = createPostgresPool();
+  const backend = createServer({
+    storageMode: "dual",
+    postgresPool: postgres.pool,
+    databasePath: path.join(directory, "database.sqlite"),
+    migrationWorkbookPath: path.join(__dirname, "..", "grade5-portal-database-template.xlsx"),
+    syncRetryIntervalMs: 600000,
+  });
+  const backendUrl = await listen(backend);
+  context.after(async () => {
+    await close(backend);
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  assert.equal((await fetch(`${backendUrl}/api/sync`, { method: "POST" })).status, 401);
+
+  await fetch(`${backendUrl}/api/health`);
+  postgres.setAvailable(false);
+  const registration = await fetch(`${backendUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Manual Sync Teacher",
+      email: "manual.sync.teacher@example.com",
+      password: "secure-pass-123",
+      role: "teacher",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+  await delay(250);
+
+  const unavailable = await fetch(`${backendUrl}/api/sync`, { method: "POST", headers: { Cookie: cookie } });
+  assert.equal(unavailable.status, 503);
+
+  postgres.setAvailable(true);
+  const revisionBefore = postgres.revision;
+  const synced = await fetch(`${backendUrl}/api/sync`, { method: "POST", headers: { Cookie: cookie } });
+  assert.equal(synced.status, 200);
+  assert.equal((await synced.json()).state, "synced");
+  assert.ok(postgres.revision > revisionBefore);
+});
+
 test("dual storage pauses on revision conflicts without overwriting the online copy", async (context) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-dual-conflict-"));
   const postgres = createPostgresPool();

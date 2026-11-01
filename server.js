@@ -2969,6 +2969,34 @@ function createServer(options = {}) {
     }
   }
 
+  async function synchronizeNow() {
+    if (!dualStorage) throw new HttpError(409, "Online synchronization is not enabled on this server.");
+    await initializeDatabase();
+    if (syncTask) await syncTask.catch(() => undefined);
+    if (syncTimer) {
+      clearTimeout(syncTimer);
+      syncTimer = null;
+    }
+    // Re-read the online copy (pulling newer online changes) inside the workbook queue,
+    // then push any pending local changes.
+    const refresh = workbookQueue.then(() => {
+      remoteInitialization = null;
+      return initializeRemoteDatabase();
+    });
+    workbookQueue = refresh.then(() => undefined, () => undefined);
+    try {
+      await refresh;
+    } catch (error) {
+      throw new HttpError(503, "The online database is unavailable. Local changes are kept and will retry automatically.");
+    }
+    try {
+      await synchronizeLocalDatabase();
+    } catch (error) {
+      throw new HttpError(503, "The online database could not be updated. Local changes are kept and will retry automatically.");
+    }
+    return readSyncStatus();
+  }
+
   async function resolveDualSyncConflict(resolution) {
     if (!dualStorage) throw new HttpError(409, "Online conflict resolution is not enabled.");
     return serializeWorkbook(async () => {
@@ -10943,6 +10971,20 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "GET" && url.pathname === "/api/admin/classes") {
         requireAdminSession(request);
         sendJson(response, 200, await listAdminClasses());
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/sync") {
+        requireTeacherSession(request);
+        const status = await synchronizeNow();
+        if (status.state === "conflict") {
+          sendJson(response, 409, {
+            error: "Local and online data changed independently. An administrator must review both copies.",
+            state: status.state,
+          });
+          return;
+        }
+        sendJson(response, 200, status);
         return;
       }
 
