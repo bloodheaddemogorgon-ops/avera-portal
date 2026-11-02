@@ -15,7 +15,7 @@ services:
         value: "true"
       - key: PORTAL_STORAGE_MODE
         value: dual
-      - key: SUPABASE_DB_URL
+      - key: DATABASE_URL
         sync: false
       - key: ADMIN_EMAIL
         sync: false

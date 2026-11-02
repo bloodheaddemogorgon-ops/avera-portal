@@ -23,6 +23,7 @@ function start(script, args, env, keepSecrets) {
     delete childEnv.ADMIN_EMAIL;
     delete childEnv.ADMIN_PASSWORD;
     delete childEnv.SUPABASE_DB_URL;
+    delete childEnv.DATABASE_URL;
   }
   const child = spawn(process.execPath, [path.join(__dirname, script), ...args], {
     env: childEnv,

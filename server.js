@@ -2426,7 +2426,7 @@ function createServer(options = {}) {
     })
     : null);
   if (dualStorage && !postgresPool) {
-    throw new Error("PORTAL_STORAGE_MODE=dual requires SUPABASE_DB_URL.");
+    throw new Error("PORTAL_STORAGE_MODE=dual requires a Neon/PostgreSQL URL (DATABASE_URL or SUPABASE_DB_URL).");
   }
   const storage = dualStorage ? "dual" : postgresPool ? "supabase" : "sqlite";
   const transactionContext = new AsyncLocalStorage();

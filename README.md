@@ -72,7 +72,7 @@ Without `PORTAL_STORAGE_MODE=dual`, setting `SUPABASE_DB_URL` retains the existi
 
 1. Create a Neon project and copy its **pooled** connection string (`...-pooler...neon.tech/...`).
 2. Push this repository to GitHub, then in Render choose **New → Blueprint** and select the repository. `render.yaml` defines one `advisers-portal` web service that runs the API (loopback only) and serves only the Parents Portal via `render-start.js`.
-3. When prompted, enter `SUPABASE_DB_URL` (the Neon string) and, for first-time setup, `ADMIN_EMAIL` and `ADMIN_PASSWORD` (a temporary password of at least 12 characters you will change at first sign-in; remove both variables afterwards).
+3. When prompted, enter `DATABASE_URL` (the pooled Neon connection string) and, for first-time setup, `ADMIN_EMAIL` and `ADMIN_PASSWORD` (a temporary password of at least 12 characters you will change at first sign-in; remove both variables afterwards).
 4. After the deploy, open `https://<service>.onrender.com/api/health`; it should return `{"status":"ok","storage":"dual","sync":"synced"}` when Neon is available.
 5. Share this link with parents: `https://<service>.onrender.com/` (also available at `/parents`). Teacher and admin pages return 404 online; teachers use the desktop app, whose data syncs to the online database.
 
