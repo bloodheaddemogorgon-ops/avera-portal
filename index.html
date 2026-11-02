@@ -1839,6 +1839,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         <p class="msg" id="msg" role="alert"></p>
       </form>
       <p class="hint" id="authHint">Create an account to get started. Teachers create a classroom when they sign up.</p>
+      <button class="btn ghost" id="adminEntryToggle" type="button" hidden></button>
       <p class="hint" id="storageStatus" role="status" aria-live="polite">Checking the account workbook...</p>
     </div>
     <noscript>
@@ -3520,6 +3521,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 <script>
 (function(){
   var entryType=document.documentElement.dataset.portalEntry||"main";
+  var canSwitchToAdmin=entryType==="main";
   var mode="in";
   var accountType=entryType==="parents"?"parent":"teacher";
   function localISODate(d){
@@ -3779,6 +3781,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       b.setAttribute("aria-selected",String(b.dataset.mode===mode));
     });
     document.querySelector("#auth [role='tablist']").hidden=isAdminEntry;
+    var adminToggle=$("adminEntryToggle");
+    adminToggle.hidden=!canSwitchToAdmin;
+    adminToggle.textContent=isAdminEntry?"Back to teacher sign in":"Sign in as administrator";
     document.querySelector("#auth [data-mode='up']").hidden=isAdminEntry;
     $("nameWrap").hidden=!up;
     $("teacherGradeWrap").hidden=!up||isParent;
@@ -3860,6 +3865,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   document.querySelectorAll(".tab[role='tab']").forEach(function(b){b.onclick=function(){mode=b.dataset.mode;render()}});
+  $("adminEntryToggle").onclick=function(){
+    entryType=entryType==="admin"?"main":"admin";
+    mode="in";
+    $("msg").textContent="";
+    render();
+  };
   $("showPw").onclick=function(){var p=$("pw"),s=p.type==="password";p.type=s?"text":"password";this.textContent=s?"Hide":"Show"};
 
   $("form").onsubmit=async function(e){
@@ -10298,6 +10309,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   async function enter(user){
     var session=await api("/api/auth/session");
     var sessionUser=session.user;
+    if(canSwitchToAdmin&&sessionUser.role==="teacher"&&sessionUser.isAdmin)entryType="admin";
     var wrongPortal=(entryType==="parents"&&sessionUser.role!=="parent")
       ||(entryType==="admin"&&(sessionUser.role!=="teacher"||!sessionUser.isAdmin))
       ||(entryType==="main"&&(sessionUser.role!=="teacher"||sessionUser.isAdmin));
