@@ -20,7 +20,7 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-fs.writeFileSync(embeddedPath, JSON.stringify({ databaseUrl }), { mode: 0o600 });
+fs.writeFileSync(embeddedPath, JSON.stringify({ databaseUrl, authUrl: process.env.NEON_AUTH_URL || "" }), { mode: 0o600 });
 try {
   const result = spawnSync(
     "npx",

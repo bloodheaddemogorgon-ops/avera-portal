@@ -1,5 +1,7 @@
 "use strict";
 
+process.env.NEON_AUTH_URL = "";
+
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const fs = require("node:fs/promises");

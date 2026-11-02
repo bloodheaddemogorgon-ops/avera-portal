@@ -18,22 +18,25 @@ function normalizeDatabaseUrl(value) {
   return text;
 }
 
-function saveOnlineDatabaseSettings(userDataPath, databaseUrl) {
+function saveOnlineDatabaseSettings(userDataPath, databaseUrl, authUrl = "") {
   const url = normalizeDatabaseUrl(databaseUrl);
   const envPath = path.join(userDataPath, ".env");
   const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
   const kept = existing
     .split(/\r?\n/)
-    .filter((line) => line.trim() && !/^\s*(SUPABASE_DB_URL|PORTAL_STORAGE_MODE)\s*=/.test(line));
+    .filter((line) => line.trim() && !/^\s*(SUPABASE_DB_URL|PORTAL_STORAGE_MODE)\s*=/.test(line)
+      && !(authUrl && /^\s*NEON_AUTH_URL\s*=/.test(line)));
   kept.push("PORTAL_STORAGE_MODE=dual", `SUPABASE_DB_URL=${JSON.stringify(url)}`);
+  if (authUrl) kept.push(`NEON_AUTH_URL=${JSON.stringify(authUrl)}`);
   fs.mkdirSync(userDataPath, { recursive: true });
   fs.writeFileSync(envPath, `${kept.join("\n")}\n`, { encoding: "utf8", mode: 0o600 });
 }
 
-function readEmbeddedDatabaseUrl() {
+function readEmbeddedSettings() {
   try {
     const embedded = JSON.parse(fs.readFileSync(path.join(__dirname, "embedded-online.json"), "utf8"));
-    return normalizeDatabaseUrl(embedded.databaseUrl);
+    const authUrl = typeof embedded.authUrl === "string" && /^https:\/\//.test(embedded.authUrl) ? embedded.authUrl : "";
+    return { databaseUrl: normalizeDatabaseUrl(embedded.databaseUrl), authUrl };
   } catch {
     return null;
   }
@@ -41,9 +44,9 @@ function readEmbeddedDatabaseUrl() {
 
 function loadDesktopEnvironment(userDataPath) {
   const envPath = path.join(userDataPath, ".env");
-  // Private installers ship with the shared online database so every device connects without setup.
-  const embeddedUrl = readEmbeddedDatabaseUrl();
-  if (embeddedUrl) saveOnlineDatabaseSettings(userDataPath, embeddedUrl);
+  // Installers built with an embedded online configuration connect every device without setup.
+  const embedded = readEmbeddedSettings();
+  if (embedded) saveOnlineDatabaseSettings(userDataPath, embedded.databaseUrl, embedded.authUrl);
   if (!fs.existsSync(envPath)) return false;
 
   const result = dotenv.config({ path: envPath });

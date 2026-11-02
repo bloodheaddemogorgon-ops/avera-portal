@@ -1087,6 +1087,7 @@ function getUserSheet(workbook) {
       signIns: ensureColumn(sheet, headers, "Sign-ins"),
       lastSignIn: ensureColumn(sheet, headers, "Last sign-in"),
       emailCheck: ensureColumn(sheet, headers, "Email check"),
+      neonAuth: neonAuthColumnEnabled ? ensureColumn(sheet, headers, "Neon Auth") : headers.get("neon auth") || null,
     },
   };
 }
@@ -1665,6 +1666,55 @@ async function verifyPassword(password, storedPassword) {
 
   const actual = await pbkdf2(password, salt, iterations, expected.length, "sha256");
   return crypto.timingSafeEqual(actual, expected);
+}
+
+const NEON_AUTH_ORIGIN = "http://localhost:3000";
+let neonAuthColumnEnabled = false;
+
+async function neonAuthRequest(baseUrl, route, body, cookie = "") {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${baseUrl}${route}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: NEON_AUTH_ORIGIN, ...(cookie ? { cookie } : {}) },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const sessionCookie = (response.headers.getSetCookie?.() || []).map((value) => value.split(";")[0]).join("; ");
+    return { ok: response.ok, status: response.status, cookie: sessionCookie };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// True when Neon Auth accepts the credentials, false when it rejects them, null when unreachable.
+async function neonAuthSignIn(baseUrl, email, password) {
+  const result = await neonAuthRequest(baseUrl, "/sign-in/email", { email, password });
+  if (!result) return null;
+  return result.ok ? true : false;
+}
+
+// Makes Neon Auth hold the same password as the portal; returns true only when both are known to match.
+async function neonAuthLink(baseUrl, email, password, name) {
+  const signedIn = await neonAuthSignIn(baseUrl, email, password);
+  if (signedIn !== false) return signedIn === true;
+  const created = await neonAuthRequest(baseUrl, "/sign-up/email", { email, password, name: name || email });
+  return Boolean(created?.ok);
+}
+
+async function neonAuthChangePassword(baseUrl, email, currentPassword, newPassword) {
+  const signedIn = await neonAuthRequest(baseUrl, "/sign-in/email", { email, password: currentPassword });
+  if (!signedIn?.ok || !signedIn.cookie) return false;
+  const changed = await neonAuthRequest(
+    baseUrl,
+    "/change-password",
+    { currentPassword, newPassword, revokeOtherSessions: true },
+    signedIn.cookie,
+  );
+  return Boolean(changed?.ok);
 }
 
 function nextUserId(sheet, idColumn, role) {
@@ -2414,6 +2464,8 @@ function createServer(options = {}) {
   );
   const supabaseDatabaseUrl = options.supabaseDatabaseUrl || process.env.SUPABASE_DB_URL;
   const dualStorage = (options.storageMode || process.env.PORTAL_STORAGE_MODE) === "dual";
+  const neonAuthUrl = String(options.neonAuthUrl ?? process.env.NEON_AUTH_URL ?? "").trim().replace(/\/+$/, "");
+  if (neonAuthUrl) neonAuthColumnEnabled = true;
   const bootstrapAdminEmail = typeof options.bootstrapAdminEmail === "string"
     ? options.bootstrapAdminEmail.trim().toLowerCase()
     : "";
@@ -3692,6 +3744,7 @@ async function deleteInventoryItem(session, id) {
         : hashPassword;
       userRow.getCell(columns.password).value = await hashPasswordForAccount(email);
       userRow.getCell(columns.mustChangePassword).value = "true";
+      if (columns.neonAuth) userRow.getCell(columns.neonAuth).value = null;
       await saveDatabaseWorkbook(workbook);
       revokeUserSessions(userId);
       return { userId, mustChangePassword: true };
@@ -3729,6 +3782,12 @@ async function deleteInventoryItem(session, id) {
       }
       const matches = await verifyPassword(currentPassword, cellText(userRow.getCell(columns.password).value));
       if (!matches) throw new HttpError(400, "Your temporary password doesn't match.");
+      if (neonAuthUrl && cellText(userRow.getCell(columns.neonAuth).value) === "Linked") {
+        const email = cellText(userRow.getCell(columns.email).value).toLowerCase();
+        const synced = await neonAuthChangePassword(neonAuthUrl, email, currentPassword, newPassword);
+        // An unsynchronized Neon Auth password must never be accepted later, so unlink it.
+        if (!synced) userRow.getCell(columns.neonAuth).value = null;
+      }
       userRow.getCell(columns.password).value = await (session.isAdmin
         ? hashAdminPassword(newPassword)
         : hashPassword(newPassword));
@@ -3798,6 +3857,9 @@ async function deleteInventoryItem(session, id) {
         incrementCell(classInfo.row.getCell(classInfo.columns.parents));
       }
       const passwordHash = await hashPassword(account.password);
+      const neonLinked = neonAuthUrl
+        ? await neonAuthLink(neonAuthUrl, account.email, account.password, account.name)
+        : false;
       const rowValues = [];
       rowValues[columns.id] = userId;
       rowValues[columns.role] = account.role === "teacher" ? "Teacher" : "Parent";
@@ -3809,6 +3871,7 @@ async function deleteInventoryItem(session, id) {
       rowValues[columns.created] = new Date();
       rowValues[columns.signIns] = 0;
       rowValues[columns.emailCheck] = "OK";
+      if (neonLinked) rowValues[columns.neonAuth] = "Linked";
       writeRow(sheet, [columns.id, columns.email], rowValues);
       setPasswordDocumentation(workbook, columns.password);
 
@@ -3876,7 +3939,22 @@ async function deleteInventoryItem(session, id) {
       }
 
       const storedPassword = cellText(row.getCell(columns.password).value);
-      if (!(await verifyPassword(account.password, storedPassword))) {
+      const isAdminAccount = cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true";
+      let passwordMatches = await verifyPassword(account.password, storedPassword);
+      if (neonAuthUrl && !isAdminAccount) {
+        const neonLinked = cellText(row.getCell(columns.neonAuth).value) === "Linked";
+        const resetPending = cellText(row.getCell(columns.mustChangePassword).value).toLowerCase() === "true";
+        if (!passwordMatches && neonLinked && !resetPending
+          && await neonAuthSignIn(neonAuthUrl, account.email, account.password) === true) {
+          // Neon Auth holds the newest password (for example changed on another device).
+          passwordMatches = true;
+          row.getCell(columns.password).value = await hashPassword(account.password);
+        } else if (passwordMatches && !neonLinked
+          && await neonAuthLink(neonAuthUrl, account.email, account.password, cellText(row.getCell(columns.name).value))) {
+          row.getCell(columns.neonAuth).value = "Linked";
+        }
+      }
+      if (!passwordMatches) {
         logSignIn(workbook, {
           email: account.email,
           role: account.role,
