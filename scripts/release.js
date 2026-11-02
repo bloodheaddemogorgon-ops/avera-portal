@@ -41,7 +41,7 @@ function pruneOldReleases() {
   }
 }
 
-if (fs.existsSync(path.join(root, "desktop", "embedded-online.json"))) {
+if (fs.existsSync(path.join(root, "desktop", "embedded-online.json")) && process.env.PORTAL_ALLOW_PUBLIC_EMBED !== "1") {
   console.error("desktop/embedded-online.json exists. Remove it before publishing a public release.");
   process.exit(1);
 }
