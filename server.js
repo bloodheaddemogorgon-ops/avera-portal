@@ -1045,6 +1045,26 @@ function serializeSectionGrades(sectionGrades) {
   return Object.fromEntries(Array.from(sectionGrades.values(), ({ section, grade }) => [section, grade]));
 }
 
+function isPristineLocalState(encodedLocal, encodedRemote) {
+  try {
+    const accountEmails = (workbook) => {
+      const { sheet, columns } = getUserSheet(workbook);
+      const emails = new Set();
+      sheet.eachRow((row, rowNumber) => {
+        const email = cellText(row.getCell(columns.email).value).toLowerCase();
+        if (rowNumber > 1 && email) emails.add(email);
+      });
+      return emails;
+    };
+    const local = decodeWorkbookState(encodedLocal);
+    const remote = decodeWorkbookState(encodedRemote);
+    const remoteEmails = accountEmails(remote);
+    return [...accountEmails(local)].every((email) => remoteEmails.has(email));
+  } catch {
+    return false;
+  }
+}
+
 function getUserSheet(workbook) {
   const sheet = workbook.getWorksheet("Users");
   if (!sheet) throw new Error('The workbook is missing the "Users" sheet.');
@@ -2556,6 +2576,24 @@ function createServer(options = {}) {
       const remoteRevision = Number(remoteResult.rows[0].revision);
       if (!Number.isSafeInteger(remoteRevision) || remoteRevision < 1) {
         throw new Error("The online portal database has an invalid revision.");
+      }
+      // A device that has never synchronized and holds no accounts or learners missing online
+      // (for example a freshly installed copy) simply adopts the online data instead of conflicting.
+      if (syncState.remote_revision === 0 && isPristineLocalState(localResult.workbook_state, remoteState)) {
+        const now = new Date().toISOString();
+        database.prepare(
+          "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
+        ).run(remoteState, now);
+        database.prepare(
+          `UPDATE portal_sync_state
+           SET remote_revision = ?, pending = 0, conflict = 0,
+               conflict_local_state = NULL, conflict_remote_state = NULL,
+               conflict_remote_revision = NULL, last_sync_at = ?, last_sync_error = NULL,
+               updated_at = ?
+           WHERE id = 1`,
+        ).run(remoteRevision, now, now);
+        remoteAvailable = true;
+        return;
       }
       if (syncState.conflict) {
         remoteAvailable = true;
