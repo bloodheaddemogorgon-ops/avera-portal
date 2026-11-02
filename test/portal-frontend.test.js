@@ -327,19 +327,30 @@ test("dual storage accepts local writes offline and synchronizes them when onlin
     sync: "synced",
   });
 
-  postgres.setAvailable(false);
-  const registration = await fetch(`${backendUrl}/api/auth/register`, {
+  const registerBody = JSON.stringify({
+    name: "Offline Sync Teacher",
+    email: "offline.sync.teacher@example.com",
+    password: "secure-pass-123",
+    role: "teacher",
+    grade: "Grade 5",
+  });
+  const registerRequest = () => fetch(`${backendUrl}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "Offline Sync Teacher",
-      email: "offline.sync.teacher@example.com",
-      password: "secure-pass-123",
-      role: "teacher",
-      grade: "Grade 5",
-    }),
+    body: registerBody,
   });
-  assert.equal(registration.status, 201);
+  postgres.setAvailable(false);
+  assert.equal((await registerRequest()).status, 503, "registration requires an online connection");
+  postgres.setAvailable(true);
+  assert.equal((await registerRequest()).status, 201);
+  assert.ok(postgres.revision > 1, "the new account is saved online before registration completes");
+  const login = () => fetch(`${backendUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "offline.sync.teacher@example.com", password: "secure-pass-123", role: "teacher" }),
+  });
+  postgres.setAvailable(false);
+  assert.equal((await login()).status, 200);
 
   await delay(150);
   const offlineHealth = await fetch(`${backendUrl}/api/health`);
@@ -349,7 +360,7 @@ test("dual storage accepts local writes offline and synchronizes them when onlin
   assert.equal(offlineStatus.sync, "offline");
 
   postgres.setAvailable(true);
-  await waitFor(() => postgres.revision > 1);
+  await waitFor(async () => (await (await fetch(`${backendUrl}/api/health`)).json()).sync === "synced");
   const syncedHealth = await fetch(`${backendUrl}/api/health`);
   assert.deepEqual(await syncedHealth.json(), {
     status: "ok",
@@ -377,7 +388,6 @@ test("Synchronize Data Online endpoint pushes pending changes on demand", async 
   assert.equal((await fetch(`${backendUrl}/api/sync`, { method: "POST" })).status, 401);
 
   await fetch(`${backendUrl}/api/health`);
-  postgres.setAvailable(false);
   const registration = await fetch(`${backendUrl}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -391,6 +401,13 @@ test("Synchronize Data Online endpoint pushes pending changes on demand", async 
   });
   assert.equal(registration.status, 201);
   const cookie = registration.headers.get("set-cookie").split(";")[0];
+  postgres.setAvailable(false);
+  const offlineLogin = await fetch(`${backendUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "manual.sync.teacher@example.com", password: "secure-pass-123", role: "teacher" }),
+  });
+  assert.equal(offlineLogin.status, 200);
   await delay(250);
 
   const unavailable = await fetch(`${backendUrl}/api/sync`, { method: "POST", headers: { Cookie: cookie } });
@@ -422,8 +439,7 @@ test("dual storage pauses on revision conflicts without overwriting the online c
 
   const initialHealth = await fetch(`${backendUrl}/api/health`);
   assert.equal((await initialHealth.json()).sync, "synced");
-  postgres.setAvailable(false);
-  const registration = await fetch(`${backendUrl}/api/auth/register`, {
+  const onlineRegistration = await fetch(`${backendUrl}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -434,7 +450,15 @@ test("dual storage pauses on revision conflicts without overwriting the online c
       grade: "Grade 5",
     }),
   });
-  assert.equal(registration.status, 201);
+  assert.equal(onlineRegistration.status, 201);
+  const revisionAfterRegistration = postgres.revision;
+  postgres.setAvailable(false);
+  const registration = await fetch(`${backendUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "conflicting.sync.teacher@example.com", password: "secure-pass-123", role: "teacher" }),
+  });
+  assert.equal(registration.status, 200);
   postgres.advanceRemoteRevision();
   postgres.setAvailable(true);
 
@@ -443,7 +467,7 @@ test("dual storage pauses on revision conflicts without overwriting the online c
     const status = await response.json();
     return status.sync === "conflict";
   });
-  assert.equal(postgres.revision, 2);
+  assert.equal(postgres.revision, revisionAfterRegistration + 1);
   const localDatabase = new DatabaseSync(path.join(directory, "database.sqlite"));
   try {
     const savedConflict = localDatabase.prepare(

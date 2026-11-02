@@ -33,7 +33,7 @@ Ports can be changed with `PORTAL_API_PORT`, `PORTAL_TEACHER_PORT`, `PORTAL_PARE
 
 ## Install as a Windows desktop app
 
-Run `npm ci`, then `npm run dist:win` on a Windows computer. The app executable, installer, and uninstaller use `icon.png` (converted to the required Windows `icon.ico` for packaging). The installer is created at `release/AVeRA Setup 1.0.20.exe`. Run that installer and follow the prompts; the installed app starts the local portal and opens it in its own desktop window without requiring a separately installed Node.js runtime.
+Run `npm ci`, then `npm run dist:win` on a Windows computer. The app executable, installer, and uninstaller use `icon.png` (converted to the required Windows `icon.ico` for packaging). The installer is created at `release/GraceDesk-Setup-<version>.exe`. Run that installer and follow the prompts; the installed app starts the local portal and opens it in its own desktop window without requiring a separately installed Node.js runtime.
 
 The desktop app stores its SQLite database and profile images in the current Windows user's application data folder. Back up that folder to preserve portal records. The installer does not include the live database or `.env` credentials. For desktop online synchronization, create `%APPDATA%\\grade5-class-portal\\.env` with `PORTAL_STORAGE_MODE=dual` and your private `SUPABASE_DB_URL`, then restart the app. The desktop app loads this per-user file and keeps the URL out of the installer. To launch the app during development, run `npm run desktop`.
 

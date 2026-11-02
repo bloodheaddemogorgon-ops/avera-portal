@@ -54,7 +54,7 @@ if (capture("gh", ["release", "view", tag, ...repoArgs]).ok) {
   process.exit(1);
 }
 
-console.log(`Building AVeRA ${version}...`);
+console.log(`Building GraceDesk ${version}...`);
 run("npm", ["run", "check"]);
 run("npm", ["run", "dist:win"]);
 
@@ -70,6 +70,6 @@ if (!assets.some((file) => file.endsWith("latest.yml")) || !assets.some((file) =
 }
 
 console.log(`Publishing ${tag}...`);
-run("gh", ["release", "create", tag, ...assets, "--title", `AVeRA ${version}`, "--generate-notes", ...repoArgs], { shell: false });
+run("gh", ["release", "create", tag, ...assets, "--title", `GraceDesk ${version}`, "--generate-notes", ...repoArgs], { shell: false });
 pruneOldReleases();
 console.log(`Released ${tag}. Installed apps can now update from Settings.`);

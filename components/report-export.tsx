@@ -38,7 +38,7 @@ export function ReportExport() {
         pdf.addImage(sliceImage, "PNG", 12, 10, pageWidth - 24, slicePdfHeight);
         offset += sliceHeight;
       }
-      pdf.save("avera-class-overview.pdf");
+      pdf.save("gracedesk-class-overview.pdf");
       setMessage(`Report exported (${Math.ceil(imageHeight / pageHeight)} page${imageHeight > pageHeight ? "s" : ""}).`);
     } catch {
       setMessage("The report could not be exported. Please try again.");

@@ -4,6 +4,10 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 
+// Keep using the settings folder from the former "AVeRA" app name so saved online-database settings survive the rename.
+const legacyUserDataPath = path.join(app.getPath("appData"), "AVeRA");
+if (require("node:fs").existsSync(legacyUserDataPath)) app.setPath("userData", legacyUserDataPath);
+
 let portalServer;
 let portalUrl;
 let mainWindow;

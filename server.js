@@ -2860,6 +2860,60 @@ function createServer(options = {}) {
     };
   }
 
+  // Must run inside workbookQueue. Adopts changes saved online by another device
+  // (new accounts, grades, etc.) when this device has no unsynchronized local edits.
+  async function pullRemoteIfNewer() {
+    const syncState = getLocalSyncState();
+    if (syncState.conflict || syncState.pending || !remoteInitialization) return;
+    const remoteResult = await postgresPool.query(
+      "SELECT revision FROM portal_state WHERE id = 1",
+    );
+    if (!remoteResult.rows.length) return;
+    const remoteRevision = Number(remoteResult.rows[0].revision);
+    if (remoteRevision === syncState.remote_revision) return;
+    const stateResult = await postgresPool.query(
+      "SELECT workbook_state, revision FROM portal_state WHERE id = 1",
+    );
+    const now = new Date().toISOString();
+    database.prepare(
+      "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
+    ).run(stateResult.rows[0].workbook_state, now);
+    database.prepare(
+      `UPDATE portal_sync_state
+       SET remote_revision = ?, last_sync_at = ?, last_sync_error = NULL, updated_at = ?
+       WHERE id = 1`,
+    ).run(Number(stateResult.rows[0].revision), now, now);
+    remoteAvailable = true;
+  }
+
+  // Registration must compare against the latest online accounts so usernames/emails are never duplicated.
+  async function requireFreshOnlineState() {
+    const unavailable = new HttpError(
+      503,
+      "You must be connected online to register. Check your internet connection and try again.",
+    );
+    try {
+      if (!remoteInitialization) await initializeRemoteDatabase();
+      await postgresPool.query("SELECT 1");
+    } catch {
+      remoteAvailable = false;
+      throw unavailable;
+    }
+    const syncState = getLocalSyncState();
+    if (syncState.conflict || syncState.pending) {
+      throw new HttpError(
+        409,
+        "This device has changes that are not yet saved online. Synchronize first, then register.",
+      );
+    }
+    try {
+      await pullRemoteIfNewer();
+    } catch {
+      remoteAvailable = false;
+      throw unavailable;
+    }
+  }
+
   function scheduleDualSync() {
     if (!dualStorage || syncTimer || serverClosing) return;
     syncTimer = setTimeout(() => {
@@ -2894,7 +2948,11 @@ function createServer(options = {}) {
 
       const synchronization = workbookQueue.then(async () => {
         const syncState = getLocalSyncState();
-        if (syncState.conflict || !syncState.pending) return;
+        if (syncState.conflict) return;
+        if (!syncState.pending) {
+          await pullRemoteIfNewer();
+          return;
+        }
         const localState = database.prepare(
           "SELECT workbook_state FROM portal_state WHERE id = 1",
         ).get();
@@ -3244,6 +3302,7 @@ async function deleteInventoryItem(session, id) {
     const result = workbookQueue.then(async () => {
       if (dualStorage) {
         await initializeDatabase();
+        if (remoteAvailable) await pullRemoteIfNewer().catch(() => { remoteAvailable = false; });
         database.exec("BEGIN IMMEDIATE");
         try {
           const value = await operation();
@@ -3663,7 +3722,14 @@ async function deleteInventoryItem(session, id) {
 
   async function register(data) {
     const account = validateAccount(data, true);
-    return serializeWorkbook(async () => {
+    let stateBeforeRegistration = null;
+    const created = await serializeWorkbook(async () => {
+      if (dualStorage) {
+        await requireFreshOnlineState();
+        stateBeforeRegistration = database.prepare(
+          "SELECT workbook_state FROM portal_state WHERE id = 1",
+        ).get().workbook_state;
+      }
       const workbook = await readDatabaseWorkbook();
       const { sheet, columns } = getUserSheet(workbook);
       if (findUser(sheet, columns, account.email)) {
@@ -3713,6 +3779,35 @@ async function deleteInventoryItem(session, id) {
         },
       };
     });
+    if (dualStorage) {
+      const failure = new HttpError(503, "Your account could not be saved online. Check your internet connection and try again.");
+      let saved = false;
+      try {
+        if (syncTask) await syncTask.catch(() => undefined);
+        await synchronizeLocalDatabase();
+        saved = readSyncStatus().state === "synced";
+      } catch {
+        saved = false;
+      }
+      if (!saved) {
+        // Withdraw the unsaved account so it cannot later collide with the same email created on another device.
+        await workbookQueue;
+        const discard = workbookQueue.then(() => {
+          const syncState = getLocalSyncState();
+          if (syncState.conflict || !syncState.pending) return;
+          database.prepare(
+            "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
+          ).run(stateBeforeRegistration, new Date().toISOString());
+          database.prepare(
+            "UPDATE portal_sync_state SET pending = 0, updated_at = ? WHERE id = 1",
+          ).run(new Date().toISOString());
+        });
+        workbookQueue = discard.then(() => undefined, () => undefined);
+        await discard.catch(() => undefined);
+        throw failure;
+      }
+    }
+    return created;
   }
 
   async function login(data) {

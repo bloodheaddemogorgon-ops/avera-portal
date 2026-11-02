@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AVeRA | Class Portal",
+  title: "GraceDesk | Class Portal",
   description: "Classroom records and learner progress",
 };
 

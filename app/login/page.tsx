@@ -8,7 +8,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   if (!isSupabaseConfigured()) {
     return (
       <main className="auth-layout">
-        <section className="auth-story"><span className="eyebrow" style={{ color: "#f2bd78" }}>AVeRA · Class Portal</span><h1>Every learner, seen.</h1><p>A calmer place to keep classroom records, attendance, and progress together.</p></section>
+        <section className="auth-story"><span className="eyebrow" style={{ color: "#f2bd78" }}>GraceDesk · Class Portal</span><h1>Every learner, seen.</h1><p>A calmer place to keep classroom records, attendance, and progress together.</p></section>
         <section className="auth-panel"><div className="auth-card"><span className="eyebrow">Setup needed</span><h2>Connect Supabase</h2><p>Add the project URL and publishable key to your local environment to enable sign-in.</p><div className="notice">Set <strong>NEXT_PUBLIC_SUPABASE_URL</strong> and <strong>NEXT_PUBLIC_SUPABASE_ANON_KEY</strong> in <strong>.env.local</strong>, then restart the Next.js server.</div><p className="auth-footer">Never put a Supabase service-role key in a <code>NEXT_PUBLIC_</code> variable.</p></div></section>
       </main>
     );
@@ -22,7 +22,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="auth-layout">
       <section className="auth-story">
-        <span className="eyebrow" style={{ color: "#f2bd78" }}>AVeRA · Class Portal</span>
+        <span className="eyebrow" style={{ color: "#f2bd78" }}>GraceDesk · Class Portal</span>
         <div><h1>Every learner, seen.</h1><p>Keep attendance, class records, and learner progress in one thoughtful workspace.</p></div>
         <span className="auth-footer" style={{ color: "#c2d6cf" }}>A classroom record system for the work that matters every day.</span>
       </section>
@@ -30,10 +30,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <div className="auth-card">
           <span className="eyebrow">Welcome back</span>
           <h2>Sign in</h2>
-          <p>Use your AVeRA account to continue to your classroom.</p>
+          <p>Use your GraceDesk account to continue to your classroom.</p>
           {registered && <div className="notice" role="status">Your account is ready. Check your email if confirmation is enabled for this Supabase project.</div>}
+          {error === "config" && <div className="notice" role="alert">Connect this app to Supabase before signing in.</div>}
           {error === "invalid" && <div className="notice" role="alert">That email and password combination could not be verified.</div>}
           {error === "missing" && <div className="notice" role="alert">Enter your email and password to continue.</div>}
+          {error === "unconfirmed" && <div className="notice" role="alert">Confirm your email address first. Check your inbox or request a new confirmation email from Supabase.</div>}
           <form action={signIn}>
             <label className="field">Email address<input name="email" type="email" autoComplete="email" required /></label>
             <label className="field">Password<input name="password" type="password" autoComplete="current-password" required /></label>

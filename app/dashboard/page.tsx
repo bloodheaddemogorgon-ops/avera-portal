@@ -52,7 +52,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   return (
     <main className="portal-shell">
       <aside className="portal-sidebar">
-        <div className="brand-lockup"><span className="brand-mark">A</span><span>AVeRA <small style={{ display: "block", color: "#a7c0b9", fontSize: 10, fontWeight: 500 }}>CLASS PORTAL</small></span></div>
+        <div className="brand-lockup"><span className="brand-mark">A</span><span>GraceDesk <small style={{ display: "block", color: "#a7c0b9", fontSize: 10, fontWeight: 500 }}>CLASS PORTAL</small></span></div>
         <span className="side-caption">Classroom</span>
         <nav aria-label="Main navigation">
           <a className="side-link" aria-current="page" href="/dashboard"><span className="side-symbol">⌂</span>Overview</a>
