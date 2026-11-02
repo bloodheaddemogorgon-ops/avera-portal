@@ -30,8 +30,20 @@ function saveOnlineDatabaseSettings(userDataPath, databaseUrl) {
   fs.writeFileSync(envPath, `${kept.join("\n")}\n`, { encoding: "utf8", mode: 0o600 });
 }
 
+function readEmbeddedDatabaseUrl() {
+  try {
+    const embedded = JSON.parse(fs.readFileSync(path.join(__dirname, "embedded-online.json"), "utf8"));
+    return normalizeDatabaseUrl(embedded.databaseUrl);
+  } catch {
+    return null;
+  }
+}
+
 function loadDesktopEnvironment(userDataPath) {
   const envPath = path.join(userDataPath, ".env");
+  // Private installers ship with the shared online database so every device connects without setup.
+  const embeddedUrl = readEmbeddedDatabaseUrl();
+  if (embeddedUrl) saveOnlineDatabaseSettings(userDataPath, embeddedUrl);
   if (!fs.existsSync(envPath)) return false;
 
   const result = dotenv.config({ path: envPath });

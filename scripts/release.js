@@ -41,6 +41,10 @@ function pruneOldReleases() {
   }
 }
 
+if (fs.existsSync(path.join(root, "desktop", "embedded-online.json"))) {
+  console.error("desktop/embedded-online.json exists. Remove it before publishing a public release.");
+  process.exit(1);
+}
 if (!capture("gh", ["auth", "status"]).ok) {
   console.error("GitHub CLI is not signed in. Run: gh auth login");
   process.exit(1);
