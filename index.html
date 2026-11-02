@@ -3202,6 +3202,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                 <div class="settings-card-body">
                   <button class="btn settings-update-link" id="syncDataButton" type="button">Synchronize Data Online</button>
                   <p class="notice" id="syncDataNotice" role="status" aria-live="polite"></p>
+                  <form id="neonConnectForm" hidden autocomplete="off">
+                    <label for="neonConnectionUrl">Neon connection string</label>
+                    <input id="neonConnectionUrl" type="password" placeholder="postgresql://user:password@host/dbname?sslmode=require" spellcheck="false" autocomplete="off">
+                    <p class="field-hint">Create a free database at neon.tech, then copy its pooled connection string. Your records stay saved on this computer; this only adds online backup and the Parents Portal feed. The app restarts after connecting.</p>
+                    <button class="btn settings-update-link" id="neonConnectButton" type="submit">Connect to Neon</button>
+                  </form>
                   <div id="syncConflictActions" hidden>
                     <p class="field-hint">Both versions are preserved. Choose which complete workbook to keep. This replaces the other copy.</p>
                     <button class="btn settings-update-link" id="keepLocalSync" type="button">Keep this device's data</button>
@@ -3834,8 +3840,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("syncDataButton").hidden=result.storage!=="dual"||result.sync==="conflict";
     $("syncConflictActions").hidden=!(result.storage==="dual"&&result.sync==="conflict"
       &&currentUser&&currentUser.isAdmin);
+    var canConfigureOnline=result.storage!=="dual"&&window.gradePortal&&typeof window.gradePortal.saveOnlineDatabase==="function";
+    $("neonConnectForm").hidden=!canConfigureOnline;
     if(result.storage!=="dual"){
-      $("syncDataNotice").textContent="Online sync is disabled on this server. Configure PORTAL_STORAGE_MODE=dual and SUPABASE_DB_URL, then restart it.";
+      $("syncDataNotice").textContent=canConfigureOnline
+        ?"Online sync is not connected yet. Records are saved on this computer. Paste your Neon connection string below to back them up online."
+        :"Online sync is disabled on this server. Configure PORTAL_STORAGE_MODE=dual and SUPABASE_DB_URL, then restart it.";
     }else if(result.sync==="synced"){
       $("syncDataNotice").textContent="Local and online portal records are synchronized.";
     }else if(result.sync==="conflict"){
@@ -10903,6 +10913,22 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       }
     };
   })();
+  $("neonConnectForm").onsubmit=async function(event){
+    event.preventDefault();
+    var button=$("neonConnectButton"),notice=$("syncDataNotice"),input=$("neonConnectionUrl");
+    button.disabled=true;
+    notice.classList.remove("error");
+    notice.textContent="Testing the Neon connection...";
+    try{
+      await window.gradePortal.saveOnlineDatabase(input.value);
+      input.value="";
+      notice.textContent="Connected. Restarting the app to start online sync...";
+    }catch(error){
+      notice.textContent=String(error.message||error).replace(/^Error invoking remote method '[^']+': (Error: )?/,"");
+      notice.classList.add("error");
+      button.disabled=false;
+    }
+  };
   $("syncDataButton").onclick=async function(){
     var button=$("syncDataButton"),notice=$("syncDataNotice");
     button.disabled=true;

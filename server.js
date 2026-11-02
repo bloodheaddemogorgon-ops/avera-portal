@@ -11717,6 +11717,9 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 }
 
 if (require.main === module) {
+  if (!process.env.SUPABASE_DB_URL && process.env.DATABASE_URL) {
+    process.env.SUPABASE_DB_URL = process.env.DATABASE_URL;
+  }
   const configuredPort = process.env.PORT ? Number(process.env.PORT) : 3003;
   const host = process.env.HOST || "127.0.0.1";
   const maxPort = process.env.PORT ? configuredPort : configuredPort + 20;
@@ -11750,10 +11753,11 @@ if (require.main === module) {
       process.exitCode = 1;
     });
     server.listen(port, host, () => {
-      if (process.env.PORTAL_STORAGE_MODE === "dual" && process.env.SUPABASE_DB_URL) {
+      const hasRemoteUrl = Boolean(process.env.SUPABASE_DB_URL || process.env.DATABASE_URL);
+      if (process.env.PORTAL_STORAGE_MODE === "dual" && hasRemoteUrl) {
         console.log("Using dual SQLite and Supabase PostgreSQL storage.");
-      } else if (process.env.SUPABASE_DB_URL) {
-        console.log("Using Supabase PostgreSQL backend.");
+      } else if (hasRemoteUrl) {
+        console.log("Using PostgreSQL backend.");
       } else {
         console.log(`Using SQLite backend: ${path.resolve(DATABASE_PATH)}`);
       }

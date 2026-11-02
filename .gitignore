@@ -26,3 +26,4 @@ SF1.xls
 *.profiles/
 *.profiles.school-logos/
 npm-debug.log*
+.neon

@@ -199,6 +199,34 @@ ipcMain.handle("app-version", (event) => {
   return app.getVersion();
 });
 
+ipcMain.handle("online-database-save", async (event, databaseUrl) => {
+  assertTrustedSender(event);
+  const { normalizeDatabaseUrl, saveOnlineDatabaseSettings } = require("./environment");
+  const url = new URL(normalizeDatabaseUrl(databaseUrl));
+  for (const parameter of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) url.searchParams.delete(parameter);
+  const { Pool } = require("pg");
+  const pool = new Pool({
+    connectionString: url.toString(),
+    ssl: { rejectUnauthorized: true },
+    max: 1,
+    connectionTimeoutMillis: 10000,
+  });
+  try {
+    await pool.query("SELECT 1");
+  } catch (error) {
+    throw new Error(`Could not connect to the Neon database: ${error.message}`);
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+  saveOnlineDatabaseSettings(app.getPath("userData"), databaseUrl);
+  setImmediate(() => {
+    portalServer?.closeAllConnections?.();
+    app.relaunch();
+    app.quit();
+  });
+  return { restarting: true };
+});
+
 async function startPortal() {
   require("./environment").loadDesktopEnvironment(app.getPath("userData"));
   const { createServer } = require("../server");

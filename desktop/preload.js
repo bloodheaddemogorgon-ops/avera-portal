@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("gradePortal", {
   downloadSF9Pdf: (selection) => ipcRenderer.invoke("download-sf9-pdf", selection),
+  saveOnlineDatabase: (databaseUrl) => ipcRenderer.invoke("online-database-save", databaseUrl),
   checkForUpdates: () => ipcRenderer.invoke("update-check"),
   getUpdateState: () => ipcRenderer.invoke("update-state"),
   downloadUpdate: () => ipcRenderer.invoke("update-download"),
