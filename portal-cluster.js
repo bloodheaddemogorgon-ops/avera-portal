@@ -45,7 +45,8 @@ const services = [
     args: ["--api"],
     env: { PORT: String(configuredApiPort) },
   },
-  ...Object.entries(configuredPorts).map(([entry, port]) => ({
+  // The Parents Portal is hosted online only (see render-start.js).
+  ...Object.entries(configuredPorts).filter(([entry]) => entry !== "parents").map(([entry, port]) => ({
     name: `${entry} portal frontend`,
     script: "portal-frontend.js",
     args: [entry],

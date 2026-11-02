@@ -1,28 +1,27 @@
 # Class Adviser's Portal
 
-## Start the new portal
+## Start the local portal
 
-The new web app uses Next.js, React, TypeScript, Tailwind CSS, and Supabase Auth/Database/Storage. Reports use jsPDF and html2canvas; reading-level charts use Recharts. The current SQLite/Electron portal remains available as a legacy app while features and data are migrated.
+The default app uses the existing Node.js backend and local SQLite database. It does not need Supabase credentials or an internet connection to save portal records.
 
-1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor.
-2. Copy `.env.example` to `.env.local`, then set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_SITE_URL` from your Supabase project and local/deployed site URL.
-3. In Supabase Auth, configure the site URL and add `/auth/callback` to the allowed redirect URLs. Keep email confirmation enabled for deployed instances.
-4. Run `npm ci`, then `npm run dev` and open `http://localhost:3000`. Use `/register` to create a teacher account, then create a classroom from the dashboard.
-5. For deployment, run `npm run build` and `npm start`; configure the same environment variables in the hosting provider.
+1. Run `npm ci` if dependencies are not installed.
+2. Run `npm run dev` (or `npm run start:legacy`) and keep the terminal open.
+3. Open the teacher portal at `http://127.0.0.1:3004`. The admin portal is at port `3006`. The Parents Portal is hosted online only (see "Deploy online").
+4. The backend API runs at `http://127.0.0.1:3003`. Check `http://127.0.0.1:3003/api/health`; local mode should report `"storage":"sqlite"`.
 
-The schema creates normalized profile, classroom, learner, grade, attendance, and reading-assessment tables, with row-level security. Parent reads are restricted to learners explicitly linked by `students.parent_id`. Storage uses a private `student-documents` bucket; file object paths must begin with the learner UUID. Never expose a database password or Supabase service-role key to browser code.
+By default, records are stored in `grade5-portal-database.sqlite` in this project folder. Set `PORTAL_DATABASE_PATH` to a private, writable local path if you want the database stored elsewhere. Keep `SUPABASE_DB_URL` unset to use SQLite. The app ignores `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in this mode.
 
-**Data migration is not automatic.** The existing SQLite database and workbook-backed records are not copied into the new Supabase tables. Keep backups and continue using `npm run start:legacy` or `npm run desktop` for existing records until a verified importer and feature migration are completed. Do not point the new schema at the legacy `portal_state` blob and assume it is normalized.
+The online Supabase project and its existing data are left untouched. The separate Next.js/Supabase scaffold can still be run explicitly with `npm run dev:next`; it is not the default local portal.
 
 ## Project documentation
 
 The `docs/` folder contains the product requirements ([PRD](docs/PRD.md)), [architecture](docs/ARCHITECTURE.md), development and privacy [rules](docs/RULES.md), [design notes](docs/DESIGN.md), staged migration [tasks](docs/TASKS.md), and durable project [memory](docs/MEMORY.md).
 
-## Legacy app (Node API/Electron)
+## Local Node API and Electron app
 
-The legacy app uses its Node.js backend and a database. It defaults to local SQLite; configure `SUPABASE_DB_URL` for its existing PostgreSQL blob-storage mode. Do not use VS Code Live Preview to run it.
+The local portal uses its Node.js backend and SQLite by default; configure `SUPABASE_DB_URL` only if you intentionally want the older PostgreSQL blob-storage mode. Do not use VS Code Live Preview to run it.
 
-Run `npm run start:legacy` to launch the shared API and teacher, parent, and admin frontends. `start-portal.bat` and `npm run desktop` also continue to launch the legacy app. The teacher, parent, and admin websites run on ports `3004`, `3005`, and `3006`; all three forward API requests to the shared backend on port `3003`.
+Run `npm run start:legacy` to launch the shared API and the teacher and admin frontends. `start-portal.bat` and `npm run desktop` also continue to launch the legacy app. The teacher and admin websites run on ports `3004` and `3006`; both forward API requests to the shared backend on port `3003`. The Parents Portal is not started locally; it is served only by the online deployment (`render-start.js`). To test it locally, run `npm run start:parents` against a running API.
 
 The legacy documentation below applies to the SQLite/PostgreSQL workbook app, not the new normalized Supabase application.
 
@@ -38,6 +37,8 @@ Run `npm ci`, then `npm run dist:win` on a Windows computer. The app executable,
 
 The desktop app stores its SQLite database and profile images in the current Windows user's application data folder. Back up that folder to preserve portal records. The installer does not include the live database or `.env` credentials. For desktop online synchronization, create `%APPDATA%\\grade5-class-portal\\.env` with `PORTAL_STORAGE_MODE=dual` and your private `SUPABASE_DB_URL`, then restart the app. The desktop app loads this per-user file and keeps the URL out of the installer. To launch the app during development, run `npm run desktop`.
 
+The packaged Windows app serves only the teacher portal; parent and admin portal pages are not included in its desktop experience. Parents use the online Parents Portal instead.
+
 The desktop app allows only one running instance so it cannot launch competing local database connections. Database request errors are logged to `%APPDATA%\grade5-class-portal\logs\portal-server.log`; the error message includes a reference ID to locate the corresponding entry. SQLite waits up to 30 seconds for a busy database before returning a lock error.
 
 In the packaged desktop app, generated SF8 reports are saved to `%USERPROFILE%\Downloads\generated-reports` because the application bundle is read-only. When running the development server directly from the project folder, generated reports are saved to `downloads/generated-reports` in the project.
@@ -49,7 +50,7 @@ On a new computer, install Node.js 22.5 or newer and start the legacy portal wit
 ### If the browser cannot connect
 
 - Start the legacy app with `start-portal.bat` or `npm run start:legacy` from the folder containing `server.js`; keep that terminal open.
-- Open the portal URL printed at startup: teacher `http://127.0.0.1:3004`, parents `http://127.0.0.1:3005`, or admin `http://127.0.0.1:3006`. Visit `http://127.0.0.1:3003/api/health` to check the shared backend. A healthy local backend returns `{"status":"ok","storage":"sqlite"}`; a healthy Supabase backend returns `{"status":"ok","storage":"supabase"}`. If a portal cannot reach the API, confirm all four server processes are running and that `PORTAL_API_URL` points to the shared backend.
+- Open the portal URL printed at startup: teacher `http://127.0.0.1:3004` or admin `http://127.0.0.1:3006`. Visit `http://127.0.0.1:3003/api/health` to check the shared backend. A healthy local backend returns `{"status":"ok","storage":"sqlite"}`; a healthy Supabase backend returns `{"status":"ok","storage":"supabase"}`. If a portal cannot reach the API, confirm all three server processes are running and that `PORTAL_API_URL` points to the shared backend.
 - Without Supabase, the first application request creates the SQLite database and migrates an available workbook. With Supabase, it migrates the existing local SQLite database when available, otherwise the selected workbook or default template. Existing account, learner, grade, and attendance data is not included in the GitHub repository.
 - If `/api/health` returns an error, check the server terminal for the database connection or migration error. For SQLite, confirm the template workbook is present and the folder is writable. For Supabase, verify `SUPABASE_DB_URL` and that the database is reachable. Set `PORTAL_MIGRATION_WORKBOOK` to import a specific workbook.
 - All four servers bind to `127.0.0.1` by default for local use. Public binding is refused unless both `PORTAL_TLS_KEY` and `PORTAL_TLS_CERT` point to a trusted TLS private key and certificate; then set `HOST=0.0.0.0`. The servers use HTTPS and mark session cookies `Secure`. GitHub Pages cannot run this Node.js backend.
@@ -70,10 +71,10 @@ Without `PORTAL_STORAGE_MODE=dual`, setting `SUPABASE_DB_URL` retains the existi
 ## Deploy online (Neon + Render)
 
 1. Create a Neon project and copy its **pooled** connection string (`...-pooler...neon.tech/...`).
-2. Push this repository to GitHub, then in Render choose **New → Blueprint** and select the repository. `render.yaml` defines one `advisers-portal` web service that runs the API (loopback only) and serves all three portals via `render-start.js`.
+2. Push this repository to GitHub, then in Render choose **New → Blueprint** and select the repository. `render.yaml` defines one `advisers-portal` web service that runs the API (loopback only) and serves only the Parents Portal via `render-start.js`.
 3. When prompted, enter `SUPABASE_DB_URL` (the Neon string) and, for first-time setup, `ADMIN_EMAIL` and `ADMIN_PASSWORD` (a temporary password of at least 12 characters you will change at first sign-in; remove both variables afterwards).
 4. After the deploy, open `https://<service>.onrender.com/api/health`; it should return `{"status":"ok","storage":"dual","sync":"synced"}` when Neon is available.
-5. Portals: teacher `https://<service>.onrender.com/`, parents `/parents`, admin `/admin`. Cookies are kept separate per portal.
+5. Share this link with parents: `https://<service>.onrender.com/` (also available at `/parents`). Teacher and admin pages return 404 online; teachers use the desktop app, whose data syncs to the online database.
 
 ### Synchronize Data Online (local copy ↔ hosted database)
 

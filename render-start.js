@@ -1,11 +1,11 @@
 "use strict";
 
-// Single-service hosting: the API listens on loopback only; one public server hosts the
-// teacher (/), parents (/parents) and admin (/admin) pages and proxies /api to the API.
+// Single-service hosting: the API listens on loopback only; one public server hosts only
+// the Parents Portal (/ and /parents) and proxies /api to the API. Teacher and admin pages are not served online.
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 
-const API_PORT = "3003";
+const API_PORT = process.env.PORTAL_API_PORT || "3003";
 const publicPort = process.env.PORT || "10000";
 const children = [];
 let stopping = false;
@@ -40,8 +40,8 @@ function start(script, args, env, keepSecrets) {
 process.on("SIGINT", () => stop(0));
 process.on("SIGTERM", () => stop(0));
 start("server.js", ["--api"], { PORT: API_PORT, HOST: "127.0.0.1" }, true);
-start("portal-frontend.js", ["all"], {
-  PORT: publicPort,
+start("portal-frontend.js", ["parents"], {
+  PORTAL_PARENTS_PORT: publicPort,
   HOST: "0.0.0.0",
   PORTAL_API_URL: `http://127.0.0.1:${API_PORT}`,
   PORTAL_TRUST_PROXY: "true",
