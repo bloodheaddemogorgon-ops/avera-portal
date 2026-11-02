@@ -2454,6 +2454,7 @@ function createServer(options = {}) {
   let syncInProgress = false;
   let serverClosing = false;
   let remoteAvailable = false;
+  let lastRemoteRetryAt = 0;
 
   async function getAppearanceTheme() {
     if (!appearancePreferencesPath) return appearanceTheme;
@@ -3302,6 +3303,13 @@ async function deleteInventoryItem(session, id) {
     const result = workbookQueue.then(async () => {
       if (dualStorage) {
         await initializeDatabase();
+        // A device that started offline (or lost the connection) must reconnect here,
+        // otherwise it keeps serving stale local accounts and rejects logins created elsewhere.
+        if (!remoteAvailable && postgresPool && Date.now() - lastRemoteRetryAt > 15000) {
+          lastRemoteRetryAt = Date.now();
+          remoteInitialization = null;
+          await initializeRemoteDatabase().catch(() => {});
+        }
         if (remoteAvailable) await pullRemoteIfNewer().catch(() => { remoteAvailable = false; });
         database.exec("BEGIN IMMEDIATE");
         try {

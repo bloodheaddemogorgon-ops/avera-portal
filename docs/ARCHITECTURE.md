@@ -1,52 +1,26 @@
 # AVeRA Class Portal — Architecture
 
-## Target stack
+## Active local runtime
 
 | Layer | Technology | Responsibility |
 |---|---|---|
-| Web application | Next.js App Router, React, TypeScript | Routing, server-rendered pages, forms, and typed UI |
-| Styling | Tailwind CSS | Utility styling and responsive presentation |
-| Authentication | Supabase Auth | User registration, sign-in, and session management |
-| Relational data | Supabase Database (PostgreSQL) | Profiles, classrooms, classroom membership, learners, grades, attendance, and reading assessments |
-| Files | Supabase Storage | Private learner documents |
-| Reports | jsPDF, html2canvas | Client-side PDF export of rendered report content |
-| Charts | Recharts | Classroom reading-level summaries |
+| Web application | Node.js portal frontends | Teacher, parent, and admin portal pages |
+| API | Node.js HTTP server | Authentication, authorization, and portal operations |
+| Local data | SQLite (`node:sqlite`) | Workbook-backed portal state and synchronization metadata |
+| Reports and records | Existing portal implementation | Attendance, grades, learner records, imports, and exports |
 
-## Request and data flow
+`npm run dev`, `npm start`, `npm run start:legacy`, and the Electron app use this local SQLite runtime by default. Set `SUPABASE_DB_URL` only to intentionally select the legacy PostgreSQL storage mode. `NEXT_PUBLIC_SUPABASE_*` browser settings do not select the active backend.
 
-1. Next.js route components render the login, registration, and dashboard surfaces.
-2. Server actions in `app/actions/` validate submitted form values and perform authenticated Supabase writes.
-3. `lib/supabase/server-client.ts` creates the server-side Supabase client using request cookies.
-4. Root `proxy.ts` refreshes Supabase Auth sessions and propagates updated cookies.
-5. Supabase RLS policies enforce access to every protected row and object; the frontend is not an authorization boundary.
-6. The dashboard reads the signed-in teacher's profile and classroom data. Recharts visualizes reading assessments; jsPDF/html2canvas exports the dashboard.
+The SQLite database defaults to `grade5-portal-database.sqlite` in the project directory. Configure `PORTAL_DATABASE_PATH` to choose another local file path.
 
-## Data model
+## Optional Next.js/Supabase scaffold
 
-The initial schema in `supabase/schema.sql` defines:
+The separate Next.js prototype can still be run explicitly with `npm run dev:next` and is not the default app. It uses Supabase Auth, Database, and Storage through files under `app/`, `lib/supabase/`, and `supabase/`.
 
-- `profiles`, linked to `auth.users`.
-- `classrooms`, owned by a teacher.
-- `classroom_members`, linking classroom users and roles.
-- `students`, optionally linked to a parent profile.
-- `grades`, `attendance`, and `reading_assessments`, each linked to both learner and classroom.
-- A private `student-documents` storage bucket.
-
-The schema uses foreign keys, checks, indexes, helper functions, and RLS policies. Parent-facing reads must use the learner link (`students.parent_id`) and must never grant access to all learners in a classroom merely because a parent is a classroom member.
-
-## Runtime boundaries
-
-- The new web app is the default `dev`, `build`, and `start` runtime.
-- The legacy Node/Electron application remains available through `start:legacy`, `desktop`, and its existing scripts.
-- Legacy records are workbook-backed state in SQLite/PostgreSQL and are not compatible automatically with the new normalized Supabase schema.
-- No migration is complete until an importer is tested with a backup and reconciliation checks against representative legacy data.
-- Browser code may use the Supabase publishable/anon key with RLS. Never place service-role keys, database passwords, or other server secrets in `NEXT_PUBLIC_*` variables.
+The Supabase project is not modified or cleared by switching the active runtime to SQLite. Existing Supabase tables and data remain online.
 
 ## Key locations
 
-- `app/`: Next.js routes and server actions.
-- `components/`: chart and report-export UI.
-- `lib/supabase/`: server-side client and helpers.
-- `proxy.ts`: session refresh proxy.
-- `supabase/schema.sql`: initial relational schema, policies, and storage setup.
-- `server.js`, `portal-*.js`, `desktop/`: retained legacy system.
+- `server.js`, `portal-*.js`, `desktop/`: active local portal backend and clients.
+- `grade5-portal-database.sqlite`: default local database (created/used by the backend).
+- `app/`, `components/`, `lib/supabase/`, `supabase/`: optional Next.js/Supabase prototype.
