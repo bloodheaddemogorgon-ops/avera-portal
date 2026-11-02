@@ -3844,7 +3844,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       :"Connected. Portal records are saved to the configured database.";
     $("syncDataButton").hidden=result.storage!=="dual"||result.sync==="conflict";
     $("syncConflictActions").hidden=!(result.storage==="dual"&&result.sync==="conflict"
-      &&currentUser&&currentUser.isAdmin);
+      &&currentUser&&(currentUser.isAdmin||currentUser.role==="teacher"));
     var canConfigureOnline=result.storage!=="dual"&&window.gradePortal&&typeof window.gradePortal.saveOnlineDatabase==="function";
     $("neonConnectForm").hidden=!canConfigureOnline;
     if(result.storage!=="dual"){
@@ -3854,9 +3854,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     }else if(result.sync==="synced"){
       $("syncDataNotice").textContent="Local and online portal records are synchronized.";
     }else if(result.sync==="conflict"){
-      $("syncDataNotice").textContent=currentUser&&currentUser.isAdmin
+      $("syncDataNotice").textContent=currentUser&&(currentUser.isAdmin||currentUser.role==="teacher")
         ?"A conflict is paused. Review both copies before choosing one."
-        :"Synchronization is paused. Sign in with an administrator account to choose which saved copy to keep. This replaces the other copy.";
+        :"Synchronization is paused. Sign in to choose which saved copy to keep. This replaces the other copy.";
     }else if(result.sync==="offline"){
       $("syncDataNotice").textContent="The online database is unavailable. Local changes are kept and will retry automatically.";
     }else{

@@ -10999,7 +10999,9 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       }
 
       if (request.method === "POST" && url.pathname === "/api/admin/sync/resolve") {
-        requireAdminSession(request);
+        // The desktop app is a single-teacher install, so its teacher owns both copies.
+        if (options.teacherOnly) requireTeacherSession(request);
+        else requireAdminSession(request);
         const { resolution } = await readJson(request);
         if (resolution !== "local" && resolution !== "online") {
           throw new HttpError(400, "Choose a valid synchronization resolution.");
