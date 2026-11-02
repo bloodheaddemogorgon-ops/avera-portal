@@ -10804,7 +10804,11 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       }
       const portalEntry = PORTAL_ENTRY_PATHS.get(url.pathname);
       if (request.method === "GET" && portalEntry) {
-        const html = (await fs.readFile(INDEX_PATH, "utf8")).replace(
+        if (options.teacherOnly && portalEntry !== "main") {
+          sendJson(response, 404, { error: "Page not found." });
+          return;
+        }
+        let html = (await fs.readFile(INDEX_PATH, "utf8")).replace(
           'data-portal-entry="main"',
           `data-portal-entry="${portalEntry}"`,
         ).replace(

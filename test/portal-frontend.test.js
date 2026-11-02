@@ -129,13 +129,8 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
     response.end(JSON.stringify({ status: "ok", storage: "sqlite" }));
   });
   const backendUrl = await listen(backend);
-  const portalUrls = {
-    teacher: "http://teacher.example.test",
-    parents: "http://parents.example.test",
-    admin: "http://admin.example.test",
-  };
   const portals = ["teacher", "parents", "admin"].map((entry) =>
-    createPortalFrontendServer({ entry, backendUrl, portalUrls }),
+    createPortalFrontendServer({ entry, backendUrl }),
   );
 
   try {
@@ -148,6 +143,7 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
       const expectedEntry = entry === "teacher" ? "main" : entry;
       assert.equal(pageResponse.status, 200);
       assert.match(html, new RegExp(`<html lang="en" data-portal-entry="${expectedEntry}">`));
+      assert.doesNotMatch(html, /portal-entry-links|portal-entry-link/);
       assert.doesNotMatch(html, /id="authAccountType"/);
       assert.match(html, /data-mode="up"/);
       if (entry === "admin") {
@@ -155,10 +151,6 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
       } else {
         assert.doesNotMatch(html, /data-mode="up" hidden/);
       }
-      assert.ok(html.includes(`href="${portalUrls.teacher}"`));
-      assert.ok(html.includes(`href="${portalUrls.parents}"`));
-      assert.ok(html.includes(`href="${portalUrls.admin}"`));
-
       const apiResponse = await fetch(`${portalOrigins[index]}/api/health`, {
         headers: { Cookie: `portal_session=${entry}` },
       });
@@ -206,6 +198,7 @@ test("combined portal server routes pages and API entry by path and referer", as
     for (const [route, expected] of [["/", "main"], ["/parents", "parents"], ["/admin", "admin"]]) {
       const html = await (await fetch(`${origin}${route}`)).text();
       assert.match(html, new RegExp(`data-portal-entry="${expected}"`));
+      assert.doesNotMatch(html, /portal-entry-links|portal-entry-link/);
     }
     assert.equal((await fetch(`${origin}/nope`)).status, 404);
     assert.equal((await fetch(`${origin}/admin/extra`)).status, 404);
@@ -224,6 +217,27 @@ test("combined portal server routes pages and API entry by path and referer", as
     assert.equal(apiRequests[0].forwardedProto, "https");
   } finally {
     await Promise.all([portal, backend].map(close));
+  }
+});
+
+test("teacher-only desktop server serves only the teacher portal", async () => {
+  const portal = createServer({ teacherOnly: true });
+  const origin = await listen(portal);
+
+  try {
+    const teacherResponse = await fetch(origin);
+    const teacherHtml = await teacherResponse.text();
+    assert.equal(teacherResponse.status, 200);
+    assert.match(teacherHtml, /data-portal-entry="main"/);
+    assert.doesNotMatch(teacherHtml, /class="portal-entry-link"/);
+
+    for (const route of ["/parents", "/parents.html", "/admin", "/admin.html"]) {
+      const response = await fetch(`${origin}${route}`);
+      assert.equal(response.status, 404, `${route} should not be served by the desktop app`);
+      assert.deepEqual(await response.json(), { error: "Page not found." });
+    }
+  } finally {
+    await close(portal);
   }
 });
 

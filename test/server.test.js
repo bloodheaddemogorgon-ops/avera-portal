@@ -1798,8 +1798,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
     assert.equal(entryResponse.status, 200);
     assert.match(await entryResponse.text(), new RegExp(`<html lang="en" data-portal-entry="${entryName}">`));
   }
-  assert.match(portalPage, /href="\/parents">Parents Portal/);
-  assert.match(portalPage, /href="\/admin">Admin Portal/);
+  assert.doesNotMatch(portalPage, /portal-entry-links|portal-entry-link/);
   assert.match(portalPage, /id="sideBrandLogo" src="\/icon\.png" alt=""/);
   assert.match(portalPage, /class="sidebar-footer-icon" src="\/icon\.png" alt="" aria-hidden="true"/);
   assert.match(portalPage, /#workspace:has\(#eClassPage:not\(\[hidden\]\)\)>\.portal-footer\{display:none\}/);

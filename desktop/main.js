@@ -203,6 +203,7 @@ async function startPortal() {
   require("./environment").loadDesktopEnvironment(app.getPath("userData"));
   const { createServer } = require("../server");
   portalServer = createServer({
+    teacherOnly: true,
     databasePath: path.join(app.getPath("userData"), "grade5-portal-database.sqlite"),
     appearancePreferencesPath: path.join(app.getPath("userData"), "appearance-preferences.json"),
     generatedReportsDirectory: path.join(app.getPath("downloads"), "generated-reports"),

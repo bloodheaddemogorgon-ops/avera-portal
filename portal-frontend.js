@@ -49,25 +49,6 @@ function sendJson(response, status, body) {
   response.end(content);
 }
 
-function escapeHtmlAttribute(value) {
-  return String(value).replace(/[&"<>]/g, (character) => ({
-    "&": "&amp;",
-    "\"": "&quot;",
-    "<": "&lt;",
-    ">": "&gt;",
-  })[character]);
-}
-
-function normalizePortalUrl(value, fallback) {
-  const portalUrl = value || fallback;
-  if (portalUrl.startsWith("/") && !portalUrl.startsWith("//")) return portalUrl;
-  const parsedUrl = new URL(portalUrl);
-  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    throw new Error("Portal URLs must use HTTP or HTTPS.");
-  }
-  return portalUrl;
-}
-
 function getLastHeaderValue(request, headerName) {
   const header = request.headers[headerName];
   const value = Array.isArray(header) ? header.join(",") : header;
@@ -93,30 +74,7 @@ function getRequestEntry(request) {
   return "teacher";
 }
 
-function getPortalUrls(options) {
-  if (options.entry === "all") {
-    return { teacher: "/", parents: "/parents", admin: "/admin" };
-  }
-  const publicHost = process.env.PORTAL_PUBLIC_HOST || "127.0.0.1";
-  const formatHost = publicHost.includes(":") && !publicHost.startsWith("[")
-    ? `[${publicHost}]`
-    : publicHost;
-  const protocol = process.env.PORTAL_TLS_KEY ? "https" : "http";
-  const defaults = Object.fromEntries(
-    Object.entries(DEFAULT_PORTS).map(([entry, port]) => {
-      const configuredPort = Number(process.env[`PORTAL_${entry.toUpperCase()}_PORT`] || port);
-      return [entry, `${protocol}://${formatHost}:${configuredPort}`];
-    }),
-  );
-  const configuredUrls = options.portalUrls || {};
-  return {
-    teacher: normalizePortalUrl(configuredUrls.teacher || process.env.PORTAL_TEACHER_URL, defaults.teacher),
-    parents: normalizePortalUrl(configuredUrls.parents || process.env.PORTAL_PARENTS_URL, defaults.parents),
-    admin: normalizePortalUrl(configuredUrls.admin || process.env.PORTAL_ADMIN_URL, defaults.admin),
-  };
-}
-
-function renderPortalPage(entry, portalUrls) {
+function renderPortalPage(entry) {
   const htmlEntry = PORTAL_ENTRIES.get(entry);
   if (!htmlEntry) throw new Error(`Unknown portal entry: ${entry}`);
   return fsPromises.readFile(INDEX_PATH, "utf8").then((source) => {
@@ -124,18 +82,6 @@ function renderPortalPage(entry, portalUrls) {
       'data-portal-entry="main"',
       `data-portal-entry="${htmlEntry}"`,
     );
-    const destinations = {
-      main: portalUrls.teacher,
-      parents: portalUrls.parents,
-      admin: portalUrls.admin,
-    };
-    for (const [linkEntry, destination] of Object.entries(destinations)) {
-      const escapedUrl = escapeHtmlAttribute(destination);
-      const linkPattern = new RegExp(
-        `(<a class="portal-entry-link" data-entry="${linkEntry}" href=")[^"]*(")`,
-      );
-      html = html.replace(linkPattern, (match, prefix, suffix) => `${prefix}${escapedUrl}${suffix}`);
-    }
     if (entry === "admin") {
       html = html.replace(
         '<button class="tab" role="tab" data-mode="up"',
@@ -207,7 +153,6 @@ function createPortalFrontendServer(options = {}) {
   if (backendUrl.protocol !== "http:" && backendUrl.protocol !== "https:") {
     throw new Error("PORTAL_API_URL must use HTTP or HTTPS.");
   }
-  const portalUrls = getPortalUrls(options);
   const tlsKeyPath = options.tlsKeyPath || process.env.PORTAL_TLS_KEY || null;
   const tlsCertPath = options.tlsCertPath || process.env.PORTAL_TLS_CERT || null;
   if ((tlsKeyPath && !tlsCertPath) || (!tlsKeyPath && tlsCertPath)) {
@@ -228,7 +173,7 @@ function createPortalFrontendServer(options = {}) {
         ? Boolean(pageEntry) && url.pathname.split("/").length <= 2
         : entryPaths.has(url.pathname);
       if (request.method === "GET" && isPage) {
-        const html = await renderPortalPage(pageEntry, portalUrls);
+        const html = await renderPortalPage(pageEntry);
         const content = Buffer.from(html);
         response.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",

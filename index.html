@@ -1284,10 +1284,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 .student-parent-link-controls select{width:100%;min-height:44px;padding:8px 34px 8px 11px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit}
 .student-parent-link-controls .btn{width:auto;margin:0}
 .student-parent-link-help{margin:8px 0 0;color:var(--muted);font-size:.82rem}
-.portal-entry-links{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:2px 0 18px;font-size:.8rem}
-.portal-entry-links a{padding:7px 10px;border:1px solid var(--line);border-radius:9px;color:var(--accent);font-weight:700;text-decoration:none}
-.portal-entry-links a:hover,.portal-entry-links a[aria-current="page"]{background:var(--soft)}
-body.portal-active .portal-entry-links{display:none}
 @media(max-width:800px){.student-detail-group .details-grid{grid-template-columns:1fr 1fr}.student-detail-head{flex-wrap:wrap}}
 @media(max-width:700px){.student-identity .student-sub{display:block}.roster-toolbar{padding:10px 14px}}
 .empty-state{padding:40px 22px}
@@ -1849,11 +1845,6 @@ body.portal-active .portal-entry-links{display:none}
       <p class="msg" style="display:block; margin-top:16px; color:var(--err);">JavaScript is required to load this portal.</p>
     </noscript>
   </section>
-  <nav class="portal-entry-links" aria-label="Choose a portal">
-    <a class="portal-entry-link" data-entry="main" href="/">Classroom Portal</a>
-    <a class="portal-entry-link" data-entry="parents" href="/parents">Parents Portal</a>
-    <a class="portal-entry-link" data-entry="admin" href="/admin">Admin Portal</a>
-  </nav>
   <div id="portal" class="portal-view" hidden>
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Main menu">
@@ -3763,10 +3754,6 @@ body.portal-active .portal-entry-links{display:none}
     document.querySelector(".brand h1 span").textContent=portalName;
     document.querySelector(".brand h1 span").setAttribute("aria-label",portalName);
     document.querySelector(".brand-acronym").hidden=entryType!=="main";
-    document.querySelectorAll(".portal-entry-link").forEach(function(link){
-      if(link.dataset.entry===entryType)link.setAttribute("aria-current","page");
-      else link.removeAttribute("aria-current");
-    });
     $("tagline").textContent=isParentsEntry
       ?"Sign in to view your child's learning."
       :isAdminEntry
