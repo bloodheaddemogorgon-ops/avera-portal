@@ -67,10 +67,11 @@ const releaseDir = path.join(root, "release");
 const assets = fs.readdirSync(releaseDir)
   .filter((name) => name.includes(version) && (name.endsWith(".exe") || name.endsWith(".blockmap")))
   .concat(fs.existsSync(path.join(releaseDir, "latest.yml")) ? ["latest.yml"] : [])
+  .concat(fs.existsSync(path.join(releaseDir, "latest-ia32.yml")) ? ["latest-ia32.yml"] : [])
   .map((name) => path.join(releaseDir, name));
 
-if (!assets.some((file) => file.endsWith("latest.yml")) || !assets.some((file) => file.endsWith(".exe"))) {
-  console.error("Build output is missing the installer or latest.yml.");
+if (!assets.some((file) => file.endsWith("latest.yml")) || !assets.some((file) => file.endsWith("latest-ia32.yml")) || !assets.some((file) => file.endsWith(".exe"))) {
+  console.error("Build output is missing an installer or architecture update metadata.");
   process.exit(1);
 }
 

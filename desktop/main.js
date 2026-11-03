@@ -165,6 +165,7 @@ function getAutoUpdater() {
   ({ autoUpdater } = require("electron-updater"));
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.channel = process.arch === "ia32" ? "latest-ia32" : "latest";
   autoUpdater.on("update-available", (info) => sendUpdateStatus({ state: "available", version: info.version }));
   autoUpdater.on("update-not-available", () => sendUpdateStatus({ state: "current", version: app.getVersion() }));
   autoUpdater.on("download-progress", (progress) => sendUpdateStatus({ state: "downloading", percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total }));
