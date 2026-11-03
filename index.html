@@ -1946,7 +1946,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         <div class="sidebar-bottom">
           <button class="logout-link" type="button" data-logout>Sign out</button>
           <img class="sidebar-footer-icon" src="/icon.png" alt="" aria-hidden="true">
-          <span class="sidebar-footer-version">GraceDesk · Version 1.0.44</span>
+          <span class="sidebar-footer-version">GraceDesk · Version 1.0.45</span>
         </div>
       </aside>
       <button class="sidebar-scrim" id="sidebarScrim" type="button" aria-label="Close menu"></button>
@@ -3205,6 +3205,11 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                   <h2 id="localDataTitle">Local data</h2>
                   <p>Your classroom records and accounts are saved in this device's local database. No online database is connected.</p>
                 </div>
+                <div class="settings-card-body">
+                  <button type="button" class="btn-secondary" id="createDataBackupButton">Create backup now</button>
+                  <p class="notice" id="dataBackupNotice" role="status" aria-live="polite"></p>
+                  <p class="field-hint" id="dataBackupStatus">Checking local backup history…</p>
+                </div>
               </section>
               <section class="data-card settings-card settings-card-wide" aria-labelledby="developerUpdatesTitle">
                 <div class="settings-card-header">
@@ -3212,8 +3217,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.44</p>
+                  <p class="developer-update-meta">Version 1.0.45</p>
                   <ul class="developer-update-list">
+                    <li>Local account, classroom, grade, E-Class, MPS, attendance and settings data now use one protected device storage location.</li>
+                    <li>Automatic rotating backups are created at startup, every six hours, and before an update download or installation.</li>
+                    <li>Missing or damaged database files can recover automatically from the newest valid local backup or a recognized legacy database.</li>
+                    <li>Settings now allows users to create a backup immediately and view the latest successful backup status.</li>
                     <li>Classroom records, accounts and settings are now saved locally on this device through SQLite.</li>
                     <li>The online database and automatic cloud account synchronization have been removed from the active portal.</li>
                     <li>App updates remain available through the secure GitHub release installer.</li>
@@ -10971,6 +10980,42 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         setMode("check","Update");
       }
     };
+  })();
+  (function(){
+    var desktop=window.gradePortal;
+    var button=$("createDataBackupButton");
+    var notice=$("dataBackupNotice");
+    var status=$("dataBackupStatus");
+    if(!desktop||!desktop.createDataBackup||!button)return;
+    async function refreshBackups(){
+      try{
+        var backups=await desktop.listDataBackups();
+        if(backups&&backups.length){
+          var latest=new Date(backups[0].createdAt);
+          status.textContent="Latest backup: "+latest.toLocaleString()+" · "+backups.length+" backup copy/copies retained";
+        }else{
+          status.textContent="No backup copy is available yet.";
+        }
+      }catch(error){
+        status.textContent="Backup status could not be read.";
+      }
+    }
+    button.onclick=async function(){
+      button.disabled=true;
+      notice.classList.remove("error");
+      notice.textContent="Creating a local backup…";
+      try{
+        await desktop.createDataBackup();
+        notice.textContent="Backup created successfully in the protected local backup folder.";
+        await refreshBackups();
+      }catch(error){
+        notice.classList.add("error");
+        notice.textContent="Backup failed: "+error.message;
+      }finally{
+        button.disabled=false;
+      }
+    };
+    refreshBackups();
   })();
   $("performanceModeToggle").onclick=function(){
     applyPerformanceMode(!performanceModeEnabled);

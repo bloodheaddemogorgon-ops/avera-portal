@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("gradePortal", {
   getUpdateState: () => ipcRenderer.invoke("update-state"),
   downloadUpdate: () => ipcRenderer.invoke("update-download"),
   installUpdate: () => ipcRenderer.invoke("update-install"),
+  createDataBackup: () => ipcRenderer.invoke("backup-create"),
+  listDataBackups: () => ipcRenderer.invoke("backup-list"),
   onUpdateStatus: (callback) => {
     const listener = (_event, status) => callback(status);
     ipcRenderer.on("update-status", listener);

@@ -3,10 +3,21 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
+const {
+  createDatabaseBackup,
+  restoreBestDatabase,
+  listDatabaseBackups,
+} = require("./data-protection");
 
-// Keep using the former app-data folder so existing local portal records remain available.
-const legacyUserDataPath = path.join(app.getPath("appData"), "AVeRA");
-if (require("node:fs").existsSync(legacyUserDataPath)) app.setPath("userData", legacyUserDataPath);
+// Use one stable data folder for accounts and academic records. It is never under
+// the installed application directory, so package replacement cannot erase data.
+const canonicalDataDirectory = path.join(app.getPath("appData"), "grade5-class-portal");
+const databasePath = path.join(canonicalDataDirectory, "grade5-portal-database.sqlite");
+const backupDirectory = path.join(canonicalDataDirectory, "backups");
+const legacyDatabasePaths = [
+  path.join(app.getPath("appData"), "AVeRA", "grade5-portal-database.sqlite"),
+  path.join(app.getPath("userData"), "grade5-portal-database.sqlite"),
+];
 
 let portalServer;
 let portalUrl;
@@ -182,6 +193,7 @@ ipcMain.handle("update-download", async (event) => {
   if (updateBusy) return { state: "busy" };
   updateBusy = true;
   try {
+    await createDatabaseBackup({ databasePath, backupDirectory });
     await getAutoUpdater().downloadUpdate();
     return { state: "downloaded" };
   } finally {
@@ -194,7 +206,9 @@ ipcMain.handle("update-install", (event) => {
   if (!app.isPackaged) return;
   setImmediate(() => {
     portalServer?.closeAllConnections?.();
-    getAutoUpdater().quitAndInstall(true, true);
+    void createDatabaseBackup({ databasePath, backupDirectory }).finally(() => {
+      getAutoUpdater().quitAndInstall(true, true);
+    });
   });
 });
 
@@ -203,12 +217,30 @@ ipcMain.handle("app-version", (event) => {
   return app.getVersion();
 });
 
+ipcMain.handle("backup-list", async (event) => {
+  assertTrustedSender(event);
+  return listDatabaseBackups({ databasePath, backupDirectory });
+});
+
+ipcMain.handle("backup-create", async (event) => {
+  assertTrustedSender(event);
+  const result = await createDatabaseBackup({ databasePath, backupDirectory });
+  if (!result.created) throw new Error("No usable local database is available to back up.");
+  return result;
+});
+
 async function startPortal() {
+  await restoreBestDatabase({ databasePath, backupDirectory, legacyDatabasePaths });
+  await createDatabaseBackup({ databasePath, backupDirectory });
+  setInterval(() => {
+    void createDatabaseBackup({ databasePath, backupDirectory });
+  }, 6 * 60 * 60 * 1000).unref();
+
   const { createServer } = require("../server");
   portalServer = createServer({
     teacherOnly: true,
-    databasePath: path.join(app.getPath("userData"), "grade5-portal-database.sqlite"),
-    appearancePreferencesPath: path.join(app.getPath("userData"), "appearance-preferences.json"),
+    databasePath,
+    appearancePreferencesPath: path.join(canonicalDataDirectory, "appearance-preferences.json"),
     generatedReportsDirectory: path.join(app.getPath("downloads"), "generated-reports"),
     logFilePath: path.join(app.getPath("logs"), "portal-server.log"),
   });
