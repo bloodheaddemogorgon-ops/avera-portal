@@ -1,7 +1,7 @@
 "use strict";
 
 // Single-service hosting: the API listens on loopback only; one public server hosts only
-// the Parents Portal (/ and /parents) and proxies /api to the API. Teacher and admin pages are not served online.
+// the Parents Portal (/ and /parents) and proxies /api to the API. The Teacher page is local-only.
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 
@@ -17,16 +17,12 @@ function stop(code) {
   for (const child of children) if (child.exitCode === null) child.kill();
 }
 
-function start(script, args, env, keepSecrets) {
+function start(script, args, env) {
   const childEnv = { ...process.env, ...env };
   delete childEnv.SUPABASE_DB_URL;
   delete childEnv.DATABASE_URL;
   delete childEnv.PORTAL_STORAGE_MODE;
   delete childEnv.NEON_AUTH_URL;
-  if (!keepSecrets) {
-    delete childEnv.ADMIN_EMAIL;
-    delete childEnv.ADMIN_PASSWORD;
-  }
   const child = spawn(process.execPath, [path.join(__dirname, script), ...args], {
     env: childEnv,
     stdio: "inherit",
@@ -42,10 +38,10 @@ function start(script, args, env, keepSecrets) {
 
 process.on("SIGINT", () => stop(0));
 process.on("SIGTERM", () => stop(0));
-start("server.js", ["--api"], { PORT: API_PORT, HOST: "127.0.0.1" }, true);
+start("server.js", ["--api"], { PORT: API_PORT, HOST: "127.0.0.1" });
 start("portal-frontend.js", ["parents"], {
   PORTAL_PARENTS_PORT: publicPort,
   HOST: "0.0.0.0",
   PORTAL_API_URL: `http://127.0.0.1:${API_PORT}`,
   PORTAL_TRUST_PROXY: "true",
-}, false);
+});

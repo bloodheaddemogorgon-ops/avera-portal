@@ -15,7 +15,6 @@ const APP_VERSION = require("./package.json").version;
 const PORTAL_ENTRIES = new Map([
   ["teacher", "main"],
   ["parents", "parents"],
-  ["admin", "admin"],
 ]);
 const STATIC_ASSETS = new Map([
   ["/icon.png", { filename: "icon.png", contentType: "image/png" }],
@@ -35,7 +34,6 @@ const HOP_BY_HOP_HEADERS = new Set([
 const DEFAULT_PORTS = {
   teacher: 3004,
   parents: 3005,
-  admin: 3006,
 };
 
 function sendJson(response, status, body) {
@@ -61,7 +59,7 @@ function getEntryFromPath(pathname) {
   const segment = pathname.split("/")[1] || "";
   const name = segment.replace(/\.html$/, "");
   if (name === "" || name === "index" || name === "teacher") return "teacher";
-  return name === "parents" || name === "admin" ? name : null;
+  return name === "parents" ? name : null;
 }
 
 function getRequestEntry(request) {
@@ -82,12 +80,6 @@ function renderPortalPage(entry) {
       'data-portal-entry="main"',
       `data-portal-entry="${htmlEntry}"`,
     );
-    if (entry === "admin") {
-      html = html.replace(
-        '<button class="tab" role="tab" data-mode="up"',
-        '<button class="tab" role="tab" data-mode="up" hidden',
-      );
-    }
     return html.replace(
       /(<span class="sidebar-footer-version">GraceDesk · Version )[^<]*(<\/span>)/,
       `$1${APP_VERSION}$2`,
@@ -144,7 +136,7 @@ function proxyApiRequest(request, response, backendUrl, entry, trustProxy) {
 function createPortalFrontendServer(options = {}) {
   const entry = options.entry;
   if (entry !== "all" && !PORTAL_ENTRIES.has(entry)) {
-    throw new Error("PORTAL_ENTRY must be teacher, parents, admin, or all.");
+    throw new Error("PORTAL_ENTRY must be teacher, parents, or all.");
   }
   const trustProxy = options.trustProxy ?? process.env.PORTAL_TRUST_PROXY === "true";
   const rawBackendUrl = options.backendUrl || process.env.PORTAL_API_URL || "http://127.0.0.1:3003";
@@ -228,7 +220,7 @@ if (require.main === module) {
   const isLoopbackHost = ["127.0.0.1", "localhost", "::1"].includes(host);
 
   if (entry !== "all" && !PORTAL_ENTRIES.has(entry)) {
-    console.error("Choose a frontend server: teacher, parents, admin, or all.");
+    console.error("Choose a frontend server: teacher, parents, or all.");
     process.exitCode = 1;
   } else if (!Number.isInteger(port) || port < 1 || port > 65535) {
     console.error(`Invalid ${entry} portal port: ${process.env[`PORTAL_${entryName}_PORT`]}`);

@@ -2,10 +2,6 @@
 
 const dotenv = require("dotenv");
 dotenv.config();
-if (process.env.PORTAL_ADMIN_SECRET_FILE) {
-  const secretEnv = dotenv.config({ path: process.env.PORTAL_ADMIN_SECRET_FILE });
-  if (secretEnv.error) throw new Error("Could not load the configured administrator secret file.");
-}
 
 const { AsyncLocalStorage } = require("node:async_hooks");
 const crypto = require("node:crypto");
@@ -70,8 +66,6 @@ const PORTAL_ENTRY_PATHS = new Map([
   ["/index.html", "main"],
   ["/parents", "parents"],
   ["/parents.html", "parents"],
-  ["/admin", "admin"],
-  ["/admin.html", "admin"],
 ]);
 const APP_VERSION = require("./package.json").version;
 const MAX_SF1_FILE_BYTES = 10 * 1024 * 1024;
@@ -362,7 +356,7 @@ const SF2_MARK_BY_STATUS = new Map([
 const PASSWORD_ITERATIONS = 210000;
 const PASSWORD_BYTES = 32;
 const SESSION_COOKIE = "grade5_session";
-const PORTAL_SESSION_ENTRIES = new Set(["teacher", "parents", "admin"]);
+const PORTAL_SESSION_ENTRIES = new Set(["teacher", "parents"]);
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 const GRADE_TERMS = ["Term 1", "Term 2", "Term 3"];
 const READING_PERIODS = ["BOSY", "MOSY", "EOSY"];
@@ -1893,6 +1887,10 @@ function openPortalDatabase(databasePath) {
     database.exec("PRAGMA journal_mode = WAL;");
     database.exec(`
       PRAGMA foreign_keys = ON;
+      PRAGMA synchronous = NORMAL;
+      PRAGMA cache_size = -16000;
+      PRAGMA temp_store = MEMORY;
+      PRAGMA mmap_size = 67108864;
       CREATE TABLE IF NOT EXISTS portal_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         schema_version INTEGER NOT NULL,
@@ -2129,6 +2127,42 @@ function validateStudent(data) {
   return { ...student, birthdate };
 }
 
+function validateSF1Student(data, syntheticLrn, rawBirthdateValue = "") {
+  const student = {};
+  for (const [key, label] of STUDENT_FIELDS) {
+    if (key === "teacherUserId") continue;
+    const value = data[key];
+    student[key] = typeof value === "string" ? value.trim() : "";
+    if (student[key].length > 200) {
+      throw new HttpError(400, `${label} must be 200 characters or fewer.`);
+    }
+  }
+
+  const digitsOnly = student.lrn.replace(/\D/g, "");
+  student.lrn = digitsOnly ? digitsOnly.padStart(12, "0").slice(-12) : syntheticLrn;
+  if (!student.lastName && !student.firstName) {
+    throw new HttpError(400, "The learner row has no usable name.");
+  }
+  if (!student.lastName) student.lastName = student.firstName;
+  if (!student.firstName) student.firstName = student.lastName;
+  if (student.gender && !["Male", "Female"].includes(student.gender)) {
+    throw new HttpError(400, "Choose Male or Female for gender.");
+  }
+  if (!student.gender) student.gender = "";
+
+  if (rawBirthdateValue && !student.birthdate) {
+    throw new HttpError(400, "Enter a valid birthdate.");
+  }
+  if (student.birthdate) {
+    const birthdate = new Date(`${student.birthdate}T00:00:00.000Z`);
+    if (Number.isNaN(birthdate.getTime()) || birthdate.toISOString().slice(0, 10) !== student.birthdate
+      || birthdate > new Date(new Date().toISOString().slice(0, 10))) {
+      throw new HttpError(400, "Enter a valid birthdate.");
+    }
+  }
+  return student;
+}
+
 function validateGradeTerm(value) {
   if (!GRADE_TERMS.includes(value)) {
     throw new HttpError(400, "Choose a valid term (Term 1 through Term 3).");
@@ -2246,12 +2280,35 @@ function parseSF1Workbook(buffer) {
       throw new HttpError(400, "The SF1 sheet has too many rows to import.");
     }
 
-    const headerIndex = rows.slice(0, 30).findIndex((row) =>
-      sf1CellText(row[0]).toLowerCase() === "lrn"
-      && sf1CellText(row[2]).toLowerCase().startsWith("name")
-      && sf1CellText(row[6]).toLowerCase().includes("sex")
-      && sf1CellText(row[7]).toLowerCase().includes("birth"),
-    );
+    let headerIndex = -1;
+    let headerColumnsMap = null;
+    for (let rowIndex = 0; rowIndex < Math.min(rows.length, 100); rowIndex += 1) {
+      const row = rows[rowIndex];
+      const normalizedHeaders = row.map((value) => normalizeHeader(sf1CellText(value)));
+      const findHeader = (patterns) => normalizedHeaders.findIndex((header) =>
+        patterns.some((pattern) => header.includes(pattern)));
+      const lrnColumn = findHeader(["lrn", "learnerreferencenumber"]);
+      const nameColumn = findHeader(["name", "learner"]);
+      if (lrnColumn < 0 || nameColumn < 0) continue;
+      headerIndex = rowIndex;
+      headerColumnsMap = {
+        lrn: lrnColumn,
+        name: nameColumn,
+        lastName: findHeader(["lastname", "surname", "apelyido"]),
+        firstName: findHeader(["firstname", "givenname"]),
+        middleName: findHeader(["middlename", "middleinitial"]),
+        gender: findHeader(["sex", "gender"]),
+        birthdate: findHeader(["birthdate", "dateofbirth", "dob"]),
+        motherTongue: findHeader(["mothertongue", "mother tongue"]),
+        ethnicity: findHeader(["ethnic", "ip"]),
+        religion: findHeader(["religion"]),
+        address: findHeader(["address", "residence"]),
+        father: findHeader(["father", "fathername"]),
+        mother: findHeader(["mothersmaiden", "mothermaiden", "motherfullname"]),
+        guardianRelationship: findHeader(["guardianrelationship", "guardian"]),
+      };
+      break;
+    }
     if (headerIndex < 0) continue;
 
     const readHeaderValue = (pattern, scanDistance) => {
@@ -2273,16 +2330,57 @@ function parseSF1Workbook(buffer) {
       }
       return "";
     };
+    const readMetadataValue = (patterns) => {
+      for (let rowIndex = 0; rowIndex < headerIndex; rowIndex += 1) {
+        const row = rows[rowIndex];
+        for (let column = 0; column < row.length; column += 1) {
+          const text = sf1CellText(row[column]).replace(/\s+/g, " ").trim();
+          if (!text) continue;
+          const normalized = normalizeHeader(text);
+          const matchedPattern = patterns.find((pattern) => normalized === pattern || normalized.startsWith(pattern));
+          if (!matchedPattern) continue;
+
+          const colonOrEquals = text.match(/^(?:[^:=]+)?[:=]\s*(.+)$/);
+          if (colonOrEquals && colonOrEquals[1].trim()) return colonOrEquals[1].trim();
+          if (/^(?:Region|Division|District)\b/i.test(text)) return text.trim();
+          const inlineLabel = text.match(/^(?:School Year|Name of School|School Name|School ID|Region|Division|District)\s*[:=-]?\s*(.+)$/i);
+          if (inlineLabel && inlineLabel[1].trim()
+            && !/^(School Year|Name of School|School Name|School ID|Region|Division|District)$/i.test(inlineLabel[1].trim())) {
+            return inlineLabel[1].trim();
+          }
+          const labelMatch = text.match(/^[A-Za-z][A-Za-z\s.&()-]*?(?:School Year|School Name|Name of School|School ID|Region|Division|District|Grade Level|Section)\s+(.+)$/i);
+          if (labelMatch && labelMatch[1].trim()) return labelMatch[1].trim();
+
+          for (let nextColumn = column + 1; nextColumn < row.length; nextColumn += 1) {
+            const candidate = sf1CellText(row[nextColumn]).replace(/\s+/g, " ").trim();
+            if (candidate) return candidate;
+          }
+          for (let nextRow = rowIndex + 1; nextRow < headerIndex; nextRow += 1) {
+            const candidate = sf1CellText(rows[nextRow][column]).replace(/\s+/g, " ").trim();
+            if (candidate) return candidate;
+          }
+        }
+      }
+      return "";
+    };
     const sectionName = readHeaderValue(/section(?:\s*[:=-]\s*|\s+)?(.*)$/i, 10);
     const grade = readHeaderValue(/grade\s*level(?:\s*[:=-]\s*|\s+)?(.*)$/i, 10);
+    const schoolYear = readMetadataValue(["schoolyear"]);
+    const schoolName = readMetadataValue(["nameofschool", "schoolname"]);
+    const schoolId = readMetadataValue(["schoolid"]);
+    const region = readMetadataValue(["region"]);
+    const division = readMetadataValue(["division"]);
+    const district = readMetadataValue(["district"]);
     const students = [];
     const skipped = [];
+    let syntheticLrnCounter = 900000000000;
     const addIssue = (rowNumber, reason) => skipped.push({ row: rowNumber, reason });
 
     for (let index = headerIndex + 1; index < rows.length; index += 1) {
       const row = rows[index];
-      const lrnValue = sf1CellText(row[0]).replace(/^'/, "");
-      const rawName = sf1CellText(row[2]);
+      const column = headerColumnsMap;
+      const lrnValue = sf1CellText(row[column.lrn]).replace(/^'/, "").trim();
+      const rawName = sf1CellText(row[column.name]).trim();
       if (/^<={2,}/.test(rawName) || /^TOTAL\b/i.test(rawName)) continue;
       if (!rawName && !/^\d{1,12}$/.test(lrnValue)) continue;
       if (!lrnValue && !rawName) continue;
@@ -2290,34 +2388,72 @@ function parseSF1Workbook(buffer) {
         throw new HttpError(400, `The SF1 file contains more than ${MAX_SF1_STUDENTS} student rows.`);
       }
 
-      const nameParts = rawName.split(",").map((part) => part.trim());
-      const genderValue = sf1CellText(row[6]).toLowerCase();
-      const address = row.slice(15, 26).map(sf1CellText).filter(Boolean).join(", ");
+      const nameParts = rawName ? rawName.split(",").map((part) => part.trim()).filter(Boolean) : [];
+      let lastName = column.lastName >= 0 ? sf1CellText(row[column.lastName]).trim() : "";
+      let firstName = column.firstName >= 0 ? sf1CellText(row[column.firstName]).trim() : "";
+      let middleName = column.middleName >= 0 ? sf1CellText(row[column.middleName]).trim() : "";
+      if (nameParts.length > 1) {
+        lastName = nameParts[0];
+        firstName = nameParts[1];
+        middleName = nameParts.slice(2).filter((part) => part !== "-" && part !== "—").join(" ");
+      } else if (!lastName && !firstName && rawName) {
+        const words = rawName.split(/\s+/).filter(Boolean);
+        if (words.length === 1) {
+          lastName = words[0];
+          firstName = words[0];
+        } else {
+          lastName = words[0];
+          firstName = words.slice(1).join(" ");
+        }
+      }
+      const genderValue = column.gender >= 0 ? sf1CellText(row[column.gender]).trim().toLowerCase() : "";
+      const address = column.address >= 0
+        ? row.slice(column.address, Math.min(column.address + 10, row.length)).map(sf1CellText).filter(Boolean).join(", ")
+        : row.slice(15, 26).map(sf1CellText).filter(Boolean).join(", ");
+      const syntheticLrn = String(syntheticLrnCounter++);
+      const rawBirthdateValue = column.birthdate >= 0
+        ? sf1CellText(row[column.birthdate])
+        : "";
       const student = {
         lrn: /^\d+$/.test(lrnValue) ? lrnValue.padStart(12, "0") : lrnValue,
-        lastName: nameParts.length > 1 ? nameParts[0] : "",
-        firstName: nameParts.length > 1 ? nameParts[1] : "",
-        middleName: nameParts.slice(2).filter((part) => part !== "-" && part !== "—").join(" "),
-        gender: genderValue === "m" ? "Male" : genderValue === "f" ? "Female" : row[6],
-        birthdate: parseSF1Birthdate(row[7]),
-        motherTongue: sf1CellText(row[11]),
-        ethnicities: sf1CellText(row[13]),
-        religion: sf1CellText(row[14]),
+        lastName,
+        firstName,
+        middleName,
+        gender: genderValue === "m" || genderValue === "male" ? "Male"
+          : genderValue === "f" || genderValue === "female" ? "Female" : genderValue,
+        birthdate: column.birthdate >= 0 ? parseSF1Birthdate(row[column.birthdate]) : "",
+        motherTongue: column.motherTongue >= 0 ? sf1CellText(row[column.motherTongue]) : "",
+        ethnicities: column.ethnicity >= 0 ? sf1CellText(row[column.ethnicity]) : "",
+        religion: column.religion >= 0 ? sf1CellText(row[column.religion]) : "",
         currentResidence: address,
-        father: sf1CellText(row[27]),
-        mothersMaidenName: sf1CellText(row[31]),
-        guardianRelationship: sf1CellText(row[40]),
+        father: column.father >= 0 ? sf1CellText(row[column.father]) : sf1CellText(row[27]),
+        mothersMaidenName: column.mother >= 0 ? sf1CellText(row[column.mother]) : sf1CellText(row[31]),
+        guardianRelationship: column.guardianRelationship >= 0 ? sf1CellText(row[column.guardianRelationship]) : sf1CellText(row[40]),
       };
 
       try {
-        students.push({ row: index + 1, student: validateStudent(student) });
+        students.push({
+          row: index + 1,
+          student: validateSF1Student(student, syntheticLrn, rawBirthdateValue),
+        });
       } catch (error) {
         if (!(error instanceof HttpError)) throw error;
         addIssue(index + 1, error.message);
       }
     }
 
-    return { students, skipped, sectionName, grade };
+    return {
+      students,
+      skipped,
+      sectionName,
+      grade,
+      schoolYear,
+      schoolName,
+      schoolId,
+      region,
+      division,
+      district,
+    };
   }
 
   throw new HttpError(400, "No SF1 student register was found. Use the SF1 template with LRN, NAME, Sex, and BIRTH DATE columns.");
@@ -2466,22 +2602,6 @@ function createServer(options = {}) {
   const postgresPool = null;
   const storage = "sqlite";
   const neonAuthUrl = "";
-  const bootstrapAdminEmail = typeof options.bootstrapAdminEmail === "string"
-    ? options.bootstrapAdminEmail.trim().toLowerCase()
-    : "";
-  const bootstrapAdminPassword = typeof options.bootstrapAdminPassword === "string"
-    ? options.bootstrapAdminPassword
-    : "";
-  if (Boolean(bootstrapAdminEmail) !== Boolean(bootstrapAdminPassword)) {
-    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must both be configured to bootstrap an administrator.");
-  }
-  if (bootstrapAdminEmail
-    && (!/^\S+@\S+\.\S+$/.test(bootstrapAdminEmail)
-      || bootstrapAdminEmail.length > 254
-      || bootstrapAdminPassword.length < 6
-      || bootstrapAdminPassword.length > 256)) {
-    throw new Error("The configured bootstrap administrator credentials are invalid.");
-  }
   const transactionContext = new AsyncLocalStorage();
   const profilePhotoDirectories = databasePath === DEFAULT_DATABASE_PATH
     ? [
@@ -2499,7 +2619,6 @@ function createServer(options = {}) {
   const authRateLimiter = options.authRateLimiter || createAuthRateLimiter();
   let database = null;
   let databaseInitialization = null;
-  let bootstrapAdminInitialization = null;
   let remoteInitialization = null;
   let appearanceTheme = null;
   let syncTimer = null;
@@ -3415,61 +3534,6 @@ async function deleteInventoryItem(session, id) {
     return result;
   }
 
-  function ensureBootstrapAdmin() {
-    if (!bootstrapAdminEmail) return Promise.resolve();
-    if (bootstrapAdminInitialization) return bootstrapAdminInitialization;
-    const initialization = serializeWorkbook(async () => {
-      const workbook = await readDatabaseWorkbook();
-      const { sheet, columns } = getUserSheet(workbook);
-      let row = findUser(sheet, columns, bootstrapAdminEmail);
-      if (row && cellText(row.getCell(columns.role).value).toLowerCase() !== "teacher") {
-        throw new Error("The configured bootstrap administrator must use a teacher account.");
-      }
-      if (row && cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true") {
-        return;
-      }
-      if (row && cellText(row.getCell(columns.status).value).toLowerCase() !== "active") {
-        throw new Error("The configured bootstrap administrator account is inactive.");
-      }
-      if (row) {
-        throw new Error(
-          "The configured bootstrap email belongs to an existing non-administrator account. "
-          + "Bootstrap credentials were not allowed to overwrite or convert that account.",
-        );
-      }
-
-      const passwordHash = await hashAdminPassword(bootstrapAdminPassword);
-      if (!row) {
-        const values = [];
-        values[columns.id] = nextUserId(sheet, columns.id, "teacher");
-        values[columns.role] = "Teacher";
-        values[columns.name] = "Administrator";
-        values[columns.email] = bootstrapAdminEmail;
-        values[columns.password] = passwordHash;
-        values[columns.classId] = "";
-        values[columns.status] = "Active";
-        values[columns.created] = new Date();
-        values[columns.signIns] = 0;
-        values[columns.emailCheck] = "OK";
-        values[columns.adminAccess] = "true";
-        values[columns.mustChangePassword] = "true";
-        row = writeRow(sheet, [columns.id, columns.email], values);
-      } else {
-        row.getCell(columns.password).value = passwordHash;
-        row.getCell(columns.adminAccess).value = "true";
-        row.getCell(columns.mustChangePassword).value = "true";
-      }
-      setPasswordDocumentation(workbook, columns.password);
-      await saveDatabaseWorkbook(workbook);
-      console.info("The configured administrator account is ready and must change its temporary password.");
-    });
-    bootstrapAdminInitialization = initialization.catch((error) => {
-      bootstrapAdminInitialization = null;
-      throw error;
-    });
-    return bootstrapAdminInitialization;
-  }
-
   async function checkWorkbook() {
     const workbook = await readDatabaseWorkbook();
     getUserSheet(workbook);
@@ -3559,7 +3623,7 @@ async function deleteInventoryItem(session, id) {
         return;
       }
 
-      storedSession.isAdmin = cellText(accountRow.getCell(columns.adminAccess).value).toLowerCase() === "true";
+      storedSession.isAdmin = false;
       storedSession.mustChangePassword =
         cellText(accountRow.getCell(columns.mustChangePassword).value).toLowerCase() === "true";
       storedSession.adminName = cellText(accountRow.getCell(columns.name).value) || storedSession.adminName;
@@ -3981,6 +4045,17 @@ async function deleteInventoryItem(session, id) {
 
       const storedPassword = cellText(row.getCell(columns.password).value);
       const isAdminAccount = cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true";
+      if (isAdminAccount) {
+        logSignIn(workbook, {
+          email: account.email,
+          role: account.role,
+          result: "Failed",
+          userId,
+          note: "Administrator access removed",
+        });
+        await saveDatabaseWorkbook(workbook);
+        throw new HttpError(403, "Administrator access has been removed.");
+      }
       let passwordMatches = await verifyPassword(account.password, storedPassword);
       if (neonAuthUrl && !isAdminAccount) {
         const neonLinked = cellText(row.getCell(columns.neonAuth).value) === "Linked";
@@ -4023,7 +4098,7 @@ async function deleteInventoryItem(session, id) {
         );
       }
 
-      const isAdmin = cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true";
+      const isAdmin = false;
       if (isAdmin && storedPassword.startsWith("pbkdf2$")) {
         row.getCell(columns.password).value = await hashAdminPassword(account.password);
       }
@@ -5051,7 +5126,9 @@ async function deleteInventoryItem(session, id) {
         id: cellText(row.getCell(columns.id).value),
         name: cellText(row.getCell(columns.name).value),
         ...student,
-        birthdate: student.birthdate.toISOString().slice(0, 10),
+        birthdate: student.birthdate instanceof Date
+          ? student.birthdate.toISOString().slice(0, 10)
+          : (typeof student.birthdate === "string" ? student.birthdate : ""),
         teacherUserId: session.userId,
       });
     }
@@ -5069,6 +5146,56 @@ async function deleteInventoryItem(session, id) {
       }
     }
     return added;
+  }
+
+  function upsertStudents(workbook, session, students) {
+    const { sheet, columns } = getStudentSheet(workbook);
+    const result = { added: [], updated: [] };
+    for (const student of students) {
+      let existingRow = null;
+      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+        const row = sheet.getRow(rowNumber);
+        const sameClass = cellText(row.getCell(columns.classId).value) === session.classId;
+        const ownedByTeacher = !cellText(row.getCell(columns.teacherUserId).value)
+          || cellText(row.getCell(columns.teacherUserId).value) === session.userId;
+        if (sameClass && ownedByTeacher
+          && cellText(row.getCell(columns.lrn).value) === student.lrn) {
+          existingRow = row;
+          break;
+        }
+      }
+
+      if (!existingRow) {
+        result.added.push(...writeStudents(workbook, session, [student]));
+        continue;
+      }
+
+      existingRow.getCell(columns.name).value = [
+        student.lastName,
+        student.firstName,
+        student.middleName,
+      ].filter(Boolean).join(", ");
+      existingRow.getCell(columns.classId).value = session.classId;
+      existingRow.getCell(columns.section).value = student.section || null;
+      existingRow.getCell(columns.teacherUserId).value = session.userId;
+      for (const [key] of STUDENT_FIELDS) {
+        if (key === "lrn") {
+          existingRow.getCell(columns[key]).value = student.lrn || null;
+        } else if (key !== "teacherUserId") {
+          existingRow.getCell(columns[key]).value = student[key] || null;
+        }
+      }
+      result.updated.push({
+        id: cellText(existingRow.getCell(columns.id).value),
+        name: cellText(existingRow.getCell(columns.name).value),
+        ...student,
+        birthdate: student.birthdate instanceof Date
+          ? student.birthdate.toISOString().slice(0, 10)
+          : (typeof student.birthdate === "string" ? student.birthdate : ""),
+        teacherUserId: session.userId,
+      });
+    }
+    return result;
   }
 
   async function addStudent(session, data) {
@@ -5097,7 +5224,7 @@ async function deleteInventoryItem(session, id) {
     });
   }
 
-  async function importStudents(session, buffer, sectionValue) {
+  async function importStudents(session, buffer, sectionValue, profileOverrides = {}) {
     const imported = parseSF1Workbook(buffer);
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
@@ -5110,36 +5237,51 @@ async function deleteInventoryItem(session, id) {
       if (section && !availableSections.some((candidate) => candidate.toLocaleLowerCase() === section.toLocaleLowerCase())) {
         throw new HttpError(400, "Choose one of the sections handled in Teacher Profile.");
       }
+      for (const [key, sf1Value] of Object.entries({
+        schoolYear: imported.schoolYear,
+        schoolName: imported.schoolName,
+        schoolId: imported.schoolId,
+        region: imported.region,
+        division: imported.division,
+        district: imported.district,
+      })) {
+        const manualValue = typeof profileOverrides[key] === "string" ? profileOverrides[key].trim() : "";
+        const value = manualValue || sf1Value || cellText(classRow.getCell(classColumns[key]).value);
+        if (value) classRow.getCell(classColumns[key]).value = value;
+      }
       imported.students.forEach((entry) => { entry.student.section = section; });
-      const { sheet, columns } = getStudentSheet(workbook);
-      const existingLrns = new Set();
-      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-        const existingLrn = cellText(sheet.getRow(rowNumber).getCell(columns.lrn).value);
-        if (existingLrn) existingLrns.add(existingLrn);
-      }
-
       const skipped = [...imported.skipped];
-      const studentsToAdd = [];
+      const latestStudentsByLrn = new Map();
       for (const entry of imported.students) {
-        if (existingLrns.has(entry.student.lrn)) {
-          skipped.push({ row: entry.row, reason: "LRN is already in the student roster or this SF1 file." });
-          continue;
-        }
-        existingLrns.add(entry.student.lrn);
-        studentsToAdd.push(entry.student);
+        latestStudentsByLrn.set(entry.student.lrn, entry.student);
       }
 
-      const students = writeStudents(workbook, session, studentsToAdd);
-      if (students.length) await saveDatabaseWorkbook(workbook);
+      const studentsToImport = [...latestStudentsByLrn.values()];
+      const result = upsertStudents(workbook, session, studentsToImport);
+      const students = [...result.added, ...result.updated];
+      if (students.length || Object.keys(profileOverrides).length) await saveDatabaseWorkbook(workbook);
       skipped.sort((left, right) => left.row - right.row);
-      return { imported: students.length, skipped };
+      return {
+        imported: students.length,
+        added: result.added.length,
+        updated: result.updated.length,
+        skipped,
+        profile: {
+          schoolYear: cellText(classRow.getCell(classColumns.schoolYear).value),
+          schoolName: cellText(classRow.getCell(classColumns.schoolName).value),
+          schoolId: cellText(classRow.getCell(classColumns.schoolId).value),
+          region: cellText(classRow.getCell(classColumns.region).value),
+          division: cellText(classRow.getCell(classColumns.division).value),
+          district: cellText(classRow.getCell(classColumns.district).value),
+        },
+      };
     });
   }
 
-  async function addSectionFromSF1(session, buffer, fallbackSection, fallbackGrade) {
+  async function addSectionFromSF1(session, buffer, fallbackSection, fallbackGrade, profileOverrides = {}) {
     const imported = parseSF1Workbook(buffer);
-    const section = imported.sectionName || fallbackSection.trim();
-    const grade = imported.grade || fallbackGrade.trim();
+    const section = fallbackSection.trim() || imported.sectionName;
+    const grade = fallbackGrade.trim() || imported.grade;
     if (!section || section.length > 100) {
       throw new HttpError(400, "The SF1 file does not include a section name. Enter a section name before adding it.");
     }
@@ -5152,15 +5294,28 @@ async function deleteInventoryItem(session, id) {
       const { sheet: classSheet, columns: classColumns } = getClassSheet(workbook);
       const classRow = findTeacherClassRow(classSheet, classColumns, session);
       if (!classRow) throw new HttpError(404, "The teacher's classroom could not be found.");
-      const sectionsHandled = getHandledSections(classRow, classColumns);
-      if (sectionsHandled.some((existing) => existing.toLocaleLowerCase() === section.toLocaleLowerCase())) {
-        throw new HttpError(409, `The section "${section}" already exists.`);
+      const profileValues = {};
+      for (const [key, sf1Value] of Object.entries({
+        schoolYear: imported.schoolYear,
+        schoolName: imported.schoolName,
+        schoolId: imported.schoolId,
+        region: imported.region,
+        division: imported.division,
+        district: imported.district,
+      })) {
+        const manualValue = typeof profileOverrides[key] === "string" ? profileOverrides[key].trim() : "";
+        const value = manualValue || sf1Value || cellText(classRow.getCell(classColumns[key]).value);
+        profileValues[key] = value;
+        if (value) classRow.getCell(classColumns[key]).value = value;
       }
-      if (sectionsHandled.length >= 30) {
+      const sectionsHandled = getHandledSections(classRow, classColumns);
+      if (!sectionsHandled.some((existing) => existing.toLocaleLowerCase() === section.toLocaleLowerCase())
+        && sectionsHandled.length >= 30) {
         throw new HttpError(400, "Sections handled must contain no more than 30 entries.");
       }
-
-      sectionsHandled.push(section);
+      if (!sectionsHandled.some((existing) => existing.toLocaleLowerCase() === section.toLocaleLowerCase())) {
+        sectionsHandled.push(section);
+      }
       const sectionGrades = readStoredSectionGrades(classRow.getCell(classColumns.sectionGrades).value);
       const primarySection = cellText(classRow.getCell(classColumns.section).value);
       const primaryGrade = cellText(classRow.getCell(classColumns.grade).value);
@@ -5172,24 +5327,14 @@ async function deleteInventoryItem(session, id) {
       classRow.getCell(classColumns.sectionGrades).value = JSON.stringify(serializeSectionGrades(sectionGrades));
 
       imported.students.forEach((entry) => { entry.student.section = section; });
-      const { sheet, columns } = getStudentSheet(workbook);
-      const existingLrns = new Set();
-      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-        const existingLrn = cellText(sheet.getRow(rowNumber).getCell(columns.lrn).value);
-        if (existingLrn) existingLrns.add(existingLrn);
-      }
       const skipped = [...imported.skipped];
-      const studentsToAdd = [];
+      const latestStudentsByLrn = new Map();
       for (const entry of imported.students) {
-        if (existingLrns.has(entry.student.lrn)) {
-          skipped.push({ row: entry.row, reason: "LRN is already in the student roster or this SF1 file." });
-          continue;
-        }
-        existingLrns.add(entry.student.lrn);
-        studentsToAdd.push(entry.student);
+        latestStudentsByLrn.set(entry.student.lrn, entry.student);
       }
 
-      const students = writeStudents(workbook, session, studentsToAdd);
+      const result = upsertStudents(workbook, session, [...latestStudentsByLrn.values()]);
+      const students = [...result.added, ...result.updated];
       await saveDatabaseWorkbook(workbook);
       skipped.sort((left, right) => left.row - right.row);
       return {
@@ -5198,7 +5343,12 @@ async function deleteInventoryItem(session, id) {
         sectionsHandled,
         sectionGrades: serializeSectionGrades(sectionGrades),
         imported: students.length,
+        added: result.added.length,
+        updated: result.updated.length,
         skipped,
+        profile: profileValues,
+        sectionNameSource: fallbackSection.trim() ? "form" : (imported.sectionName ? "sf1" : ""),
+        gradeSource: fallbackGrade.trim() ? "form" : (imported.grade ? "sf1" : ""),
       };
     });
   }
@@ -11161,11 +11311,15 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   const requestHandler = async (request, response) => {
     try {
       const url = new URL(request.url, "http://localhost");
+      if (url.pathname === "/admin" || url.pathname === "/admin.html"
+        || url.pathname.startsWith("/api/admin/")) {
+        sendJson(response, 404, { error: "Not found." });
+        return;
+      }
       if (options.apiOnly && !url.pathname.startsWith("/api/")) {
         sendJson(response, 404, { error: "Page not found." });
         return;
       }
-      if (url.pathname.startsWith("/api/")) await ensureBootstrapAdmin();
       const currentSession = url.pathname.startsWith("/api/") ? getSession(request) : null;
       if (currentSession) {
         await refreshSessionAccount(currentSession);
@@ -11464,11 +11618,15 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "POST" && url.pathname === "/api/teacher/sections/import") {
         const session = requireTeacherSession(request);
         const upload = await readSF1Upload(request);
+        const profileOverrides = Object.fromEntries([
+          "schoolYear", "schoolName", "schoolId", "region", "division", "district",
+        ].map((key) => [key, url.searchParams.get(key) || ""]));
         sendJson(response, 201, await addSectionFromSF1(
           session,
           upload,
           url.searchParams.get("sectionName") || "",
           url.searchParams.get("grade") || "",
+          profileOverrides,
         ));
         return;
       }
@@ -11645,7 +11803,15 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "POST" && url.pathname === "/api/students/import") {
         const session = requireTeacherSession(request);
         const upload = await readSF1Upload(request);
-        const result = await importStudents(session, upload, url.searchParams.get("section") || "");
+        const profileOverrides = Object.fromEntries([
+          "schoolYear", "schoolName", "schoolId", "region", "division", "district",
+        ].map((key) => [key, url.searchParams.get(key) || ""]));
+        const result = await importStudents(
+          session,
+          upload,
+          url.searchParams.get("section") || "",
+          profileOverrides,
+        );
         sendJson(response, 200, result);
         return;
       }
@@ -12124,8 +12290,6 @@ if (require.main === module) {
       tlsKeyPath,
       tlsCertPath,
       apiOnly,
-      bootstrapAdminEmail: process.env.ADMIN_EMAIL || "",
-      bootstrapAdminPassword: process.env.ADMIN_PASSWORD || "",
     });
     server.once("error", (error) => {
       if (!process.env.PORT && error.code === "EADDRINUSE" && port < maxPort) {

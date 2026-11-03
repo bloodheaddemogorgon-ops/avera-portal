@@ -60,7 +60,8 @@ if (capture("gh", ["release", "view", tag, ...repoArgs]).ok) {
 
 console.log(`Building GraceDesk ${version}...`);
 run("npm", ["run", "check"]);
-run("npm", ["run", "dist:win"]);
+run("npm", ["run", "dist:win:x64"]);
+run("npm", ["run", "dist:win:ia32"]);
 
 const releaseDir = path.join(root, "release");
 const assets = fs.readdirSync(releaseDir)

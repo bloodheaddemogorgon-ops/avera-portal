@@ -23,6 +23,10 @@ let portalServer;
 let portalUrl;
 let mainWindow;
 
+// Software-rendered Chromium is more reliable on older PCs and avoids
+// GPU-driver crashes that can appear as frozen input fields.
+app.disableHardwareAcceleration();
+
 async function createPortalWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -31,11 +35,14 @@ async function createPortalWindow() {
     minHeight: 640,
     icon: path.join(__dirname, "..", "icon.ico"),
     autoHideMenuBar: true,
+    show: false,
+    backgroundColor: "#f5f7fb",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       preload: path.join(__dirname, "preload.js"),
+      backgroundThrottling: true,
     },
   });
 
@@ -52,6 +59,12 @@ async function createPortalWindow() {
     return { action: "deny" };
   });
   await mainWindow.loadURL(portalUrl);
+  mainWindow.once("ready-to-show", () => {
+    if (!mainWindow.isDestroyed()) mainWindow.show();
+  });
+  // Some older graphics/Windows combinations miss ready-to-show. Displaying
+  // after load is safe and keeps startup from showing a partially loaded UI.
+  if (!mainWindow.isVisible()) mainWindow.show();
 }
 
 const SF9_PRINT_SELECTIONS = new Set([

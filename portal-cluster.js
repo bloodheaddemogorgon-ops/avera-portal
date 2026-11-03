@@ -2,11 +2,6 @@
 
 const dotenv = require("dotenv");
 dotenv.config();
-if (process.env.PORTAL_ADMIN_SECRET_FILE) {
-  const secretEnv = dotenv.config({ path: process.env.PORTAL_ADMIN_SECRET_FILE });
-  if (secretEnv.error) throw new Error("Could not load the configured administrator secret file.");
-}
-
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 
@@ -14,7 +9,6 @@ const configuredApiPort = Number(process.env.PORTAL_API_PORT || process.env.PORT
 const configuredPorts = {
   teacher: Number(process.env.PORTAL_TEACHER_PORT || 3004),
   parents: Number(process.env.PORTAL_PARENTS_PORT || 3005),
-  admin: Number(process.env.PORTAL_ADMIN_PORT || 3006),
 };
 const tlsKeyPath = process.env.PORTAL_TLS_KEY;
 const tlsCertPath = process.env.PORTAL_TLS_CERT;
@@ -35,7 +29,6 @@ const apiUrl = process.env.PORTAL_API_URL
 const portalUrls = {
   teacher: process.env.PORTAL_TEACHER_URL || `${protocol}://${formattedPublicHost}:${configuredPorts.teacher}`,
   parents: process.env.PORTAL_PARENTS_URL || `${protocol}://${formattedPublicHost}:${configuredPorts.parents}`,
-  admin: process.env.PORTAL_ADMIN_URL || `${protocol}://${formattedPublicHost}:${configuredPorts.admin}`,
 };
 
 const services = [
@@ -55,7 +48,6 @@ const services = [
       PORTAL_API_URL: apiUrl,
       PORTAL_TEACHER_URL: portalUrls.teacher,
       PORTAL_PARENTS_URL: portalUrls.parents,
-      PORTAL_ADMIN_URL: portalUrls.admin,
     },
   })),
 ];
@@ -75,11 +67,6 @@ function startService(service) {
   const childEnvironment = { ...process.env, ...service.env };
   for (const key of ["DATABASE_URL", "SUPABASE_DB_URL", "PORTAL_STORAGE_MODE", "NEON_AUTH_URL"]) {
     delete childEnvironment[key];
-  }
-  if (service.name !== "shared API backend") {
-    delete childEnvironment.ADMIN_EMAIL;
-    delete childEnvironment.ADMIN_PASSWORD;
-    delete childEnvironment.PORTAL_ADMIN_SECRET_FILE;
   }
   const child = spawn(
     process.execPath,

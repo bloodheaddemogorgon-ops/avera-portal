@@ -73,15 +73,15 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
     response.end(JSON.stringify({ status: "ok", storage: "sqlite" }));
   });
   const backendUrl = await listen(backend);
-  const portals = ["teacher", "parents", "admin"].map((entry) =>
+  const portals = ["teacher", "parents"].map((entry) =>
     createPortalFrontendServer({ entry, backendUrl }),
   );
 
   try {
     const portalOrigins = await Promise.all(portals.map(listen));
-    assert.equal(new Set(portalOrigins).size, 3);
+    assert.equal(new Set(portalOrigins).size, 2);
 
-    for (const [index, entry] of ["teacher", "parents", "admin"].entries()) {
+    for (const [index, entry] of ["teacher", "parents"].entries()) {
       const pageResponse = await fetch(portalOrigins[index]);
       const html = await pageResponse.text();
       const expectedEntry = entry === "teacher" ? "main" : entry;
@@ -90,11 +90,7 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
       assert.doesNotMatch(html, /portal-entry-links|portal-entry-link/);
       assert.doesNotMatch(html, /id="authAccountType"/);
       assert.match(html, /data-mode="up"/);
-      if (entry === "admin") {
-        assert.match(html, /data-mode="up" hidden/);
-      } else {
-        assert.doesNotMatch(html, /data-mode="up" hidden/);
-      }
+      assert.doesNotMatch(html, /data-mode="up" hidden/);
       const apiResponse = await fetch(`${portalOrigins[index]}/api/health`, {
         headers: { Cookie: `portal_session=${entry}` },
       });
@@ -103,21 +99,18 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
       assert.match(apiResponse.headers.get("set-cookie"), /portal_session=shared/);
     }
 
-    assert.equal(apiRequests.length, 3);
+    assert.equal(apiRequests.length, 2);
     assert.deepEqual(apiRequests.map(({ url }) => url), [
-      "/api/health",
       "/api/health",
       "/api/health",
     ]);
     assert.deepEqual(apiRequests.map(({ cookie }) => cookie), [
       "portal_session=teacher",
       "portal_session=parents",
-      "portal_session=admin",
     ]);
     assert.deepEqual(apiRequests.map(({ portalEntry }) => portalEntry), [
       "teacher",
       "parents",
-      "admin",
     ]);
   } finally {
     await Promise.all([...portals, backend].map(close));
@@ -139,15 +132,16 @@ test("combined portal server routes pages and API entry by path and referer", as
   const portal = createPortalFrontendServer({ entry: "all", backendUrl, trustProxy: true });
   try {
     const origin = await listen(portal);
-    for (const [route, expected] of [["/", "main"], ["/parents", "parents"], ["/admin", "admin"]]) {
+    for (const [route, expected] of [["/", "main"], ["/parents", "parents"]]) {
       const html = await (await fetch(`${origin}${route}`)).text();
       assert.match(html, new RegExp(`data-portal-entry="${expected}"`));
       assert.doesNotMatch(html, /portal-entry-links|portal-entry-link/);
     }
     assert.equal((await fetch(`${origin}/nope`)).status, 404);
     assert.equal((await fetch(`${origin}/admin/extra`)).status, 404);
+    assert.equal((await fetch(`${origin}/admin`)).status, 404);
 
-    for (const route of ["/parents", "/admin", "/"]) {
+    for (const route of ["/parents", "/"]) {
       await fetch(`${origin}/api/health`, {
         headers: {
           Referer: `${origin}${route}`,
@@ -156,7 +150,7 @@ test("combined portal server routes pages and API entry by path and referer", as
         },
       });
     }
-    assert.deepEqual(apiRequests.map(({ entry }) => entry), ["parents", "admin", "teacher"]);
+    assert.deepEqual(apiRequests.map(({ entry }) => entry), ["parents", "teacher"]);
     assert.equal(apiRequests[0].forwardedFor, "198.51.100.7");
     assert.equal(apiRequests[0].forwardedProto, "https");
   } finally {
@@ -178,7 +172,6 @@ test("teacher-only desktop server serves only the teacher portal", async () => {
     for (const route of ["/parents", "/parents.html", "/admin", "/admin.html"]) {
       const response = await fetch(`${origin}${route}`);
       assert.equal(response.status, 404, `${route} should not be served by the desktop app`);
-      assert.deepEqual(await response.json(), { error: "Page not found." });
     }
   } finally {
     await close(portal);

@@ -1,6 +1,6 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.45",
+  "version": "1.0.46",
   "private": true,
   "description": "Grade 5 Class Portal desktop application",
   "main": "desktop/main.js",
@@ -17,9 +17,10 @@
     "start:api": "node server.js --api",
     "start:teacher": "node portal-frontend.js teacher",
     "start:parents": "node portal-frontend.js parents",
-    "start:admin": "node portal-frontend.js admin",
     "desktop": "electron .",
     "dist:win": "electron-builder --win nsis --publish never",
+    "dist:win:x64": "electron-builder --win nsis --x64 --publish never",
+    "dist:win:ia32": "electron-builder --win nsis --ia32 --publish never",
     "release": "node scripts/release.js",
     "check": "node scripts/check.js",
     "typecheck": "tsc --noEmit",
@@ -106,7 +107,7 @@
       "target": "nsis"
     },
     "nsis": {
-      "artifactName": "GraceDesk-Setup-${version}.${ext}",
+      "artifactName": "GraceDesk-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "icon.ico",

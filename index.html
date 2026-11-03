@@ -1844,7 +1844,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         <p class="msg" id="msg" role="alert"></p>
       </form>
       <p class="hint" id="authHint">Create an account to get started. Teachers create a classroom when they sign up.</p>
-      <button class="btn ghost" id="adminEntryToggle" type="button" hidden></button>
       <p class="hint" id="storageStatus" role="status" aria-live="polite">Checking the account workbook...</p>
     </div>
     <noscript>
@@ -1921,9 +1920,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           </button>
           <button class="nav-link" id="navTeacherProfile" type="button">
             <span class="nav-icon" aria-hidden="true">◉</span>Teacher Profile
-          </button>
-          <button class="nav-link" id="navAdminAccounts" type="button" hidden>
-            <span class="nav-icon" aria-hidden="true">♙</span>Admin
           </button>
           <button class="nav-link" id="navSettings" type="button">
             <span class="nav-icon" aria-hidden="true">⚙</span>Settings
@@ -3239,54 +3235,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
               </section>
             </div>
           </section>
-          <section id="adminAccountsPage" aria-labelledby="adminAccountsTitle" hidden>
-            <div class="page-heading">
-              <div><h1 id="adminAccountsTitle" tabindex="-1">Manage User Logins</h1><p>Review account access, search the user list, and help users recover account access.</p></div>
-              <button class="btn ghost" id="refreshAdminAccounts" type="button"><span aria-hidden="true">↻</span> Refresh accounts</button>
-            </div>
-            <div class="admin-account-overview" aria-label="Account overview">
-              <article class="admin-account-stat"><span>Total accounts</span><strong id="adminTotalAccounts">—</strong></article>
-              <article class="admin-account-stat"><span>Active logins</span><strong id="adminActiveAccounts">—</strong></article>
-              <article class="admin-account-stat"><span>Teacher accounts</span><strong id="adminTeacherAccounts">—</strong></article>
-              <article class="admin-account-stat"><span>Parent accounts</span><strong id="adminParentAccounts">—</strong></article>
-            </div>
-            <div class="data-card">
-              <p class="admin-account-guidance">Password resets set the temporary password to the user's email address. The user must choose a new password at their next sign-in.</p>
-              <div class="admin-account-filters">
-                <div class="admin-account-toolbar">
-                  <div class="form-field admin-account-search">
-                    <label for="adminAccountSearch">Search accounts</label>
-                    <input id="adminAccountSearch" type="search" placeholder="Search name, email, or class" autocomplete="off">
-                  </div>
-                  <div class="form-field">
-                    <label for="adminAccountRoleFilter">Account type</label>
-                    <select id="adminAccountRoleFilter">
-                      <option value="all">All account types</option>
-                      <option value="teacher">Teachers</option>
-                      <option value="parent">Parents</option>
-                    </select>
-                  </div>
-                  <div class="form-field">
-                    <label for="adminAccountStatusFilter">Login status</label>
-                    <select id="adminAccountStatusFilter">
-                      <option value="all">All statuses</option>
-                      <option value="active">Active</option>
-                      <option value="inactive">Disabled</option>
-                    </select>
-                  </div>
-                  <p class="admin-account-result-count" id="adminAccountResultCount" aria-live="polite"></p>
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table class="student-table admin-account-table" id="adminAccountsTable">
-                  <thead><tr><th>User account</th><th>Account type and class</th><th>Access status</th><th>Account actions</th></tr></thead>
-                  <tbody id="adminAccountRows"></tbody>
-                </table>
-                <div class="empty-state" id="adminAccountsEmpty" hidden><h3 id="adminAccountsEmptyTitle">No accounts found</h3><p id="adminAccountsEmptyMessage">Try adjusting your search or filters.</p></div>
-              </div>
-            </div>
-            <p class="notice" id="adminAccountsNotice" role="status" aria-live="polite"></p>
-          </section>
           <section id="parentPage" aria-labelledby="parentPortalTitle" hidden>
             <div class="page-heading parent-welcome">
               <div><h1 id="parentPortalTitle">Parent Portal</h1><p id="parentWelcomeMessage">Welcome.</p><p class="field-hint" id="parentPortalSyncStatus" role="status" aria-live="polite">Teacher updates sync automatically while this portal is open.</p></div>
@@ -3542,7 +3490,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 <script>
 (function(){
   var entryType=document.documentElement.dataset.portalEntry||"main";
-  var canSwitchToAdmin=entryType==="main";
   var mode="in";
   var accountType=entryType==="parents"?"parent":"teacher";
   function localISODate(d){
@@ -3554,7 +3501,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   var parentPortalRefreshInProgress=false;
   var parentSelectedLearnerIndex=0;
   var adminClasses=[];
-  var adminAccountsData=[];
   var gradeStudents=[];
   var sf10Students=[];
   var sf10ActiveRecordKey="manual";
@@ -3776,35 +3722,23 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var up=mode==="up";
     var isParent=accountType==="parent";
     var isParentsEntry=entryType==="parents";
-    var isAdminEntry=entryType==="admin";
-    var portalName=isParentsEntry?"Parents Portal":isAdminEntry?"Admin Portal":"GraceDesk";
+    var portalName=isParentsEntry?"Parents Portal":"GraceDesk";
     document.title=portalName+" · GraceDesk";
     document.querySelector(".brand h1 span").textContent=portalName;
     document.querySelector(".brand h1 span").setAttribute("aria-label",portalName);
     document.querySelector(".brand-acronym").hidden=entryType!=="main";
     $("tagline").textContent=isParentsEntry
       ?"Sign in to view your child's learning."
-      :isAdminEntry
-        ?"Sign in to manage all classes and accounts."
-        :isParent
+      :isParent
       ?up?"Create an account to follow your child's learning.":"Sign in to view your child's learning."
       :up?"Create an account for your classroom.":"Sign in to your classroom.";
-    $("authModeTitle").textContent=isAdminEntry
-      ?"Administrator sign in"
-      :(isParent?"Parent / Guardian":"Teacher")+" "+(up?"create account":"sign in");
-    $("authModeDescription").textContent=isAdminEntry
-      ?"Use an existing administrator account to continue."
-      :isParent
+    $("authModeTitle").textContent=(isParent?"Parent / Guardian":"Teacher")+" "+(up?"create account":"sign in");
+    $("authModeDescription").textContent=isParent
       ?up?"Register with the class code shared by your child's teacher.":"View attendance, reading progress, and grades shared by the teacher."
       :up?"Create your account and set up your classroom.":"Manage your classroom and learner records.";
     document.querySelectorAll("#auth [role='tablist'] .tab").forEach(function(b){
       b.setAttribute("aria-selected",String(b.dataset.mode===mode));
     });
-    document.querySelector("#auth [role='tablist']").hidden=isAdminEntry;
-    var adminToggle=$("adminEntryToggle");
-    adminToggle.hidden=!canSwitchToAdmin;
-    adminToggle.textContent=isAdminEntry?"Back to teacher sign in":"Sign in as administrator";
-    document.querySelector("#auth [data-mode='up']").hidden=isAdminEntry;
     $("nameWrap").hidden=!up;
     $("teacherGradeWrap").hidden=!up||isParent;
     var gradeLevel=$("teacherGrade").value;
@@ -3812,9 +3746,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("teacherStrandWrap").hidden=!up||isParent||!isSeniorHigh;
     if(!isSeniorHigh)$("teacherStrand").value="";
     $("parentClassCodeWrap").hidden=!up||!isParent;
-    $("authHint").textContent=isAdminEntry
-      ?"Use an existing administrator account. Administrator accounts cannot be created here."
-      :isParent
+    $("authHint").textContent=isParent
       ?up?"Your child's learner record will appear after their teacher links it to your account."
         :"New to the portal? Choose Create account and enter the class code from the teacher."
       :up?"Your classroom is created as part of teacher registration."
@@ -3834,7 +3766,13 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   async function api(url,options){
     var response;
     try{
-      response=await fetch(url,Object.assign({credentials:"same-origin"},options||{}));
+      var requestOptions=Object.assign({credentials:"same-origin"},options||{});
+      if(!requestOptions.signal){
+        var controller=new AbortController();
+        requestOptions.signal=controller.signal;
+        window.setTimeout(function(){controller.abort();},20000);
+      }
+      response=await fetch(url,requestOptions);
     }catch(error){
       if(error instanceof TypeError){
         throw new Error("Can't reach the portal server. Restart it with npm start, open the exact address printed in its terminal, refresh this page, and try again. Do not use VS Code Live Preview.");
@@ -3859,12 +3797,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   document.querySelectorAll(".tab[role='tab']").forEach(function(b){b.onclick=function(){mode=b.dataset.mode;render()}});
-  $("adminEntryToggle").onclick=function(){
-    entryType=entryType==="admin"?"main":"admin";
-    mode="in";
-    $("msg").textContent="";
-    render();
-  };
   $("showPw").onclick=function(){var p=$("pw"),s=p.type==="password";p.type=s?"text":"password";this.textContent=s?"Hide":"Show"};
 
   $("form").onsubmit=async function(e){
@@ -4336,181 +4268,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     button.title=studentSectionLocked
       ?"Section selection is applied. Choose Change Section to select another."
       :"Apply and lock the selected section across the portal.";
-  }
-
-  async function loadAdminAccounts(){
-    $("adminAccountsNotice").textContent="Loading accounts...";
-    $("adminAccountsNotice").classList.remove("error");
-    $("adminAccountRows").replaceChildren();
-    $("adminAccountsEmpty").hidden=true;
-    try{
-      var result=await api("/api/admin/accounts");
-      adminAccountsData=result.accounts;
-      $("adminAccountsNotice").textContent="";
-      renderAdminAccounts();
-    }catch(error){
-      $("adminAccountResultCount").textContent="";
-      $("adminAccountsNotice").textContent=error.message;
-      $("adminAccountsNotice").classList.add("error");
-    }
-  }
-
-  function createAdminAccountBadge(text,modifier){
-    var badge=document.createElement("span");
-    badge.className="admin-account-badge "+modifier;
-    badge.textContent=text;
-    return badge;
-  }
-
-  function renderAdminAccounts(){
-    var accounts=adminAccountsData;
-    var activeCount=accounts.filter(function(account){return account.status.toLowerCase()==="active"}).length;
-    $("adminTotalAccounts").textContent=String(accounts.length);
-    $("adminActiveAccounts").textContent=String(activeCount);
-    $("adminTeacherAccounts").textContent=String(accounts.filter(function(account){return account.role.toLowerCase()==="teacher"}).length);
-    $("adminParentAccounts").textContent=String(accounts.filter(function(account){return account.role.toLowerCase()==="parent"}).length);
-    var roleFilter=$("adminAccountRoleFilter").value;
-    var statusFilter=$("adminAccountStatusFilter").value;
-    var search=$("adminAccountSearch").value.trim().toLowerCase();
-    var visibleAccounts=accounts.filter(function(account){
-      var classroom=adminClasses.find(function(item){return item.id===account.classId});
-      var searchable=[account.name,account.email,account.id,account.classId,classroom&&classroom.classroom,
-        classroom&&classroom.teacherName,classroom&&classroom.grade,classroom&&classroom.section]
-        .filter(Boolean).join(" ").toLowerCase();
-      return (roleFilter==="all"||account.role.toLowerCase()===roleFilter)
-        &&(statusFilter==="all"||account.status.toLowerCase()===statusFilter)
-        &&(!search||searchable.includes(search));
-    });
-    $("adminAccountResultCount").textContent="Showing "+visibleAccounts.length+" of "+accounts.length+" accounts";
-    $("adminAccountRows").replaceChildren();
-    $("adminAccountsEmpty").hidden=visibleAccounts.length!==0;
-    if(!visibleAccounts.length){
-      $("adminAccountsEmptyTitle").textContent=accounts.length?"No matching accounts":"No accounts found";
-      $("adminAccountsEmptyMessage").textContent=accounts.length
-        ?"Try a different name, email, class, or filter."
-        :"Teacher and parent login accounts will appear here.";
-    }
-    visibleAccounts.forEach(function(account){
-        var row=document.createElement("tr");
-        var classroom=adminClasses.find(function(item){return item.id===account.classId});
-        var identityCell=document.createElement("td");
-        identityCell.className="admin-account-identity";
-        var name=document.createElement("strong");
-        name.textContent=account.name||"Unnamed account";
-        var email=document.createElement("span");
-        email.textContent=account.email;
-        var id=document.createElement("small");
-        id.textContent="Account ID: "+account.id;
-        identityCell.append(name,email,id);
-        row.appendChild(identityCell);
-        var roleCell=document.createElement("td");
-        roleCell.appendChild(createAdminAccountBadge(account.role,"is-"+account.role.toLowerCase()));
-        if(account.isAdmin){
-          var adminLabel=document.createElement("span");
-          adminLabel.className="admin-account-admin-label";
-          adminLabel.textContent="Admin";
-          roleCell.appendChild(adminLabel);
-        }
-        var classCell=document.createElement("td");
-        classCell.className="admin-account-class";
-        if(classroom){
-          var className=document.createElement("strong");
-          className.textContent=classroom.classroom?"Classroom "+classroom.classroom:"Class";
-          classCell.appendChild(className);
-          var classDetails=[classroom.grade,classroom.section].filter(Boolean).join(" · ");
-          if(classDetails){
-            var classInfo=document.createElement("span");
-            classInfo.textContent=classDetails;
-            classCell.appendChild(classInfo);
-          }
-        }else{
-          classCell.textContent=account.classId||"No class assigned";
-        }
-        roleCell.appendChild(classCell);
-        row.appendChild(roleCell);
-        var statusCell=document.createElement("td");
-        statusCell.className="admin-account-access";
-        var isActive=account.status.toLowerCase()==="active";
-        var mustChange=account.mustChangePassword===true;
-        var loginStatus=document.createElement("div");
-        loginStatus.className="admin-account-access-row";
-        var loginLabel=document.createElement("small");
-        loginLabel.textContent="Login";
-        loginStatus.appendChild(loginLabel);
-        loginStatus.appendChild(createAdminAccountBadge(isActive?"Active":"Disabled",isActive?"is-active":"is-inactive"));
-        statusCell.appendChild(loginStatus);
-        var passwordStatus=document.createElement("div");
-        passwordStatus.className="admin-account-access-row";
-        var passwordLabel=document.createElement("small");
-        passwordLabel.textContent="Password";
-        passwordStatus.appendChild(passwordLabel);
-        passwordStatus.appendChild(createAdminAccountBadge(
-          mustChange?"Change required":"No reset pending",
-          mustChange?"is-required":"is-ready",
-        ));
-        statusCell.appendChild(passwordStatus);
-        row.appendChild(statusCell);
-        var actionCell=document.createElement("td");
-        var actionButtons=document.createElement("div");
-        actionButtons.className="admin-account-actions";
-        var action=document.createElement("button");
-        action.type="button";
-        action.className="btn ghost";
-        action.textContent=isActive?"Disable login":"Enable login";
-        action.disabled=account.id===currentUser.id;
-        action.setAttribute("aria-label",action.textContent+" account for "+account.name);
-        action.addEventListener("click",async function(){
-          var nextStatus=account.status.toLowerCase()==="active"?"Inactive":"Active";
-          action.disabled=true;
-          resetAction.disabled=true;
-          try{
-            await api("/api/admin/accounts/"+encodeURIComponent(account.id),{
-              method:"PUT",
-              headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({status:nextStatus})
-            });
-            account.status=nextStatus;
-            $("adminAccountsNotice").textContent=account.name+"'s login is "+(nextStatus==="Active"?"enabled.":"disabled.");
-            $("adminAccountsNotice").classList.remove("error");
-            renderAdminAccounts();
-          }catch(error){
-            $("adminAccountsNotice").textContent=error.message;
-            $("adminAccountsNotice").classList.add("error");
-          }finally{
-            action.disabled=account.id===currentUser.id;
-            resetAction.disabled=account.id===currentUser.id;
-          }
-        });
-        actionButtons.appendChild(action);
-        var resetAction=document.createElement("button");
-        resetAction.type="button";
-        resetAction.className="btn ghost";
-        resetAction.textContent="Reset password";
-        resetAction.disabled=account.id===currentUser.id;
-        resetAction.setAttribute("aria-label","Reset password for "+account.name);
-        resetAction.addEventListener("click",async function(){
-          if(!window.confirm("Reset "+account.name+"'s password? Their temporary password will be their email address, and they must change it after signing in."))return;
-          resetAction.disabled=true;
-          try{
-            await api("/api/admin/accounts/"+encodeURIComponent(account.id)+"/password",{
-              method:"PUT"
-            });
-            account.mustChangePassword=true;
-            $("adminAccountsNotice").textContent="Password reset. The temporary password is the user's email address; they must change it after signing in.";
-            $("adminAccountsNotice").classList.remove("error");
-            renderAdminAccounts();
-          }catch(error){
-            $("adminAccountsNotice").textContent=error.message;
-            $("adminAccountsNotice").classList.add("error");
-          }finally{
-            resetAction.disabled=account.id===currentUser.id;
-          }
-        });
-        actionButtons.appendChild(resetAction);
-        actionCell.appendChild(actionButtons);
-        row.appendChild(actionCell);
-        $("adminAccountRows").appendChild(row);
-    });
   }
 
   function appendTextCell(row,text){
@@ -7377,7 +7134,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var leavingRma=!$("rmaPage").hidden&&!showRma;
     var leavingEClass=!$("eClassPage").hidden&&!showEClass;
     var showAttendance=page==="attendance";
-    var showAdminAccounts=page==="adminAccounts";
     var leavingAttendance=!$("attendancePage").hidden&&!showAttendance;
     var leavingProfile=!$("teacherProfilePage").hidden&&page!=="profile";
     var showSettings=page==="settings";
@@ -7395,7 +7151,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       ||(showAttendance&&!$("attendancePage").hidden)
       ||(showEClass&&!$("eClassPage").hidden)
       ||(showSf10&&!$("sf10Page").hidden)
-      ||(showAdminAccounts&&!$("adminAccountsPage").hidden)
       ||(page==="profile"&&!$("teacherProfilePage").hidden)
       ||(showSettings&&!$("settingsPage").hidden))return;
     refreshAttendanceYears();
@@ -7411,7 +7166,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       teacherPasswordDirty=false;
       $("teacherPasswordForm").reset();
     }
-    $("studentsPage").hidden=showAttendance||showEClass||showGrades||showSf10||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||showInventory||page==="profile"||showSettings||showAdminAccounts;
+    $("studentsPage").hidden=showAttendance||showEClass||showGrades||showSf10||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||showInventory||page==="profile"||showSettings;
     $("nutritionalStatusPage").hidden=!showNutritionalStatus;
     $("inventoryPage").hidden=!showInventory;
     $("attendancePage").hidden=!showAttendance;
@@ -7430,8 +7185,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var showProfile=page==="profile";
     $("teacherProfilePage").hidden=!showProfile;
     $("settingsPage").hidden=!showSettings;
-    $("adminAccountsPage").hidden=!showAdminAccounts;
-    [["navStudents",!showAttendance&&!showEClass&&!showGrades&&!showSf10&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showInventory&&!showProfile&&!showSettings&&!showAdminAccounts],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navSf10",showSf10],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navInventory",showInventory],["navTeacherProfile",showProfile],["navSettings",showSettings],["navAdminAccounts",showAdminAccounts]]
+    [["navStudents",!showAttendance&&!showEClass&&!showGrades&&!showSf10&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showInventory&&!showProfile&&!showSettings],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navSf10",showSf10],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navInventory",showInventory],["navTeacherProfile",showProfile],["navSettings",showSettings]]
       .forEach(function(entry){
         if(entry[1])$(entry[0]).setAttribute("aria-current","page");
         else $(entry[0]).removeAttribute("aria-current");
@@ -7458,7 +7212,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       inventory:["GraceDesk","Inventory"],
       profile:["GraceDesk","Teacher Profile"],
       settings:["GraceDesk","Settings"],
-      adminAccounts:["GraceDesk","Manage User Logins"],
     };
     var pageLabel=pageLabels[page]||pageLabels.students;
     $("topbarPageSubtitle").textContent=pageLabel[0];
@@ -7504,10 +7257,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       applyPerformanceMode(performanceModeEnabled);
       $("performanceNotice").classList.toggle("error",Boolean(performanceModeStorageError));
       $("performanceNotice").textContent=performanceModeStorageError;
-    }
-    else if(showAdminAccounts){
-      $("adminAccountsTitle").focus({preventScroll:true});
-      loadAdminAccounts();
     }
     else if(!showEClass&&!showSf10)loadStudents();
   }
@@ -10341,9 +10090,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("inventoryPage").hidden=true;
     $("teacherProfilePage").hidden=true;
     $("settingsPage").hidden=true;
-    $("adminAccountsPage").hidden=true;
     $("parentPage").hidden=user.role==="teacher";
-    $("navAdminAccounts").hidden=!user.isAdmin;
     if(user.role==="teacher"){
       $("classSummary").textContent="Manage the student records for your class.";
       if(!user.mustChangePassword)loadStudents();
@@ -10365,17 +10112,13 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   async function enter(user){
     var session=await api("/api/auth/session");
     var sessionUser=session.user;
-    if(canSwitchToAdmin&&sessionUser.role==="teacher"&&sessionUser.isAdmin)entryType="admin";
     var wrongPortal=(entryType==="parents"&&sessionUser.role!=="parent")
-      ||(entryType==="admin"&&(sessionUser.role!=="teacher"||!sessionUser.isAdmin))
-      ||(entryType==="main"&&(sessionUser.role!=="teacher"||sessionUser.isAdmin));
+      ||(entryType==="main"&&sessionUser.role!=="teacher");
     if(wrongPortal){
       await api("/api/auth/logout",{method:"POST"});
       throw new Error(entryType==="parents"
         ?"This account is not a parent account. Sign in through the Parents Portal."
-        :entryType==="admin"
-          ?"This account does not have administrator access. Sign in through the Teacher Portal if it is a teacher account."
-          :"Only teacher accounts can use the Teacher Portal. Sign in through the Parents Portal or Admin Portal instead.");
+        :"Only teacher accounts can use the Teacher Portal. Sign in through the Parents Portal instead.");
     }
     user.id=session.user.userId;
     user.role=sessionUser.role;
@@ -10884,8 +10627,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   $("navTeacherProfile").onclick=function(){showDashboardPage("profile")};
   $("navSettings").onclick=function(){showDashboardPage("settings")};
   $("settingsMenuButton").onclick=function(){$("menuToggle").click()};
-  $("navAdminAccounts").onclick=function(){showDashboardPage("adminAccounts")};
-  $("refreshAdminAccounts").onclick=loadAdminAccounts;
   (function(){
     var button=$("updateButton"),notice=$("updateNotice"),manual=$("updateManualLink");
     var api=window.gradePortal;
@@ -11032,9 +10773,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       $("performanceNotice").classList.add("error");
     }
   };
-  $("adminAccountSearch").oninput=renderAdminAccounts;
-  $("adminAccountRoleFilter").onchange=renderAdminAccounts;
-  $("adminAccountStatusFilter").onchange=renderAdminAccounts;
   $("appearanceSetting").onchange=async function(){
     applyTheme(this.value);
     appearancePreferenceChanged=true;
@@ -11148,7 +10886,11 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   $("attendanceRows").addEventListener("change",function(event){
     if(event.target.classList.contains("attendance-day-select"))event.target.dataset.status=event.target.value;
   });
-  window.setInterval(function(){$("attendanceUnsaved").hidden=!attendanceDirty},400);
+  window.setInterval(function(){
+    if(document.visibilityState==="visible"){
+      $("attendanceUnsaved").hidden=!attendanceDirty;
+    }
+  },1000);
   $("attendanceMonthlyTab").onclick=function(){setAttendanceTab(false)};
   $("attendanceSummaryTab").onclick=function(){setAttendanceTab(true)};
   $("refreshAttendanceSummary").onclick=loadAttendanceSummary;
@@ -12607,7 +12349,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       $("forcedPasswordForm").reset();
       currentUser.mustChangePassword=false;
       $("forcedPasswordDialog").close();
-      $("adminAccountsNotice").textContent="";
       await enter(currentUser);
     }catch(error){
       $("forcedPasswordError").textContent=error.message;
@@ -12880,8 +12621,18 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     button.textContent="Adding...";
     importButton.disabled=true;
     try{
+      var sf1ProfileParams=new URLSearchParams({
+        sectionName:sectionName,
+        grade:grade,
+        schoolYear:$("teacherProfileSchoolYear").value,
+        schoolName:$("teacherProfileSchoolName").value,
+        schoolId:$("teacherProfileSchoolId").value,
+        region:$("teacherProfileRegion").value,
+        division:$("teacherProfileDivision").value,
+        district:$("teacherProfileDistrict").value
+      });
       var result=file
-        ?await api("/api/teacher/sections/import?sectionName="+encodeURIComponent(sectionName)+"&grade="+encodeURIComponent(grade),{
+        ?await api("/api/teacher/sections/import?"+sf1ProfileParams.toString(),{
           method:"POST",
           headers:{"Content-Type":"application/octet-stream"},
           body:file
@@ -12893,6 +12644,19 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         });
       sectionName=result.sectionName||sectionName;
       grade=result.grade||grade;
+      if(result.profile){
+        ["schoolYear","schoolName","schoolId","region","division","district"].forEach(function(key){
+          var inputId={
+            schoolYear:"teacherProfileSchoolYear",
+            schoolName:"teacherProfileSchoolName",
+            schoolId:"teacherProfileSchoolId",
+            region:"teacherProfileRegion",
+            division:"teacherProfileDivision",
+            district:"teacherProfileDistrict"
+          }[key];
+          if(!$(inputId).value.trim())$(inputId).value=result.profile[key]||"";
+        });
+      }
       var profileWasDirty=teacherProfileDirty;
       handledSections=result.sectionsHandled;
       sectionGrades=result.sectionGrades;
@@ -13177,7 +12941,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     }
   }
   refreshStorageStatus();
-  window.setInterval(refreshStorageStatus,15000);
+  window.setInterval(function(){
+    if(document.visibilityState==="visible")refreshStorageStatus();
+  },30000);
 })();
 </script>
 </body>
