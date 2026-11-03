@@ -2955,6 +2955,24 @@ function createServer(options = {}) {
         "SELECT workbook_state FROM portal_state WHERE id = 1",
       ).get();
       if (existingState) {
+        // Legacy installations may still contain promoted/admin-account flags.
+        // Administrator access is removed; retain the row as its Teacher or
+        // Parent account and never let the flag grant elevated capabilities.
+        const workbook = decodeWorkbookState(existingState.workbook_state);
+        const { sheet, columns } = getUserSheet(workbook);
+        let removedLegacyAdminFlags = false;
+        for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+          const row = sheet.getRow(rowNumber);
+          if (cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true") {
+            row.getCell(columns.adminAccess).value = "false";
+            removedLegacyAdminFlags = true;
+          }
+        }
+        if (removedLegacyAdminFlags) {
+          database.prepare(
+            "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
+          ).run(encodeWorkbookState(workbook), new Date().toISOString());
+        }
         return;
       }
       if (!fileSystem.existsSync(migrationWorkbookPath)) {
@@ -4045,17 +4063,6 @@ async function deleteInventoryItem(session, id) {
 
       const storedPassword = cellText(row.getCell(columns.password).value);
       const isAdminAccount = cellText(row.getCell(columns.adminAccess).value).toLowerCase() === "true";
-      if (isAdminAccount) {
-        logSignIn(workbook, {
-          email: account.email,
-          role: account.role,
-          result: "Failed",
-          userId,
-          note: "Administrator access removed",
-        });
-        await saveDatabaseWorkbook(workbook);
-        throw new HttpError(403, "Administrator access has been removed.");
-      }
       let passwordMatches = await verifyPassword(account.password, storedPassword);
       if (neonAuthUrl && !isAdminAccount) {
         const neonLinked = cellText(row.getCell(columns.neonAuth).value) === "Linked";

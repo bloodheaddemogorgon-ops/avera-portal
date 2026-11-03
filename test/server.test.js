@@ -3110,7 +3110,10 @@ test("registrations persist in the workbook and can sign in after a restart", as
     password: teacherCredentials.password,
     role: "teacher",
   });
-  assert.equal(adminLogin.status, 403);
+  assert.equal(adminLogin.status, 200, "legacy Admin Access flags must not block Teacher sign-in");
+  const normalizedLoginUser = (await adminLogin.json()).user;
+  assert.equal(normalizedLoginUser.role, "teacher");
+  assert.equal(normalizedLoginUser.isAdmin, false);
   return;
   let adminCookie = adminLogin.headers.get("set-cookie").split(";")[0];
   const adminLoginUser = (await adminLogin.json()).user;
