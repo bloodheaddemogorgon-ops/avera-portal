@@ -1,16 +1,11 @@
 "use strict";
 
-process.env.NEON_AUTH_URL = "";
-
 const assert = require("node:assert/strict");
-const { DatabaseSync } = require("node:sqlite");
 const fs = require("node:fs/promises");
 const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const { setTimeout: delay } = require("node:timers/promises");
-const { loadDesktopEnvironment } = require("../desktop/environment");
 const { createPortalFrontendServer } = require("../portal-frontend");
 const { createServer } = require("../server");
 
@@ -27,91 +22,38 @@ async function close(server) {
   await new Promise((resolve) => server.close(resolve));
 }
 
-function createPostgresPool() {
-  let available = true;
-  let remoteState = null;
-  let revision = 0;
-  const query = async (text, values = []) => {
-    if (!available) {
-      const error = new Error("Database unavailable");
-      error.code = "ECONNREFUSED";
-      throw error;
-    }
-    const sql = text.trim().replace(/\s+/g, " ").toLowerCase();
-    if (sql.startsWith("select workbook_state, revision from portal_state")) {
-      return {
-        rows: remoteState ? [{ workbook_state: remoteState, revision }] : [],
-        rowCount: remoteState ? 1 : 0,
-      };
-    }
-    if (sql.startsWith("insert into portal_state")) {
-      if (!remoteState) {
-        remoteState = Buffer.from(values[0]);
-        revision = 1;
-      }
-      return { rows: [], rowCount: 1 };
-    }
-    if (sql.startsWith("update portal_state")) {
-      remoteState = Buffer.from(values[0]);
-      revision += 1;
-      return { rows: [], rowCount: 1 };
-    }
-    if (sql.startsWith("select id from portal_state")) {
-      return { rows: remoteState ? [{ id: 1 }] : [], rowCount: remoteState ? 1 : 0 };
-    }
-    return { rows: [], rowCount: 0 };
-  };
-  return {
-    pool: {
-      query,
-      async connect() {
-        return { query, release() {} };
-      },
-      async end() {},
-    },
-    setAvailable(value) {
-      available = value;
-    },
-    advanceRemoteRevision() {
-      revision += 1;
-    },
-    get revision() {
-      return revision;
-    },
-  };
-}
-
-async function waitFor(assertion, timeoutMs = 3000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await assertion()) return;
-    await delay(20);
-  }
-  assert.ok(await assertion(), "timed out waiting for background synchronization");
-}
-
-test("desktop loads dual-storage settings from the per-user environment file", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-desktop-env-"));
-  const previousMode = process.env.PORTAL_STORAGE_MODE;
-  const previousDatabaseUrl = process.env.SUPABASE_DB_URL;
-  delete process.env.PORTAL_STORAGE_MODE;
-  delete process.env.SUPABASE_DB_URL;
+test("portal records are saved locally even when online storage settings are requested", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-local-only-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  let remoteCalls = 0;
+  const backend = createServer({
+    storageMode: "dual",
+    postgresPool: { async query() { remoteCalls += 1; throw new Error("Online storage must not be used"); } },
+    databasePath,
+    migrationWorkbookPath: path.join(__dirname, "..", "grade5-portal-database-template.xlsx"),
+  });
+  const backendUrl = await listen(backend);
   context.after(async () => {
-    if (previousMode === undefined) delete process.env.PORTAL_STORAGE_MODE;
-    else process.env.PORTAL_STORAGE_MODE = previousMode;
-    if (previousDatabaseUrl === undefined) delete process.env.SUPABASE_DB_URL;
-    else process.env.SUPABASE_DB_URL = previousDatabaseUrl;
+    await close(backend);
     await fs.rm(directory, { recursive: true, force: true });
   });
 
-  assert.equal(loadDesktopEnvironment(directory), false);
-  await fs.writeFile(
-    path.join(directory, ".env"),
-    "PORTAL_STORAGE_MODE=dual\nSUPABASE_DB_URL=postgresql://test:test@localhost/test\n",
-  );
-  assert.equal(loadDesktopEnvironment(directory), true);
-  assert.equal(process.env.PORTAL_STORAGE_MODE, "dual");
-  assert.equal(process.env.SUPABASE_DB_URL, "postgresql://test:test@localhost/test");
+  const health = await fetch(`${backendUrl}/api/health`);
+  assert.deepEqual(await health.json(), { status: "ok", storage: "sqlite" });
+  const registration = await fetch(`${backendUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Local Teacher",
+      email: "local.teacher@example.com",
+      password: "secure-pass-123",
+      role: "teacher",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  assert.ok((await fs.stat(databasePath)).size > 0, "local SQLite file stores portal records");
+  assert.equal(remoteCalls, 0, "no online database calls are made");
 });
 
 test("separate portal frontends serve distinct entries and proxy to one API", async () => {
@@ -304,181 +246,4 @@ test("shared API keeps portal sessions isolated across local ports", async (cont
   });
   assert.equal(logout.status, 200);
   assert.match(logout.headers.get("set-cookie"), /^grade5_session_teacher=;/);
-});
-
-test("dual storage accepts local writes offline and synchronizes them when online", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-dual-offline-"));
-  const postgres = createPostgresPool();
-  const backend = createServer({
-    storageMode: "dual",
-    postgresPool: postgres.pool,
-    databasePath: path.join(directory, "database.sqlite"),
-    migrationWorkbookPath: path.join(__dirname, "..", "grade5-portal-database-template.xlsx"),
-    syncRetryIntervalMs: 25,
-  });
-  const backendUrl = await listen(backend);
-  context.after(async () => {
-    await close(backend);
-    await fs.rm(directory, { recursive: true, force: true });
-  });
-
-  const initialHealth = await fetch(`${backendUrl}/api/health`);
-  assert.deepEqual(await initialHealth.json(), {
-    status: "ok",
-    storage: "dual",
-    sync: "synced",
-  });
-
-  const registerBody = JSON.stringify({
-    name: "Offline Sync Teacher",
-    email: "offline.sync.teacher@example.com",
-    password: "secure-pass-123",
-    role: "teacher",
-    grade: "Grade 5",
-  });
-  const registerRequest = () => fetch(`${backendUrl}/api/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: registerBody,
-  });
-  postgres.setAvailable(false);
-  assert.equal((await registerRequest()).status, 503, "registration requires an online connection");
-  postgres.setAvailable(true);
-  assert.equal((await registerRequest()).status, 201);
-  assert.ok(postgres.revision > 1, "the new account is saved online before registration completes");
-  const login = () => fetch(`${backendUrl}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "offline.sync.teacher@example.com", password: "secure-pass-123", role: "teacher" }),
-  });
-  postgres.setAvailable(false);
-  assert.equal((await login()).status, 200);
-
-  await delay(150);
-  const offlineHealth = await fetch(`${backendUrl}/api/health`);
-  const offlineStatus = await offlineHealth.json();
-  assert.equal(offlineHealth.status, 200);
-  assert.equal(offlineStatus.storage, "dual");
-  assert.equal(offlineStatus.sync, "offline");
-
-  postgres.setAvailable(true);
-  await waitFor(async () => (await (await fetch(`${backendUrl}/api/health`)).json()).sync === "synced");
-  const syncedHealth = await fetch(`${backendUrl}/api/health`);
-  assert.deepEqual(await syncedHealth.json(), {
-    status: "ok",
-    storage: "dual",
-    sync: "synced",
-  });
-});
-
-test("Synchronize Data Online endpoint pushes pending changes on demand", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-dual-manual-"));
-  const postgres = createPostgresPool();
-  const backend = createServer({
-    storageMode: "dual",
-    postgresPool: postgres.pool,
-    databasePath: path.join(directory, "database.sqlite"),
-    migrationWorkbookPath: path.join(__dirname, "..", "grade5-portal-database-template.xlsx"),
-    syncRetryIntervalMs: 600000,
-  });
-  const backendUrl = await listen(backend);
-  context.after(async () => {
-    await close(backend);
-    await fs.rm(directory, { recursive: true, force: true });
-  });
-
-  assert.equal((await fetch(`${backendUrl}/api/sync`, { method: "POST" })).status, 401);
-
-  await fetch(`${backendUrl}/api/health`);
-  const registration = await fetch(`${backendUrl}/api/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "Manual Sync Teacher",
-      email: "manual.sync.teacher@example.com",
-      password: "secure-pass-123",
-      role: "teacher",
-      grade: "Grade 5",
-    }),
-  });
-  assert.equal(registration.status, 201);
-  const cookie = registration.headers.get("set-cookie").split(";")[0];
-  postgres.setAvailable(false);
-  const offlineLogin = await fetch(`${backendUrl}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "manual.sync.teacher@example.com", password: "secure-pass-123", role: "teacher" }),
-  });
-  assert.equal(offlineLogin.status, 200);
-  await delay(250);
-
-  const unavailable = await fetch(`${backendUrl}/api/sync`, { method: "POST", headers: { Cookie: cookie } });
-  assert.equal(unavailable.status, 503);
-
-  postgres.setAvailable(true);
-  const revisionBefore = postgres.revision;
-  const synced = await fetch(`${backendUrl}/api/sync`, { method: "POST", headers: { Cookie: cookie } });
-  assert.equal(synced.status, 200);
-  assert.equal((await synced.json()).state, "synced");
-  assert.ok(postgres.revision > revisionBefore);
-});
-
-test("dual storage pauses on revision conflicts without overwriting the online copy", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-dual-conflict-"));
-  const postgres = createPostgresPool();
-  const backend = createServer({
-    storageMode: "dual",
-    postgresPool: postgres.pool,
-    databasePath: path.join(directory, "database.sqlite"),
-    migrationWorkbookPath: path.join(__dirname, "..", "grade5-portal-database-template.xlsx"),
-    syncRetryIntervalMs: 25,
-  });
-  const backendUrl = await listen(backend);
-  context.after(async () => {
-    await close(backend);
-    await fs.rm(directory, { recursive: true, force: true });
-  });
-
-  const initialHealth = await fetch(`${backendUrl}/api/health`);
-  assert.equal((await initialHealth.json()).sync, "synced");
-  const onlineRegistration = await fetch(`${backendUrl}/api/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "Conflicting Sync Teacher",
-      email: "conflicting.sync.teacher@example.com",
-      password: "secure-pass-123",
-      role: "teacher",
-      grade: "Grade 5",
-    }),
-  });
-  assert.equal(onlineRegistration.status, 201);
-  const revisionAfterRegistration = postgres.revision;
-  postgres.setAvailable(false);
-  const registration = await fetch(`${backendUrl}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "conflicting.sync.teacher@example.com", password: "secure-pass-123", role: "teacher" }),
-  });
-  assert.equal(registration.status, 200);
-  postgres.advanceRemoteRevision();
-  postgres.setAvailable(true);
-
-  await waitFor(async () => {
-    const response = await fetch(`${backendUrl}/api/health`);
-    const status = await response.json();
-    return status.sync === "conflict";
-  });
-  assert.equal(postgres.revision, revisionAfterRegistration + 1);
-  const localDatabase = new DatabaseSync(path.join(directory, "database.sqlite"));
-  try {
-    const savedConflict = localDatabase.prepare(
-      "SELECT conflict, conflict_local_state, conflict_remote_state FROM portal_sync_state WHERE id = 1",
-    ).get();
-    assert.equal(savedConflict.conflict, 1);
-    assert.ok(savedConflict.conflict_local_state.length > 0);
-    assert.ok(savedConflict.conflict_remote_state.length > 0);
-  } finally {
-    localDatabase.close();
-  }
 });

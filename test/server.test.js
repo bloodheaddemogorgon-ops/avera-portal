@@ -1,7 +1,5 @@
 "use strict";
 
-process.env.NEON_AUTH_URL = "";
-
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
@@ -7468,97 +7466,4 @@ test("SQLite initialization can recover after a transient migration source failu
   const recoveredHealth = await fetch(healthUrl);
   assert.equal(recoveredHealth.status, 200, await recoveredHealth.clone().text());
   assert.deepEqual(await recoveredHealth.json(), { status: "ok", storage: "sqlite" });
-});
-
-test("Supabase PostgreSQL storage persists the portal state transactionally", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "grade5-portal-supabase-"));
-  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
-  await createEmptyTestWorkbook(migrationWorkbookPath);
-
-  let savedState = null;
-  const savedPhotos = new Map();
-  const queries = [];
-  const query = async (text, values = []) => {
-    const sql = text.trim().replace(/\s+/g, " ").toLowerCase();
-    queries.push(sql);
-    if (sql.startsWith("select 1 from portal_profile_photos")) {
-      return { rows: savedPhotos.has(values[0]) ? [{ "?column?": 1 }] : [], rowCount: savedPhotos.has(values[0]) ? 1 : 0 };
-    }
-    if (sql.startsWith("select photo_data from portal_profile_photos")) {
-      return { rows: savedPhotos.has(values[0]) ? [{ photo_data: savedPhotos.get(values[0]) }] : [], rowCount: 1 };
-    }
-    if (sql.startsWith("insert into portal_profile_photos")) {
-      savedPhotos.set(values[0], values[2]);
-      return { rows: [], rowCount: 1 };
-    }
-    if (sql.startsWith("select id from portal_state")) {
-      return { rows: savedState ? [{ id: 1 }] : [], rowCount: savedState ? 1 : 0 };
-    }
-    if (sql.startsWith("select workbook_state from portal_state")) {
-      return { rows: savedState ? [{ workbook_state: savedState }] : [], rowCount: savedState ? 1 : 0 };
-    }
-    if (sql.startsWith("insert into portal_state")) {
-      if (!savedState) savedState = Buffer.from(values[0]);
-      return { rows: [], rowCount: savedState ? 1 : 0 };
-    }
-    if (sql.startsWith("update portal_state")) {
-      savedState = Buffer.from(values[0]);
-      return { rows: [], rowCount: 1 };
-    }
-    return { rows: [], rowCount: 0 };
-  };
-  const postgresPool = {
-    query,
-    async connect() {
-      return { query, release() {} };
-    },
-    async end() {},
-  };
-  const server = createServer({ postgresPool, migrationWorkbookPath });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  context.after(async () => {
-    if (server.listening) {
-      await new Promise((resolve, reject) =>
-        server.close((error) => error ? reject(error) : resolve()));
-    }
-    await fs.rm(directory, { recursive: true, force: true });
-  });
-
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
-  const health = await fetch(`${baseUrl}/api/health`);
-  assert.equal(health.status, 200);
-  assert.deepEqual(await health.json(), { status: "ok", storage: "supabase" });
-
-  const registration = await fetch(`${baseUrl}/api/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "Supabase Teacher",
-      email: "supabase.teacher@example.com",
-      password: "secure-pass-123",
-      role: "teacher",
-      extra: "12",
-      grade: "Grade 5",
-    }),
-  });
-  assert.equal(registration.status, 201);
-  assert.ok(queries.includes("begin"));
-  assert.ok(queries.includes("commit"));
-  assert.ok(queries.some((sql) => sql.startsWith("update portal_state")));
-
-  const teacherCookie = registration.headers.get("set-cookie").split(";")[0];
-  const readProfile = async () => (await fetch(`${baseUrl}/api/teacher/profile`, {
-    headers: { Cookie: teacherCookie },
-  })).json();
-  assert.equal((await readProfile()).hasPhoto, false);
-  const profilePng = await sharp({
-    create: { width: 32, height: 32, channels: 4, background: { r: 26, g: 92, b: 156, alpha: 1 } },
-  }).png().toBuffer();
-  const savePhoto = await fetch(`${baseUrl}/api/teacher/profile/photo`, {
-    method: "PUT",
-    headers: { "Content-Type": "image/png", Cookie: teacherCookie },
-    body: profilePng,
-  });
-  assert.equal(savePhoto.status, 200);
-  assert.equal((await readProfile()).hasPhoto, true);
 });

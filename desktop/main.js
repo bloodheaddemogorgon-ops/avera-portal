@@ -4,7 +4,7 @@ const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 
-// Keep using the settings folder from the former "AVeRA" app name so saved online-database settings survive the rename.
+// Keep using the former app-data folder so existing local portal records remain available.
 const legacyUserDataPath = path.join(app.getPath("appData"), "AVeRA");
 if (require("node:fs").existsSync(legacyUserDataPath)) app.setPath("userData", legacyUserDataPath);
 
@@ -203,36 +203,7 @@ ipcMain.handle("app-version", (event) => {
   return app.getVersion();
 });
 
-ipcMain.handle("online-database-save", async (event, databaseUrl) => {
-  assertTrustedSender(event);
-  const { normalizeDatabaseUrl, saveOnlineDatabaseSettings } = require("./environment");
-  const url = new URL(normalizeDatabaseUrl(databaseUrl));
-  for (const parameter of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) url.searchParams.delete(parameter);
-  const { Pool } = require("pg");
-  const pool = new Pool({
-    connectionString: url.toString(),
-    ssl: { rejectUnauthorized: true },
-    max: 1,
-    connectionTimeoutMillis: 10000,
-  });
-  try {
-    await pool.query("SELECT 1");
-  } catch (error) {
-    throw new Error(`Could not connect to the Neon database: ${error.message}`);
-  } finally {
-    await pool.end().catch(() => undefined);
-  }
-  saveOnlineDatabaseSettings(app.getPath("userData"), databaseUrl);
-  setImmediate(() => {
-    portalServer?.closeAllConnections?.();
-    app.relaunch();
-    app.quit();
-  });
-  return { restarting: true };
-});
-
 async function startPortal() {
-  require("./environment").loadDesktopEnvironment(app.getPath("userData"));
   const { createServer } = require("../server");
   portalServer = createServer({
     teacherOnly: true,

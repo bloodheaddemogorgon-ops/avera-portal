@@ -23,13 +23,12 @@ const ExcelJS = require("exceljs");
 const JSZip = require("jszip");
 const XLSX = require("@e965/xlsx");
 const sharp = require("sharp");
-const { Pool } = require("pg");
 const { createAuthRateLimiter } = require("./auth-rate-limiter");
 const { calculateBmiForAge } = require("./who-growth-reference");
 
 const DOWNLOADS_DIRECTORY = path.join(os.homedir(), "Downloads");
 const DEFAULT_DATABASE_PATH = path.join(__dirname, "grade5-portal-database.sqlite");
-// Supabase defines the anon/authenticated roles; plain PostgreSQL (e.g. Neon) does not.
+// Retained only by the unreachable legacy PostgreSQL initialization path.
 const POSTGRES_REVOKE_PUBLIC_ACCESS_SQL = `
   DO $$
   DECLARE role_name text;
@@ -2462,10 +2461,11 @@ function createServer(options = {}) {
   const migrationWorkbookWasSpecified = Boolean(
     options.migrationWorkbookPath || process.env.PORTAL_MIGRATION_WORKBOOK,
   );
-  const supabaseDatabaseUrl = options.supabaseDatabaseUrl || process.env.SUPABASE_DB_URL;
-  const dualStorage = (options.storageMode || process.env.PORTAL_STORAGE_MODE) === "dual";
-  const neonAuthUrl = String(options.neonAuthUrl ?? process.env.NEON_AUTH_URL ?? "").trim().replace(/\/+$/, "");
-  if (neonAuthUrl) neonAuthColumnEnabled = true;
+  // The supported portal backend is local SQLite; cloud storage settings are ignored.
+  const dualStorage = false;
+  const postgresPool = null;
+  const storage = "sqlite";
+  const neonAuthUrl = "";
   const bootstrapAdminEmail = typeof options.bootstrapAdminEmail === "string"
     ? options.bootstrapAdminEmail.trim().toLowerCase()
     : "";
@@ -2482,25 +2482,6 @@ function createServer(options = {}) {
       || bootstrapAdminPassword.length > 256)) {
     throw new Error("The configured bootstrap administrator credentials are invalid.");
   }
-  const postgresConnectionUrl = supabaseDatabaseUrl ? new URL(supabaseDatabaseUrl) : null;
-  if (postgresConnectionUrl) {
-    for (const parameter of ["sslmode", "sslcert", "sslkey", "sslrootcert"]) {
-      postgresConnectionUrl.searchParams.delete(parameter);
-    }
-  }
-  const postgresPool = options.postgresPool || (supabaseDatabaseUrl
-    ? new Pool({
-      connectionString: postgresConnectionUrl.toString(),
-      ssl: { rejectUnauthorized: true },
-      max: 10,
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-    })
-    : null);
-  if (dualStorage && !postgresPool) {
-    throw new Error("PORTAL_STORAGE_MODE=dual requires a Neon/PostgreSQL URL (DATABASE_URL or SUPABASE_DB_URL).");
-  }
-  const storage = dualStorage ? "dual" : postgresPool ? "supabase" : "sqlite";
   const transactionContext = new AsyncLocalStorage();
   const profilePhotoDirectories = databasePath === DEFAULT_DATABASE_PATH
     ? [
@@ -11938,9 +11919,6 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 }
 
 if (require.main === module) {
-  if (!process.env.SUPABASE_DB_URL && process.env.DATABASE_URL) {
-    process.env.SUPABASE_DB_URL = process.env.DATABASE_URL;
-  }
   const configuredPort = process.env.PORT ? Number(process.env.PORT) : 3003;
   const host = process.env.HOST || "127.0.0.1";
   const maxPort = process.env.PORT ? configuredPort : configuredPort + 20;
@@ -11974,14 +11952,7 @@ if (require.main === module) {
       process.exitCode = 1;
     });
     server.listen(port, host, () => {
-      const hasRemoteUrl = Boolean(process.env.SUPABASE_DB_URL || process.env.DATABASE_URL);
-      if (process.env.PORTAL_STORAGE_MODE === "dual" && hasRemoteUrl) {
-        console.log("Using dual SQLite and Supabase PostgreSQL storage.");
-      } else if (hasRemoteUrl) {
-        console.log("Using PostgreSQL backend.");
-      } else {
-        console.log(`Using SQLite backend: ${path.resolve(DATABASE_PATH)}`);
-      }
+      console.log(`Using local SQLite database: ${path.resolve(DATABASE_PATH)}`);
       console.log(`${apiOnly ? "Shared API backend" : "Class Adviser's Portal"} is running at ${tlsKeyPath ? "https" : "http"}://${host}:${port}`);
     });
   }

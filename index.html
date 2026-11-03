@@ -3195,25 +3195,10 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                   <p class="notice" id="updateNotice" role="status" aria-live="polite"></p>
                 </div>
               </section>
-              <section class="data-card settings-card" aria-labelledby="syncDataTitle">
+              <section class="data-card settings-card" aria-labelledby="localDataTitle">
                 <div class="settings-card-header">
-                  <h2 id="syncDataTitle">Online data sync</h2>
-                  <p>Portal records are saved locally and synchronized with PostgreSQL when the online database is available.</p>
-                </div>
-                <div class="settings-card-body">
-                  <button class="btn settings-update-link" id="syncDataButton" type="button">Synchronize Data Online</button>
-                  <p class="notice" id="syncDataNotice" role="status" aria-live="polite"></p>
-                  <form id="neonConnectForm" hidden autocomplete="off">
-                    <label for="neonConnectionUrl">Neon connection string</label>
-                    <input id="neonConnectionUrl" type="password" placeholder="postgresql://user:password@host/dbname?sslmode=require" spellcheck="false" autocomplete="off">
-                    <p class="field-hint">Create a free database at neon.tech, then copy its pooled connection string. Your records stay saved on this computer; this only adds online backup and the Parents Portal feed. The app restarts after connecting.</p>
-                    <button class="btn settings-update-link" id="neonConnectButton" type="submit">Connect to Neon</button>
-                  </form>
-                  <div id="syncConflictActions" hidden>
-                    <p class="field-hint">Both versions are preserved. Choose which complete workbook to keep. This replaces the other copy.</p>
-                    <button class="btn settings-update-link" id="keepLocalSync" type="button">Keep this device's data</button>
-                    <button class="btn ghost settings-update-link" id="keepOnlineSync" type="button">Keep online data</button>
-                  </div>
+                  <h2 id="localDataTitle">Local data</h2>
+                  <p>Your classroom records and accounts are saved in this device's local database. No online database is connected.</p>
                 </div>
               </section>
             </div>
@@ -3600,7 +3585,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   var activeGradeSelection={studentId:"",term:"Term 1"};
   var gradesDirty=false;
   var activeTermLocked=false;
-  var onlineSyncState="disabled";
   var activeEClassGradeSubjects=new Set();
   var gradeRecordLoading=false;
   var gradeRecordAvailable=false;
@@ -3834,34 +3818,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     return result;
   }
 
-  function applyStorageHealth(result){
-    onlineSyncState=result.storage==="dual"?result.sync:"disabled";
-    $("storageStatus").textContent=result.storage==="dual"
-      ?result.sync==="synced"?"Connected. Portal records are saved locally and synchronized online."
-        :result.sync==="conflict"?"Local and online data changed independently. Sync is paused to protect both copies; contact an administrator."
-          :result.sync==="offline"?"Offline mode. Portal records are saved locally and will synchronize when online."
-            :"Connected locally. Online synchronization is pending."
-      :"Connected. Portal records are saved to the configured database.";
-    $("syncDataButton").hidden=result.storage!=="dual"||result.sync==="conflict";
-    $("syncConflictActions").hidden=!(result.storage==="dual"&&result.sync==="conflict"
-      &&currentUser&&(currentUser.isAdmin||currentUser.role==="teacher"));
-    var canConfigureOnline=result.storage!=="dual"&&window.gradePortal&&typeof window.gradePortal.saveOnlineDatabase==="function";
-    $("neonConnectForm").hidden=!canConfigureOnline;
-    if(result.storage!=="dual"){
-      $("syncDataNotice").textContent=canConfigureOnline
-        ?"Online sync is not connected yet. Records are saved on this computer. Paste your Neon connection string below to back them up online."
-        :"Online sync is disabled on this server. Configure PORTAL_STORAGE_MODE=dual and SUPABASE_DB_URL, then restart it.";
-    }else if(result.sync==="synced"){
-      $("syncDataNotice").textContent="Local and online portal records are synchronized.";
-    }else if(result.sync==="conflict"){
-      $("syncDataNotice").textContent=currentUser&&(currentUser.isAdmin||currentUser.role==="teacher")
-        ?"A conflict is paused. Review both copies before choosing one."
-        :"Synchronization is paused. Sign in to choose which saved copy to keep. This replaces the other copy.";
-    }else if(result.sync==="offline"){
-      $("syncDataNotice").textContent="The online database is unavailable. Local changes are kept and will retry automatically.";
-    }else{
-      $("syncDataNotice").textContent="Local changes are waiting to synchronize.";
-    }
+  function applyStorageHealth(){
+    $("storageStatus").textContent="Connected. Portal records are saved on this device.";
   }
 
   document.querySelectorAll(".tab[role='tab']").forEach(function(b){b.onclick=function(){mode=b.dataset.mode;render()}});
@@ -10925,63 +10883,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       }
     };
   })();
-  $("neonConnectForm").onsubmit=async function(event){
-    event.preventDefault();
-    var button=$("neonConnectButton"),notice=$("syncDataNotice"),input=$("neonConnectionUrl");
-    button.disabled=true;
-    notice.classList.remove("error");
-    notice.textContent="Testing the Neon connection...";
-    try{
-      await window.gradePortal.saveOnlineDatabase(input.value);
-      input.value="";
-      notice.textContent="Connected. Restarting the app to start online sync...";
-    }catch(error){
-      notice.textContent=String(error.message||error).replace(/^Error invoking remote method '[^']+': (Error: )?/,"");
-      notice.classList.add("error");
-      button.disabled=false;
-    }
-  };
-  $("syncDataButton").onclick=async function(){
-    var button=$("syncDataButton"),notice=$("syncDataNotice");
-    button.disabled=true;
-    notice.classList.remove("error");
-    notice.textContent="Synchronizing with the online database...";
-    var failure="";
-    try{
-      await api("/api/sync",{method:"POST"});
-    }catch(error){
-      failure=error.message;
-    }
-    await refreshStorageStatus();
-    if(failure){
-      notice.textContent=failure;
-      notice.classList.add("error");
-    }else if(onlineSyncState==="synced"){
-      notice.textContent="Synchronized just now. Local and online portal records match.";
-    }
-    button.disabled=false;
-  };
-  async function resolveOnlineSyncConflict(resolution){
-    $("keepLocalSync").disabled=true;
-    $("keepOnlineSync").disabled=true;
-    try{
-      await api("/api/admin/sync/resolve",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({resolution:resolution})
-      });
-      await refreshStorageStatus();
-    }catch(error){
-      $("syncDataNotice").textContent=error.message;
-      $("syncDataNotice").classList.add("error");
-      await refreshStorageStatus();
-    }finally{
-      $("keepLocalSync").disabled=false;
-      $("keepOnlineSync").disabled=false;
-    }
-  }
-  $("keepLocalSync").onclick=function(){resolveOnlineSyncConflict("local")};
-  $("keepOnlineSync").onclick=function(){resolveOnlineSyncConflict("online")};
   $("performanceModeToggle").onclick=function(){
     applyPerformanceMode(!performanceModeEnabled);
     $("performanceNotice").classList.remove("error");
@@ -13120,7 +13021,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         throw new Error("The backend is unavailable.");
       }
       var result=await response.json();
-      if(result.status!=="ok"||!["sqlite","supabase","dual"].includes(result.storage)){
+      if(result.status!=="ok"||result.storage!=="sqlite"){
         throw new Error("The portal database is unavailable.");
       }
       applyStorageHealth(result);
@@ -13133,7 +13034,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       return result;
     }catch(error){
       $("storageStatus").textContent="Backend not connected. Run start-portal.bat or npm start, then open the address shown in the terminal.";
-      $("syncDataNotice").textContent="The backend could not report online synchronization status.";
       return null;
     }
   }

@@ -1,6 +1,6 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.41",
+  "version": "1.0.42",
   "private": true,
   "description": "Grade 5 Class Portal desktop application",
   "main": "desktop/main.js",
@@ -20,7 +20,6 @@
     "start:admin": "node portal-frontend.js admin",
     "desktop": "electron .",
     "dist:win": "electron-builder --win nsis --publish never",
-    "dist:private": "node scripts/build-private.js",
     "release": "node scripts/release.js",
     "check": "node scripts/check.js",
     "typecheck": "tsc --noEmit",
@@ -28,8 +27,6 @@
   },
   "dependencies": {
     "@e965/xlsx": "^0.20.3",
-    "@neon/config": "^1.10.0",
-    "@neon/env": "^1.6.8",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "bcryptjs": "^3.0.3",
@@ -40,7 +37,6 @@
     "jspdf": "^4.2.1",
     "jszip": "^3.10.2",
     "next": "^16.4.3",
-    "pg": "^8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "recharts": "^3.10.1",

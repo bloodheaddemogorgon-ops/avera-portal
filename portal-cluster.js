@@ -73,11 +73,13 @@ function stopServices(exitCode) {
 
 function startService(service) {
   const childEnvironment = { ...process.env, ...service.env };
+  for (const key of ["DATABASE_URL", "SUPABASE_DB_URL", "PORTAL_STORAGE_MODE", "NEON_AUTH_URL"]) {
+    delete childEnvironment[key];
+  }
   if (service.name !== "shared API backend") {
     delete childEnvironment.ADMIN_EMAIL;
     delete childEnvironment.ADMIN_PASSWORD;
     delete childEnvironment.PORTAL_ADMIN_SECRET_FILE;
-    delete childEnvironment.SUPABASE_DB_URL;
   }
   const child = spawn(
     process.execPath,

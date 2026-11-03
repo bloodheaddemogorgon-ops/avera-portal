@@ -13,10 +13,6 @@ services:
         value: "22"
       - key: PORTAL_TRUST_PROXY
         value: "true"
-      - key: PORTAL_STORAGE_MODE
-        value: dual
-      - key: DATABASE_URL
-        sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD
