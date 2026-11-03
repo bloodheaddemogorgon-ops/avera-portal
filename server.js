@@ -3431,6 +3431,12 @@ async function deleteInventoryItem(session, id) {
       if (row && cellText(row.getCell(columns.status).value).toLowerCase() !== "active") {
         throw new Error("The configured bootstrap administrator account is inactive.");
       }
+      if (row) {
+        throw new Error(
+          "The configured bootstrap email belongs to an existing non-administrator account. "
+          + "Bootstrap credentials were not allowed to overwrite or convert that account.",
+        );
+      }
 
       const passwordHash = await hashAdminPassword(bootstrapAdminPassword);
       if (!row) {
@@ -3529,6 +3535,60 @@ async function deleteInventoryItem(session, id) {
     for (const [sessionId, activeSession] of sessions) {
       if (activeSession.adminUserId === userId) sessions.delete(sessionId);
     }
+  }
+
+  async function refreshSessionAccount(session) {
+    if (!session?.sessionId) return;
+    await serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { sheet, columns } = getUserSheet(workbook);
+      const storedSession = sessions.get(session.sessionId);
+      if (!storedSession) return;
+
+      let accountRow = null;
+      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+        const row = sheet.getRow(rowNumber);
+        if (cellText(row.getCell(columns.id).value) === storedSession.adminUserId) {
+          accountRow = row;
+          break;
+        }
+      }
+      if (!accountRow
+        || cellText(accountRow.getCell(columns.status).value).toLowerCase() !== "active") {
+        sessions.delete(session.sessionId);
+        return;
+      }
+
+      storedSession.isAdmin = cellText(accountRow.getCell(columns.adminAccess).value).toLowerCase() === "true";
+      storedSession.mustChangePassword =
+        cellText(accountRow.getCell(columns.mustChangePassword).value).toLowerCase() === "true";
+      storedSession.adminName = cellText(accountRow.getCell(columns.name).value) || storedSession.adminName;
+
+      if (storedSession.isAdmin && storedSession.userId !== storedSession.adminUserId) {
+        let activeTeacherRow = null;
+        for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+          const row = sheet.getRow(rowNumber);
+          if (cellText(row.getCell(columns.id).value) === storedSession.userId) {
+            activeTeacherRow = row;
+            break;
+          }
+        }
+        if (!activeTeacherRow
+          || cellText(activeTeacherRow.getCell(columns.status).value).toLowerCase() !== "active"
+          || cellText(activeTeacherRow.getCell(columns.role).value).toLowerCase() !== "teacher") {
+          sessions.delete(session.sessionId);
+          return;
+        }
+        storedSession.name = cellText(activeTeacherRow.getCell(columns.name).value) || storedSession.name;
+        storedSession.role = "teacher";
+        storedSession.classId = cellText(activeTeacherRow.getCell(columns.classId).value);
+      } else {
+        storedSession.name = cellText(accountRow.getCell(columns.name).value) || storedSession.name;
+        storedSession.role = cellText(accountRow.getCell(columns.role).value).toLowerCase();
+        storedSession.userId = storedSession.adminUserId;
+        storedSession.classId = cellText(accountRow.getCell(columns.classId).value);
+      }
+    });
   }
 
   function requireTeacherSession(request) {
@@ -10992,13 +11052,17 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       }
       if (url.pathname.startsWith("/api/")) await ensureBootstrapAdmin();
       const currentSession = url.pathname.startsWith("/api/") ? getSession(request) : null;
+      if (currentSession) {
+        await refreshSessionAccount(currentSession);
+      }
+      const refreshedSession = url.pathname.startsWith("/api/") ? getSession(request) : null;
       const allowedDuringPasswordChange = (request.method === "GET" && url.pathname === "/api/auth/session")
         || (request.method === "POST" && url.pathname === "/api/auth/logout")
         || (request.method === "PUT" && url.pathname === "/api/auth/change-password")
         || (request.method === "GET" && url.pathname === "/api/health")
         || (request.method === "GET" && url.pathname === "/api/preferences/appearance")
         || (request.method === "PUT" && url.pathname === "/api/preferences/appearance");
-      if (currentSession?.mustChangePassword && !allowedDuringPasswordChange) {
+      if (refreshedSession?.mustChangePassword && !allowedDuringPasswordChange) {
         sendJson(response, 403, { error: "Change your temporary password before using the portal." });
         return;
       }
