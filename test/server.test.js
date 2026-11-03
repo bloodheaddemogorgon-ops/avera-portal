@@ -212,6 +212,19 @@ test("E-Class score inputs reconcile with refreshed and cleared student rosters"
   assert.equal(storedScores.size, 1);
 });
 
+test("E-Class drafts are persisted through the backend and flushed before sign out", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
+
+  assert.match(serverSource, /\/api\/e-class\/draft/);
+  assert.match(serverSource, /async function saveEClassDraft/);
+  assert.match(serverSource, /recordRow\.getCell\(columns\.locked\)\.value = false/);
+  assert.match(portalPage, /api\("\/api\/e-class\/draft"/);
+  assert.match(portalPage, /window\.flushEClassDraftSave=async function/);
+  assert.match(portalPage, /await window\.flushEClassDraftSave\(\)/);
+  assert.match(portalPage, /It will remain after sign out/);
+});
+
 test("E-Class score validation enforces each highest-possible-score limit", async () => {
   const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
   const helperSource = portalPage.match(

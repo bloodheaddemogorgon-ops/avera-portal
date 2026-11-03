@@ -1946,7 +1946,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         <div class="sidebar-bottom">
           <button class="logout-link" type="button" data-logout>Sign out</button>
           <img class="sidebar-footer-icon" src="/icon.png" alt="" aria-hidden="true">
-          <span class="sidebar-footer-version">GraceDesk · Version 1.0.43</span>
+          <span class="sidebar-footer-version">GraceDesk · Version 1.0.44</span>
         </div>
       </aside>
       <button class="sidebar-scrim" id="sidebarScrim" type="button" aria-label="Close menu"></button>
@@ -3212,7 +3212,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.43</p>
+                  <p class="developer-update-meta">Version 1.0.44</p>
                   <ul class="developer-update-list">
                     <li>Classroom records, accounts and settings are now saved locally on this device through SQLite.</li>
                     <li>The online database and automatic cloud account synchronization have been removed from the active portal.</li>
@@ -3222,6 +3222,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                     <li>Long-running desktop sessions now clear interrupted drag-scroll and pointer state automatically.</li>
                     <li>Active sessions are refreshed against the local account database so account changes and classroom links stay current.</li>
                     <li>Bootstrap setup no longer overwrites or converts an existing teacher account.</li>
+                    <li>E-Class scores and calculated student grades now save as database drafts before the record is locked.</li>
+                    <li>E-Class data remains linked to each student ID, classroom, term, subject, and section after sign out or restart.</li>
+                    <li>MPS reports now read saved E-Class and term-grade data from the local database backend.</li>
                   </ul>
                 </div>
               </section>
@@ -6753,6 +6756,71 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       var values=Array.from(row.querySelectorAll("input[data-score-index]")).map(function(input){return input.value.trim()});
       window.localStorage.setItem(key,JSON.stringify(values));
     }
+    var eClassDraftTimer=null;
+    var eClassDraftSaving=false;
+    var eClassDraftQueued=false;
+    window.flushEClassDraftSave=async function(){
+      window.clearTimeout(eClassDraftTimer);
+      if(!eClassDirty||recordLocked||recordLoading)return;
+      var studentRows=Array.from(table.querySelectorAll("tbody tr[data-student-id]"));
+      await api("/api/e-class/draft",{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          term:selectedTerm,
+          subject:selectedSubject,
+          mapehGroup:selectedMapehGroup,
+          section:selectedSection,
+          highestScores:highestScoreMaxima,
+          students:studentRows.map(function(row){
+            return {
+              id:row.dataset.studentId,
+              scores:Array.from(row.querySelectorAll("input[data-score-index]")).map(function(input){return input.value.trim()}),
+              grade:""
+            };
+          })
+        })
+      });
+    };
+    function queueEClassDraftSave(){
+      eClassDraftQueued=true;
+      if(eClassDraftSaving)return;
+      window.clearTimeout(eClassDraftTimer);
+      eClassDraftTimer=window.setTimeout(async function(){
+        if(eClassDraftSaving)return;
+        eClassDraftSaving=true;
+        try{
+          var studentRows=Array.from(table.querySelectorAll("tbody tr[data-student-id]"));
+          await api("/api/e-class/draft",{
+            method:"PUT",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({
+              term:selectedTerm,
+              subject:selectedSubject,
+              mapehGroup:selectedMapehGroup,
+              section:selectedSection,
+              highestScores:highestScoreMaxima,
+              students:studentRows.map(function(row){
+                return {
+                  id:row.dataset.studentId,
+                  scores:Array.from(row.querySelectorAll("input[data-score-index]")).map(function(input){return input.value.trim()}),
+                  grade:""
+                };
+              })
+            })
+          });
+          eClassDraftQueued=false;
+          eClassNotice.classList.remove("error");
+          eClassNotice.textContent="E-Class draft saved to the local database. It will remain after sign out.";
+        }catch(error){
+          eClassNotice.classList.add("error");
+          eClassNotice.textContent="Could not save the E-Class draft to the backend: "+error.message;
+        }finally{
+          eClassDraftSaving=false;
+          if(eClassDraftQueued)queueEClassDraftSave();
+        }
+      },350);
+    }
     table.addEventListener("input",function(event){
       var maximumCell=event.target.closest("th[data-highest-possible-score]");
       if(maximumCell){
@@ -6798,6 +6866,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         });
         try{
           persistHighestScores();
+          queueEClassDraftSave();
           if(scoreSaveError){
             eClassNotice.classList.add("error");
             eClassNotice.textContent="Could not save scores cleared by the updated maximum: "+scoreSaveError;
@@ -6833,6 +6902,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       eClassDirty=true;
       try{
         persistStudentScores(row);
+        queueEClassDraftSave();
         eClassNotice.classList.remove("error");
         eClassNotice.textContent="Draft scores saved in this browser for "+row.dataset.studentName+". Select Save & Lock Record to save changes.";
       }catch(error){
@@ -6851,19 +6921,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         +encodeURIComponent(selectedSubject)+mapehStorageSuffix+":"+encodeURIComponent(row.dataset.studentId);
       try{
         var storedScores=eClassRecord.scores&&eClassRecord.scores[row.dataset.studentId];
-        var localScores=null;
-        if(!recordLocked){
-          var savedScores=window.localStorage.getItem(key);
-          if(savedScores!==null){
-            localScores=JSON.parse(savedScores);
-            if(!Array.isArray(localScores)||localScores.length!==11
-              ||localScores.some(function(score){return typeof score!=="string"})){
-              throw new Error("Saved learner score data is invalid.");
-            }
-            if(!recordSaved||JSON.stringify(localScores)!==JSON.stringify(storedScores))eClassDirty=true;
-          }
-        }
-        var rowScores=localScores||storedScores;
+        var rowScores=storedScores;
         if(rowScores!==undefined&&rowScores!==null){
           if(!Array.isArray(rowScores)||rowScores.length!==11
             ||rowScores.some(function(score){return typeof score!=="string"})){
@@ -13002,6 +13060,11 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   async function signOut(){
     if((readingDirty||rmaDirty||attendanceDirty||teacherProfileDirty||teacherPasswordDirty)
       &&!window.confirm("Discard unsaved changes?"))return;
+    try{
+      if(typeof window.flushEClassDraftSave==="function")await window.flushEClassDraftSave();
+    }catch(error){
+      console.error("Could not flush the E-Class draft before sign out:",error);
+    }
     readingDirty=false;
     rmaDirty=false;
     attendanceDirty=false;

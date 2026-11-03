@@ -5847,6 +5847,121 @@ async function deleteInventoryItem(session, id) {
     });
   }
 
+  async function saveEClassDraft(session, data) {
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const selection = getEClassSelection(session, workbook, data);
+      if (!selection.students.length) {
+        throw new HttpError(400, "There are no learners in the selected E-Class record to save.");
+      }
+      const scores = data.students;
+      const maxima = data.highestScores;
+      if (!Array.isArray(maxima) || maxima.length !== 11
+        || maxima.some((value) => typeof value !== "string" || value.length > 50
+          || value.trim() !== "" && (!Number.isFinite(Number(value)) || Number(value) <= 0))) {
+        throw new HttpError(400, "Enter 11 valid highest-possible-score values or leave them blank.");
+      }
+      if (!Array.isArray(scores) || scores.length !== selection.students.length
+        || scores.some((entry) => !entry || typeof entry.id !== "string"
+          || !Array.isArray(entry.scores) || entry.scores.length !== 11
+          || entry.scores.some((value) => typeof value !== "string" || value.length > 120))) {
+        throw new HttpError(400, "The E-Class scores are incomplete or invalid.");
+      }
+      const scoresByStudent = new Map(scores.map((entry) => [entry.id, entry]));
+      if (scoresByStudent.size !== scores.length
+        || selection.students.some((student) => !scoresByStudent.has(student.id))
+        || scores.some((entry) => !selection.students.some((student) => student.id === entry.id))) {
+        throw new HttpError(409, "The E-Class roster changed. Refresh the record and try again.");
+      }
+      for (const entry of scores) {
+        entry.scores.forEach((value, index) => {
+          if (!value.trim()) return;
+          const score = Number(value);
+          const maximum = Number(maxima[index]);
+          if (!Number.isFinite(score) || score < 0 || !Number.isFinite(maximum) || maximum <= 0 || score > maximum) {
+            throw new HttpError(400, `A learner score is invalid or exceeds highest possible score ${index + 1}.`);
+          }
+        });
+      }
+
+      const { sheet, columns } = getGradeSheet(workbook);
+      const now = new Date();
+      const savedGrades = {};
+      for (const student of selection.students) {
+        const entry = scoresByStudent.get(student.id);
+        const termGrade = computeEClassTermGrade(entry.scores, maxima, selection.subject, selection.gradingMethod).termGrade;
+        const grade = validateStudentGrades(
+          { [selection.gradeSubject]: termGrade },
+          selection.gradeSubjectDefinitions,
+        )[selection.gradeSubject];
+        savedGrades[student.id] = grade === null ? "" : String(grade);
+
+        let gradeRow = null;
+        for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+          const row = sheet.getRow(rowNumber);
+          if (
+            cellText(row.getCell(columns.studentId).value) === student.id
+            && cellText(row.getCell(columns.classId).value) === session.classId
+            && cellText(row.getCell(columns.teacherUserId).value) === session.userId
+            && cellText(row.getCell(columns.term).value) === selection.term
+            && cellText(row.getCell(columns.subject).value) === selection.gradeSubject
+          ) {
+            gradeRow = row;
+            break;
+          }
+        }
+        if (!gradeRow) {
+          gradeRow = writeRow(sheet, [columns.id, columns.subject], {
+            [columns.id]: nextGradeId(sheet, columns.id),
+            [columns.studentId]: student.id,
+            [columns.classId]: session.classId,
+            [columns.teacherUserId]: session.userId,
+            [columns.term]: selection.term,
+            [columns.subject]: selection.gradeSubject,
+          });
+        }
+        if (cellText(gradeRow.getCell(columns.source).value).toLowerCase() !== "e-class"
+          || cellText(gradeRow.getCell(columns.grade).value) !== "") {
+          // Replace incomplete or existing E-Class-derived values with the current calculation.
+          gradeRow.getCell(columns.grade).value = grade;
+        } else {
+          gradeRow.getCell(columns.grade).value = grade;
+        }
+        gradeRow.getCell(columns.source).value = grade === null ? "" : "E-Class";
+        gradeRow.getCell(columns.updated).value = now;
+      }
+
+      const { sheet: recordSheet, columns: recordColumns } = getEClassRecordSheet(workbook);
+      let recordRow = null;
+      for (let rowNumber = 2; rowNumber <= recordSheet.rowCount; rowNumber += 1) {
+        const row = recordSheet.getRow(rowNumber);
+        if (eClassRecordMatches(row, recordColumns, session, selection)) {
+          recordRow = row;
+          break;
+        }
+      }
+      if (recordRow && (recordRow.getCell(recordColumns.locked).value === true
+        || cellText(recordRow.getCell(recordColumns.locked).value).toLowerCase() === "true")) {
+        throw new HttpError(409, "This E-Class record is locked. Unlock it before saving a draft.");
+      }
+      if (!recordRow) recordRow = recordSheet.getRow(recordSheet.rowCount + 1);
+      const scoresById = Object.fromEntries(scores.map(({ id, scores: values }) => [id, values]));
+      recordRow.getCell(recordColumns.classId).value = session.classId;
+      recordRow.getCell(recordColumns.teacherUserId).value = session.userId;
+      recordRow.getCell(recordColumns.term).value = selection.term;
+      recordRow.getCell(recordColumns.subject).value = selection.subject;
+      recordRow.getCell(recordColumns.mapehGroup).value = selection.mapehGroup;
+      recordRow.getCell(recordColumns.section).value = selection.section;
+      recordRow.getCell(recordColumns.scores).value = JSON.stringify(scoresById);
+      recordRow.getCell(recordColumns.highestScores).value = JSON.stringify(maxima);
+      recordRow.getCell(recordColumns.grades).value = JSON.stringify(savedGrades);
+      recordRow.getCell(recordColumns.locked).value = false;
+      recordRow.getCell(recordColumns.updated).value = now;
+      await saveDatabaseWorkbook(workbook);
+      return { saved: true, draft: true, locked: false };
+    });
+  }
+
   async function saveEClassRecord(session, data) {
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
@@ -11627,6 +11742,12 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "PUT" && url.pathname === "/api/e-class/record") {
         const session = requireTeacherSession(request);
         sendJson(response, 200, await saveEClassRecord(session, await readJson(request, 1048576)));
+        return;
+      }
+
+      if (request.method === "PUT" && url.pathname === "/api/e-class/draft") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await saveEClassDraft(session, await readJson(request, 1048576)));
         return;
       }
 
