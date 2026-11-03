@@ -7279,6 +7279,51 @@ test("trusted proxy mode marks session cookies Secure and rate-limits by forward
   assert.notEqual((await login({ "X-Forwarded-For": "198.51.100.7" }, "nobody-other@example.com")).status, 429, "other clients behind the proxy are not locked out");
 });
 
+test("registered accounts normalize email, hash passwords, and accept normalized sign-in", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "grade5-auth-normalization-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  const server = createServer({ databasePath, migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const password = "secure-pass-123";
+  const registration = await fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Case Login Teacher",
+      email: "  Case.Login@Example.com ",
+      password,
+      role: "teacher",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+
+  const users = readPortalDatabaseWorkbook(databasePath).getWorksheet("Users");
+  assert.equal(String(users.getRow(2).getCell(4).value), "case.login@example.com");
+  const storedPassword = String(users.getRow(2).getCell(5).value);
+  assert.match(storedPassword, /^pbkdf2\$\d+\$[A-Za-z0-9+/]+=*\$[A-Za-z0-9+/]+=*$/);
+  assert.notEqual(storedPassword, password);
+
+  const login = await fetch(`${baseUrl}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: " CASE.LOGIN@EXAMPLE.COM ",
+      password,
+      role: "teacher",
+    }),
+  });
+  assert.equal(login.status, 200);
+});
+
 test("registration rejects a class code that is not in the workbook", async (context) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "grade5-portal-"));
   const databasePath = path.join(directory, "database.sqlite");
@@ -7489,4 +7534,66 @@ test("SQLite initialization can recover after a transient migration source failu
   const recoveredHealth = await fetch(healthUrl);
   assert.equal(recoveredHealth.status, 200, await recoveredHealth.clone().text());
   assert.deepEqual(await recoveredHealth.json(), { status: "ok", storage: "sqlite" });
+});
+
+test("classroom API scopes every operation to the calling owner", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "classroom-owner-"));
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  process.env.PORTAL_DEV_USER_ID = "dev-user-123";
+  const server = createServer({ databasePath: path.join(directory, "database.sqlite"), migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    delete process.env.PORTAL_DEV_USER_ID;
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const call = (route, userId, method = "GET", body) => fetch(`${baseUrl}${route}`, {
+    method,
+    headers: { ...(userId ? { "x-dev-user-id": userId } : {}), ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  assert.equal((await call("/api/classrooms", null)).status, 401);
+  assert.equal((await call("/api/classrooms", "someone-else")).status, 401);
+
+  const created = await call("/api/classrooms", "dev-user-123", "POST", {
+    classroom: "Owner Room", grade: "Grade 5", section: "Mabini", teacherId: "attacker",
+  });
+  assert.equal(created.status, 201);
+  const { classroom } = await created.json();
+  assert.equal(classroom.section, "Mabini");
+
+  const listed = await (await call("/api/classrooms", "dev-user-123")).json();
+  assert.deepEqual(listed.classrooms.map((item) => item.id), [classroom.id]);
+
+  const updated = await call(`/api/classrooms/${classroom.id}`, "dev-user-123", "PATCH", { section: "Rizal" });
+  assert.equal((await updated.json()).classroom.section, "Rizal");
+
+  const otherTeacher = await fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Other Teacher", email: "other.teacher@example.com", password: "secure-pass-123",
+      role: "teacher", extra: "Other Room", grade: "Grade 4",
+    }),
+  });
+  const otherCookie = otherTeacher.headers.get("set-cookie").split(";")[0];
+  const otherList = await (await fetch(`${baseUrl}/api/classrooms`, { headers: { Cookie: otherCookie } })).json();
+  assert.equal(otherList.classrooms.some((item) => item.id === classroom.id), false);
+  for (const method of ["GET", "PATCH", "DELETE"]) {
+    const denied = await fetch(`${baseUrl}/api/classrooms/${classroom.id}`, {
+      method,
+      headers: { Cookie: otherCookie, "Content-Type": "application/json" },
+      body: method === "PATCH" ? JSON.stringify({ section: "Hijacked" }) : undefined,
+    });
+    assert.equal(denied.status, 403, method);
+  }
+
+  assert.equal((await call(`/api/classrooms/${classroom.id}`, "dev-user-123", "DELETE")).status, 200);
+  assert.equal((await call(`/api/classrooms/${classroom.id}`, "dev-user-123")).status, 403);
 });

@@ -9,9 +9,9 @@ The default app uses the existing Node.js backend and local SQLite database. It 
 3. Open the teacher portal at `http://127.0.0.1:3004`. The admin portal is at port `3006`.
 4. The backend API runs at `http://127.0.0.1:3003`. Check `http://127.0.0.1:3003/api/health`; local mode should report `"storage":"sqlite"`.
 
-Records are always stored in `grade5-portal-database.sqlite` in this project folder. Set `PORTAL_DATABASE_PATH` to a private, writable local path if you want the database stored elsewhere. The active portal does not use `DATABASE_URL`, `SUPABASE_DB_URL`, or `PORTAL_STORAGE_MODE`.
+Records are always stored in `grade5-portal-database.sqlite` in this project folder. Set `PORTAL_DATABASE_PATH` to a private, writable local path if you want the database stored elsewhere. Profile photos and school logos are stored as files next to the database, not inside it.
 
-The separate Next.js/Supabase prototype can still be run explicitly with `npm run dev:next`; it is not the active portal described here.
+The Next.js authentication screens can be run with `npm run dev:next`; this starts the local SQLite API and Next.js together. Visit `http://localhost:3000/login` or `/register`. Account passwords are stored as protected hashes in the local portal database; session cookies are HttpOnly and credentials are not stored in browser local storage.
 
 ## Project documentation
 
@@ -60,7 +60,7 @@ On a new computer, install Node.js 22.5 or newer and start the legacy portal wit
 
 ## Local-only data storage
 
-The active portal stores each installation's records in its local SQLite file. Online database connections and record synchronization are not supported. Existing records that exist only in an online database are not imported automatically and remain untouched there; export them before switching if you need a local copy. The separate Next.js prototype remains independent and uses Supabase when run explicitly.
+The active portal stores each installation's records in its local SQLite file. Online database connections and record synchronization are not supported. Existing records that exist only in an online database are not imported automatically and remain untouched there; export them before switching if you need a local copy.
 
 ## SQLite backend
 

@@ -19,10 +19,6 @@ function stop(code) {
 
 function start(script, args, env) {
   const childEnv = { ...process.env, ...env };
-  delete childEnv.SUPABASE_DB_URL;
-  delete childEnv.DATABASE_URL;
-  delete childEnv.PORTAL_STORAGE_MODE;
-  delete childEnv.NEON_AUTH_URL;
   const child = spawn(process.execPath, [path.join(__dirname, script), ...args], {
     env: childEnv,
     stdio: "inherit",

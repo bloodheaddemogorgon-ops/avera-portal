@@ -61,16 +61,21 @@ if (capture("gh", ["release", "view", tag, ...repoArgs]).ok) {
 console.log(`Building GraceDesk ${version}...`);
 run("npm", ["run", "check"]);
 run("npm", ["run", "dist:win:x64"]);
-run("npm", ["run", "dist:win:ia32"]);
+const x64Only = process.argv.includes("--x64-only");
+if (!x64Only) run("npm", ["run", "dist:win:ia32"]);
 
 const releaseDir = path.join(root, "release");
 const assets = fs.readdirSync(releaseDir)
-  .filter((name) => name.includes(version) && (name.endsWith(".exe") || name.endsWith(".blockmap")))
+  .filter((name) => name.includes(version)
+    && (name.endsWith(".exe") || name.endsWith(".blockmap"))
+    && (!x64Only || name.includes("-x64.")))
   .concat(fs.existsSync(path.join(releaseDir, "latest.yml")) ? ["latest.yml"] : [])
-  .concat(fs.existsSync(path.join(releaseDir, "latest-ia32.yml")) ? ["latest-ia32.yml"] : [])
+  .concat(!x64Only && fs.existsSync(path.join(releaseDir, "latest-ia32.yml")) ? ["latest-ia32.yml"] : [])
   .map((name) => path.join(releaseDir, name));
 
-if (!assets.some((file) => file.endsWith("latest.yml")) || !assets.some((file) => file.endsWith("latest-ia32.yml")) || !assets.some((file) => file.endsWith(".exe"))) {
+if (!assets.some((file) => file.endsWith("latest.yml"))
+  || (!x64Only && !assets.some((file) => file.endsWith("latest-ia32.yml")))
+  || !assets.some((file) => x64Only ? file.endsWith("-x64.exe") : file.endsWith(".exe"))) {
   console.error("Build output is missing an installer or architecture update metadata.");
   process.exit(1);
 }

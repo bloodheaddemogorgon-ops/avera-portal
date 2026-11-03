@@ -1,6 +1,6 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.49",
+  "version": "1.0.52",
   "private": true,
   "description": "Grade 5 Class Portal desktop application",
   "main": "desktop/main.js",
@@ -9,10 +9,10 @@
   },
   "scripts": {
     "dev": "node portal-cluster.js",
-    "dev:next": "next dev",
+    "dev:next": "node next-portal.js dev",
     "build": "next build",
     "start": "node portal-cluster.js",
-    "start:next": "next start",
+    "start:next": "node next-portal.js start",
     "start:legacy": "node portal-cluster.js",
     "start:api": "node server.js --api",
     "start:teacher": "node portal-frontend.js teacher",
@@ -81,7 +81,6 @@
       "!components/**",
       "!lib/**",
       "!docs/**",
-      "!supabase/**",
       "!proxy.ts",
       "!next-env.d.ts",
       "!tsconfig*.json",

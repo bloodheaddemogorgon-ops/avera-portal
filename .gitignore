@@ -26,7 +26,6 @@ SF1.xls
 *.profiles/
 *.profiles.school-logos/
 npm-debug.log*
-.neon
 
 /release-private/
 desktop/embedded-online.json

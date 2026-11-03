@@ -9,7 +9,7 @@
 
 This is a Node.js desktop/web hybrid for Grade 5 classroom administration. It provides teacher and parent accounts, class/learner rosters, grades, attendance, reading and mathematics assessments, nutritional status calculations, Excel import/export, profile images, and a Windows Electron package.
 
-The backend is a dependency-light Node `http` server. Its primary data model is an Excel workbook held as compressed binary state inside SQLite or PostgreSQL/Supabase. This preserves workbook compatibility, but makes normal relational querying, indexing, reporting, and concurrent scaling more difficult.
+The backend is a dependency-light Node `http` server. Its primary data model is an Excel workbook held as compressed binary state inside SQLite. This preserves workbook compatibility, but makes normal relational querying, indexing, reporting, and concurrent scaling more difficult.
 
 The server binds to loopback by default and refuses public binding without TLS credentials. Failed sign-ins are now throttled in process memory. The primary unresolved risks are sensitive local data without application-level encryption, and the scalability costs of repeatedly reading and rewriting workbook state.
 
@@ -35,7 +35,6 @@ The server binds to loopback by default and refuses public binding without TLS c
 ├── grade5-portal-database.sqlite-*    SQLite WAL/shared-memory files
 ├── grade5-portal-database.xlsx        Live/migration workbook artifact
 ├── grade5-portal-database-template.xlsx
-├── portal-schema.sql                   PostgreSQL/Supabase schema
 ├── SF1.xls, SF2.xlsx, SF8.xlsx, SF9.xlsx
 ├── Grading Sheet.xlsx, RMA TEMP.xlsx,
 │   PhilIRI_Auto_Scoring_Template.xlsx Excel import/export templates
@@ -57,7 +56,6 @@ The repository also contains large binary templates and release payloads. `relea
 | Packaging | electron-builder 26 / NSIS | Windows installer and executable packaging |
 | Spreadsheet processing | ExcelJS 4.4; `@e965/xlsx` | Workbook persistence, SF1/SF2/report import/export, WHO reference loading |
 | Image processing | Sharp 0.35 | Validation/processing of profile photos and school logos |
-| PostgreSQL | `pg` 8.23; Supabase-compatible PostgreSQL | Optional remote persistence backend |
 | Configuration | dotenv 18 | `.env` configuration loading |
 | Frontend | Vanilla HTML/CSS/JavaScript | Single-page UI; no React/Vue/Angular or CSS framework |
 | Testing | Node built-in `node:test` and `node:assert` | Automated tests |
@@ -69,8 +67,8 @@ There is no Express, ORM, migration framework, client-side build pipeline, or Ty
 1. `server.js` starts a custom HTTP server, serves `index.html`, and exposes JSON/file-download endpoints under `/api/*`.
 2. The frontend calls the same-origin API with `fetch` and uses an `HttpOnly`, `SameSite=Strict` session cookie.
 3. The backend loads an Excel workbook through ExcelJS, applies row/sheet-level business logic, compresses the workbook, and stores it as one state blob.
-4. Local mode stores the blob in SQLite table `portal_state`.
-5. Supabase mode stores the blob in PostgreSQL `portal_state`; profile photos and school logos are separate bytea tables.
+4. Workbook state is stored as one blob in SQLite table `portal_state`.
+5. Profile photos and school logos are stored as files on disk next to the database.
 6. Electron starts the server on an ephemeral loopback port and opens it in a sandboxed, context-isolated BrowserWindow.
 
 ## 5. Database schema
@@ -90,17 +88,9 @@ portal_state(
 
 `workbook_state` is a gzip-compressed serialized workbook. The business tables are therefore logical worksheets inside the blob, not independently queryable SQLite tables. The repository also includes SQLite WAL/SHM files, which are operational database files and should be handled carefully in backups.
 
-### 5.2 PostgreSQL/Supabase schema
+Profile photos and school logos are stored as files on disk next to the database; they are not kept in SQLite.
 
-`portal-schema.sql` and runtime initialization define:
-
-- `portal_state(id, schema_version, workbook_state bytea, updated_at timestamptz)` with a single-row `id = 1` constraint.
-- `portal_profile_photos(user_id, extension, photo_data bytea, updated_at timestamptz)`.
-- `portal_school_logos(user_id, extension, logo_data bytea, updated_at timestamptz)`.
-
-Table access is revoked from `public`, `anon`, and `authenticated`; the server uses the PostgreSQL connection string server-side.
-
-### 5.3 Logical workbook schema
+### 5.2 Logical workbook schema
 
 The application dynamically creates/extends worksheets as required. The main logical entities are:
 
@@ -140,9 +130,7 @@ No security review was performed for this update. The following are design and d
 - Administrator passwords use bcrypt cost 12; teacher/parent passwords use PBKDF2-SHA-256 with random 16-byte salts and 210,000 iterations.
 - `HttpOnly` and `SameSite=Strict` session cookie attributes.
 - Electron `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`.
-- Same-origin API design, parameterized PostgreSQL queries, upload size limits, image signature checks, and role/session checks on protected endpoints.
-- Supabase table privileges are revoked from browser-facing roles.
-- Public network binding requires TLS key and certificate configuration; default binding is loopback-only.
+- Same-origin API design, parameterized SQLite queries, upload size limits, image signature checks, and role/session checks on protected endpoints.- Public network binding requires TLS key and certificate configuration; default binding is loopback-only.
 
 ## 7. Performance and scalability issues
 
@@ -151,7 +139,7 @@ No security review was performed for this update. The following are design and d
 1. **Workbook-as-database architecture:** Most operations deserialize the entire workbook and later serialize/compress/write the entire workbook. A small grade or attendance update can incur O(total workbook size) I/O and CPU.
 2. **Repeated linear scans:** User, class, student, grade, attendance, and ID lookups iterate worksheet rows. There are no relational indexes, query plans, or in-memory indexes for the logical entities.
 3. **Serialized write queue:** `serializeWorkbook` intentionally serializes writes. This protects consistency but creates a single throughput bottleneck and increases wait time under concurrent requests.
-4. **PostgreSQL blob contention:** Supabase transactions lock the single `portal_state` row. Concurrent users/classes contend on one row even when updating unrelated records.
+4. **Single-row blob contention:** all state lives in the single `portal_state` row, so unrelated updates still rewrite the whole blob.
 5. **ExcelJS memory footprint:** Large workbooks, SF1/SF2 imports, and report generation are loaded into memory. Multiple simultaneous requests can amplify memory use.
 
 ### Medium impact
@@ -163,7 +151,7 @@ No security review was performed for this update. The following are design and d
 
 ### Recommended direction
 
-Move transactional portal entities to normalized SQLite/PostgreSQL tables with foreign keys and indexes; retain Excel only as an import/export format. Add pagination and bounded report jobs, background report generation, report retention, and operational metrics. Preserve the current workbook migration path for compatibility.
+Move transactional portal entities to normalized SQLite tables with foreign keys and indexes; retain Excel only as an import/export format. Add pagination and bounded report jobs, background report generation, report retention, and operational metrics. Preserve the current workbook migration path for compatibility.
 
 ## 8. Missing or incomplete features
 

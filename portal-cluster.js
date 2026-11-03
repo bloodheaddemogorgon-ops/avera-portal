@@ -65,9 +65,6 @@ function stopServices(exitCode) {
 
 function startService(service) {
   const childEnvironment = { ...process.env, ...service.env };
-  for (const key of ["DATABASE_URL", "SUPABASE_DB_URL", "PORTAL_STORAGE_MODE", "NEON_AUTH_URL"]) {
-    delete childEnvironment[key];
-  }
   const child = spawn(
     process.execPath,
     [path.join(__dirname, service.script), ...service.args],

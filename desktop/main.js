@@ -8,6 +8,7 @@ const {
   restoreBestDatabase,
   listDatabaseBackups,
 } = require("./data-protection");
+const { focusOrCreateWindow } = require("./window-lifecycle");
 
 // Use one stable data folder for accounts and academic records. It is never under
 // the installed application directory, so package replacement cannot erase data.
@@ -65,6 +66,14 @@ async function createPortalWindow() {
   // Some older graphics/Windows combinations miss ready-to-show. Displaying
   // after load is safe and keeps startup from showing a partially loaded UI.
   if (!mainWindow.isVisible()) mainWindow.show();
+}
+
+function restorePortalWindow() {
+  if (!portalUrl) return;
+  void focusOrCreateWindow(mainWindow, createPortalWindow).catch((error) => {
+    console.error("Could not restore the GraceDesk window:", error);
+    dialog.showErrorBox("GraceDesk", `The portal window could not be restored.\n\n${error.message}`);
+  });
 }
 
 const SF9_PRINT_SELECTIONS = new Set([
@@ -273,12 +282,7 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-  });
+  app.on("second-instance", restorePortalWindow);
 
   app.whenReady().then(startPortal).catch(async (error) => {
     const logFilePath = path.join(app.getPath("logs"), "portal-server.log");
@@ -299,7 +303,7 @@ if (!hasSingleInstanceLock) {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0 && portalUrl) {
-    createPortalWindow();
+    restorePortalWindow();
   }
 });
 
