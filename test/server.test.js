@@ -1820,6 +1820,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /#eClassPage \.eclass-table-wrap\{margin:0\}/);
   assert.match(portalPage, /\.sidebar-footer-icon\{display:block;width:48px;height:48px;margin:14px auto 0/);
   assert.ok(portalPage.includes(`class="sidebar-footer-version">GraceDesk · Version ${require("../package.json").version}</span>`));
+  assert.ok(portalPage.includes(`class="brand-version">${require("../package.json").version}</span>`));
   assert.match(portalPage, /\.teacher-profile-card\{display:flex;max-width:920px;align-items:center/);
   assert.match(portalPage, /\.teacher-profile-form\{max-width:920px;padding:0 22px 22px\}/);
   assert.match(portalPage, /\.teacher-profile-form \.form-field\.full\{grid-column:1\/-1\}/);
@@ -1909,9 +1910,10 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /var result=await api\("\/api\/students"\);[\s\S]*?var students=filterStudentsForActiveSection\(result\.students\)/);
   assert.match(portalPage, /renderPhilIriScoreForm\(students\)/);
   assert.match(portalPage, /\$\("navPhilIri"\)\.onclick=function\(\)\{showDashboardPage\("philIri"\)\}/);
-  assert.match(portalPage, /id="navRma"[^>]*disabled[^>]*aria-disabled="true"/);
-  assert.match(portalPage, /if\(\(showReading\|\|showRma\)&&\(!currentUser\|\|!currentUser\.isAdmin\)\)return/);
-  assert.match(portalPage, /\$\("navRma"\)\.disabled=!user\.isAdmin/);
+  assert.match(portalPage, /id="navRma"[^>]*title="Open RMA"/);
+  assert.match(portalPage, /if\(showReading&&\(!currentUser\|\|!currentUser\.isAdmin\)\)return/);
+  assert.match(portalPage, /\$\("navRma"\)\.disabled=false/);
+  assert.match(portalPage, /\$\("navRma"\)\.removeAttribute\("aria-disabled"\)/);
   assert.match(portalPage, /id="adminClassSwitcher" hidden/);
   assert.doesNotMatch(portalPage, /id="navAdminAccounts"/);
   assert.doesNotMatch(portalPage, /id="adminAccountsPage"/);

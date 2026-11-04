@@ -1,8 +1,12 @@
 "use strict";
 
-const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs/promises");
+const {
+  createRememberedLoginStore,
+  restoreRememberedLogin,
+} = require("./remembered-login");
 const {
   createDatabaseBackup,
   restoreBestDatabase,
@@ -23,6 +27,7 @@ const legacyDatabasePaths = [
 let portalServer;
 let portalUrl;
 let mainWindow;
+let rememberedLoginStore;
 
 // Software-rendered Chromium is more reliable on older PCs and avoids
 // GPU-driver crashes that can appear as frozen input fields.
@@ -240,6 +245,85 @@ ipcMain.handle("app-version", (event) => {
   return app.getVersion();
 });
 
+function getRememberedLoginStore() {
+  if (!rememberedLoginStore) throw new Error("Secure sign-in storage is not ready.");
+  return rememberedLoginStore;
+}
+
+ipcMain.handle("remembered-login-save", (event, credentials) => {
+  assertTrustedSender(event);
+  return getRememberedLoginStore().save(credentials);
+});
+
+ipcMain.handle("remembered-login-update-password", (event, password) => {
+  assertTrustedSender(event);
+  return getRememberedLoginStore().updatePassword(password);
+});
+
+ipcMain.handle("remembered-login-clear", (event) => {
+  assertTrustedSender(event);
+  return getRememberedLoginStore().clear();
+});
+
+async function clearPortalAuthCookies() {
+  if (!mainWindow || mainWindow.isDestroyed() || !portalUrl) return;
+  const portalSession = mainWindow.webContents.session;
+  const authCookieNames = new Set([
+    "grade5_session",
+    "grade5_session_teacher",
+    "grade5_session_parents",
+  ]);
+  const cookies = await portalSession.cookies.get({ url: portalUrl });
+  await Promise.all(cookies
+    .filter((cookie) => authCookieNames.has(cookie.name))
+    .map((cookie) => portalSession.cookies.remove(portalUrl, cookie.name)));
+}
+
+ipcMain.handle("portal-auth-cookies-clear", async (event) => {
+  assertTrustedSender(event);
+  await clearPortalAuthCookies();
+});
+
+ipcMain.handle("remembered-login-restore", async (event) => {
+  assertTrustedSender(event);
+  const result = await restoreRememberedLogin({
+    store: getRememberedLoginStore(),
+    authenticate: async (credentials) => {
+      const response = await fetch(new URL("/api/auth/login", portalUrl), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(credentials),
+        cache: "no-store",
+      });
+      const body = await response.json();
+      if (!response.ok) return { ok: false, status: response.status };
+      if (!body.user) throw new Error("The portal could not verify the restored account.");
+
+      const cookieHeaders = response.headers.getSetCookie();
+      const cookieHeader = cookieHeaders.find((value) => value.startsWith("grade5_session="));
+      const cookieMatch = cookieHeader?.match(/^([^=;]+)=([^;]*)/);
+      if (!cookieMatch || !/^[a-f0-9]{64}$/i.test(cookieMatch[2])) {
+        throw new Error("The portal did not return a valid sign-in session.");
+      }
+
+      const maxAge = cookieHeader.match(/;\s*Max-Age=(\d+)/i);
+      await mainWindow.webContents.session.cookies.set({
+        url: portalUrl,
+        name: cookieMatch[1],
+        value: cookieMatch[2],
+        path: "/",
+        httpOnly: true,
+        secure: /;\s*Secure(?:;|$)/i.test(cookieHeader),
+        sameSite: /;\s*SameSite=Strict(?:;|$)/i.test(cookieHeader) ? "strict" : "lax",
+        ...(maxAge ? { expirationDate: Date.now() / 1000 + Number(maxAge[1]) } : {}),
+      });
+      return { ok: true, status: response.status };
+    },
+  });
+  if (result.reason === "invalid") await clearPortalAuthCookies();
+  return result;
+});
+
 ipcMain.handle("backup-list", async (event) => {
   assertTrustedSender(event);
   return listDatabaseBackups({ databasePath, backupDirectory });
@@ -253,6 +337,10 @@ ipcMain.handle("backup-create", async (event) => {
 });
 
 async function startPortal() {
+  rememberedLoginStore = createRememberedLoginStore({
+    safeStorage,
+    filePath: path.join(app.getPath("userData"), "remembered-login.enc"),
+  });
   await restoreBestDatabase({ databasePath, backupDirectory, legacyDatabasePaths });
   await createDatabaseBackup({ databasePath, backupDirectory });
   setInterval(() => {

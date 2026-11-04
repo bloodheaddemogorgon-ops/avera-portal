@@ -1138,6 +1138,7 @@ body:not(.portal-active) .brand .mark{width:104px;height:104px;margin:0 0 24px;b
 body:not(.portal-active) .brand h1{max-width:520px;font-size:clamp(2rem,4vw,3.15rem);line-height:1.12;letter-spacing:-.055em}
 body:not(.portal-active) .brand h1 span[aria-label="GraceDesk"]{color:var(--accent)}
 body:not(.portal-active) .brand p{margin-top:12px;color:var(--muted);font-size:1.04rem}
+body:not(.portal-active) .brand .brand-version{margin-top:14px;color:var(--accent);font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .brand-acronym{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin:10px 0 0;padding-left:12px;border-left:3px solid var(--accent);color:var(--muted);font-size:.9rem;font-weight:500;letter-spacing:.01em;line-height:1.5}
 .brand-acronym b{color:var(--accent);font-size:1.12em;font-weight:800}
 .brand-acronym .amp{color:var(--muted);opacity:.7}
@@ -1773,6 +1774,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     <div class="brand-acronym" aria-label="Grade Records, Assessment and Classroom Essentials">
       <span><b>G</b>rade</span><span><b>R</b>ecords,</span><span><b>A</b>ssessment</span><span class="amp">&amp;</span><span><b>C</b>lassroom</span><span><b>E</b>ssentials</span>
     </div>
+    <span class="brand-version">1.0.52</span>
     <p id="tagline">Welcome back. Sign in to your classroom.</p>
   </header>
 
@@ -1909,7 +1911,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           <button class="nav-link" id="navPhilIri" type="button">
             <span class="nav-icon" aria-hidden="true">▥</span>Phil-Iri
           </button>
-          <button class="nav-link" id="navRma" type="button" disabled aria-disabled="true" title="Available to administrators only">
+          <button class="nav-link" id="navRma" type="button" title="Open RMA">
             <span class="nav-icon" aria-hidden="true">∑</span>RMA
           </button>
           <button class="nav-link" id="navNutritionalStatus" type="button">
@@ -3792,6 +3794,34 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     return result;
   }
 
+  async function rememberAuthenticatedAccount(email,password){
+    var bridge=window.gradePortal;
+    if(!bridge||typeof bridge.saveRememberedLogin!=="function")return;
+    try{
+      var result=await bridge.saveRememberedLogin({email:email,password:password});
+      if(!result.saved){
+        $("msg").textContent="Signed in, but this device cannot securely remember your account. Sign in manually next time.";
+      }
+    }catch(error){
+      console.error("Could not securely remember the signed-in account:",error);
+      $("msg").textContent="Signed in, but this device could not securely remember your account. Sign in manually next time.";
+    }
+  }
+
+  async function updateRememberedPassword(password){
+    var bridge=window.gradePortal;
+    if(!bridge||typeof bridge.updateRememberedPassword!=="function")return;
+    try{
+      var result=await bridge.updateRememberedPassword(password);
+      if(!result.saved&&result.reason!=="missing"){
+        $("msg").textContent="Your password changed, but automatic sign-in could not be updated. Sign in manually next time.";
+      }
+    }catch(error){
+      console.error("Could not update the securely remembered password:",error);
+      $("msg").textContent="Your password changed, but automatic sign-in could not be updated. Sign in manually next time.";
+    }
+  }
+
   function applyStorageHealth(){
     $("storageStatus").textContent="Connected. Portal records are saved on this device.";
   }
@@ -3834,6 +3864,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         })
       });
       await enter(result.user);
+      await rememberAuthenticatedAccount(email,pw);
+      $("pw").value="";
     }catch(error){
       $("msg").textContent=error instanceof TypeError
         ?"Can't reach the portal server. Run npm start in the portal folder, then open the address printed in the terminal."
@@ -7129,7 +7161,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var showInventory=page==="inventory";
     var showEClass=page==="eClass";
     var showSf10=page==="sf10";
-    if((showReading||showRma)&&(!currentUser||!currentUser.isAdmin))return;
+    if(showReading&&(!currentUser||!currentUser.isAdmin))return;
     var leavingReading=!$("readingProgressPage").hidden&&!showReading;
     var leavingRma=!$("rmaPage").hidden&&!showRma;
     var leavingEClass=!$("eClassPage").hidden&&!showEClass;
@@ -10063,9 +10095,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("navRma").hidden=false;
     $("navNutritionalStatus").hidden=false;
     $("navInventory").hidden=false;
-    $("navRma").disabled=!user.isAdmin;
-    $("navRma").setAttribute("aria-disabled",String(!user.isAdmin));
-    $("navRma").title=user.isAdmin?"Open RMA":"Available to administrators only";
+    $("navRma").disabled=false;
+    $("navRma").removeAttribute("aria-disabled");
+    $("navRma").title="Open RMA";
     $("navAssessmentItemAnalysis").hidden=!user.isAdmin;
     $("navAssessmentItemAnalysis").setAttribute("aria-disabled",String(!user.isAdmin));
     $("navAssessmentItemAnalysis").title=user.isAdmin?"Open Item Analysis":"Available to administrators only";
@@ -10116,6 +10148,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       ||(entryType==="main"&&sessionUser.role!=="teacher");
     if(wrongPortal){
       await api("/api/auth/logout",{method:"POST"});
+      if(window.gradePortal&&typeof window.gradePortal.clearRememberedLogin==="function"){
+        await window.gradePortal.clearRememberedLogin();
+      }
+      if(window.gradePortal&&typeof window.gradePortal.clearPortalAuthCookies==="function"){
+        await window.gradePortal.clearPortalAuthCookies();
+      }
       throw new Error(entryType==="parents"
         ?"This account is not a parent account. Sign in through the Parents Portal."
         :"Only teacher accounts can use the Teacher Portal. Sign in through the Parents Portal instead.");
@@ -12299,6 +12337,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           newPassword:newPassword
         })
       });
+      await updateRememberedPassword(newPassword);
       $("teacherPasswordForm").reset();
       teacherPasswordDirty=false;
       $("teacherProfileNotice").textContent="Password updated.";
@@ -12346,6 +12385,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           newPassword:newPassword
         })
       });
+      await updateRememberedPassword(newPassword);
       $("forcedPasswordForm").reset();
       currentUser.mustChangePassword=false;
       $("forcedPasswordDialog").close();
@@ -12874,6 +12914,16 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     }catch(error){
       console.error("Could not flush the E-Class draft before sign out:",error);
     }
+    var desktopBridge=window.gradePortal;
+    if(desktopBridge&&typeof desktopBridge.clearRememberedLogin==="function"){
+      try{
+        await desktopBridge.clearRememberedLogin();
+      }catch(error){
+        $("msg").textContent="Could not clear the securely remembered account. Please try signing out again.";
+        console.error("Could not clear the remembered account during sign out:",error);
+        return;
+      }
+    }
     readingDirty=false;
     rmaDirty=false;
     attendanceDirty=false;
@@ -12881,7 +12931,19 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     teacherProfileDetailsDirty=false;
     teacherSubjectsDirty=false;
     teacherPasswordDirty=false;
-    try{await api("/api/auth/logout",{method:"POST"})}catch(error){console.error("Sign out failed:",error)}
+    var logoutError=null;
+    try{await api("/api/auth/logout",{method:"POST"})}catch(error){logoutError=error;console.error("Sign out failed:",error)}
+    if(desktopBridge&&typeof desktopBridge.clearPortalAuthCookies==="function"){
+      try{
+        await desktopBridge.clearPortalAuthCookies();
+      }catch(error){
+        console.error("Could not clear the portal session cookie:",error);
+        if(logoutError){
+          $("msg").textContent="Could not safely finish signing out. Check that the portal is running and try again.";
+          return;
+        }
+      }
+    }
     currentUser=null;
     document.body.classList.remove("portal-active");
     $("portal").hidden=true;
@@ -12931,7 +12993,31 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       if(!authSessionChecked){
         authSessionChecked=true;
         api("/api/auth/session").then(function(result){return enter(result.user)}).catch(function(error){
-        if(error.status!==401)$("msg").textContent=error.message;
+          if(error.status!==401){
+            $("msg").textContent=error.message;
+            return;
+          }
+          var bridge=window.gradePortal;
+          if(!bridge||typeof bridge.restoreRememberedLogin!=="function")return;
+          bridge.restoreRememberedLogin().then(async function(result){
+            if(result.restored){
+              try{
+                await enter({});
+              }catch(restoreError){
+                if(restoreError.status===401&&typeof bridge.clearRememberedLogin==="function"){
+                  await bridge.clearRememberedLogin();
+                }
+                throw restoreError;
+              }
+            }else if(result.reason==="invalid"){
+              $("msg").textContent="Your saved sign-in could not be restored. Please sign in again.";
+            }else if(result.reason==="unavailable"){
+              $("msg").textContent="Automatic sign-in is temporarily unavailable. Please sign in manually.";
+            }
+          }).catch(function(restoreError){
+            console.error("Could not restore the saved sign-in:",restoreError);
+            $("msg").textContent="Automatic sign-in could not be completed. Please sign in manually.";
+          });
         });
       }
       return result;

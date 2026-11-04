@@ -10630,6 +10630,9 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         ).replace(
           /(<span class="sidebar-footer-version">GraceDesk · Version )[^<]*(<\/span>)/,
           `$1${APP_VERSION}$2`,
+        ).replace(
+          /(<span class="brand-version">)[^<]*(<\/span>)/,
+          `$1${APP_VERSION}$2`,
         );
         response.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
