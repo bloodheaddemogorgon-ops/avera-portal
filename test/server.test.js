@@ -225,6 +225,148 @@ test("E-Class drafts are persisted through the backend and flushed before sign o
   assert.match(portalPage, /It will remain after sign out/);
 });
 
+test("SF 10 is available to teachers in the Term Grade menu", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const termGradeSubnav = portalPage.match(
+    /<div class="sidebar-subnav" id="termGradeSubnav" hidden>([\s\S]*?)<\/div>/,
+  );
+  assert.ok(termGradeSubnav, "Term Grade navigation group exists");
+  assert.match(termGradeSubnav[1], /id="navSf10"/);
+  assert.match(portalPage, /\$\("navSf10"\)\.hidden=false;/);
+  assert.match(portalPage, /\$\("navSf10"\)\.title="Open SF 10";/);
+  assert.doesNotMatch(portalPage, /page==="sf10"\|\|page==="assessmentDifficultyIndex"/);
+});
+
+test("SF 10 term grades follow the matching Classified as Grade field", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const gradeSubjects = portalPage.match(/var sf10GradeSubjects=\[[\s\S]*?\n  \];/);
+  const classifiedGradeHelper = portalPage.match(
+    /function sf10ClassifiedGradeIndex\([\s\S]*?\n  \}/,
+  );
+  const termGradeHelper = portalPage.match(/function sf10TermGradeFields\([\s\S]*?\n  \}/);
+  const lockGradeHelper = portalPage.match(/function sf10LockGradeInputs\([\s\S]*?\n  \}/);
+  const metadataHelper = portalPage.match(/function sf10GradeMetadataFields\([\s\S]*?\n  \}/);
+  assert.ok(gradeSubjects, "SF 10 grade subject rows exist");
+  assert.ok(classifiedGradeHelper, "SF 10 classified-grade lookup exists");
+  assert.ok(termGradeHelper, "SF 10 Term Grades mapping exists");
+  assert.ok(lockGradeHelper, "SF 10 synced grade inputs can be locked");
+  assert.ok(metadataHelper, "SF 10 teacher-profile metadata mapping exists");
+
+  const helpers = vm.runInNewContext(
+    `${gradeSubjects[0]}\n${classifiedGradeHelper[0]}\n${termGradeHelper[0]}\n${lockGradeHelper[0]}\n${metadataHelper[0]}\n` +
+      "({ sf10ClassifiedGradeIndex, sf10TermGradeFields, sf10LockGradeInputs, sf10GradeMetadataFields })",
+  );
+  const gradeIndex = helpers.sf10ClassifiedGradeIndex(
+    ["1", "2", "3", "4", "5", "6"],
+    "Grade 5",
+  );
+  assert.equal(gradeIndex, 4);
+  assert.equal(
+    helpers.sf10ClassifiedGradeIndex(["5", "5", "3", "4", "1", "6"], "Grade 5"),
+    -1,
+    "ambiguous classified-grade values do not select a destination",
+  );
+
+  const fields = helpers.sf10TermGradeFields(gradeIndex, [
+    { grades: { filipino: "88", epp: "91", musicAndArts: "90", physicalEducationAndHealth: "80" } },
+    { grades: { filipino: "89", epp: "92", musicAndArts: "", physicalEducationAndHealth: "80" } },
+    { grades: { filipino: "", epp: "93" } },
+  ]);
+  assert.equal(fields["grade.5.subjects.0.q1"], "88");
+  assert.equal(fields["grade.5.subjects.0.q2"], "89");
+  assert.equal(fields["grade.5.subjects.0.q3"], "");
+  assert.equal(fields["grade.5.subjects.6.q1"], "91");
+  assert.equal(fields["grade.5.subjects.6.q3"], "93");
+  assert.equal(fields["grade.5.subjects.7.q1"], "85");
+  assert.equal(fields["grade.5.subjects.7.q2"], "");
+  assert.equal(fields["grade.5.subjects.8.q1"], "90");
+  assert.equal(fields["grade.5.subjects.8.q2"], "");
+  assert.equal(fields["grade.5.subjects.9.q1"], "80");
+  assert.equal(fields["grade.5.subjects.9.q2"], "80");
+  assert.equal(fields["grade.5.subjects.0.final"], "");
+  assert.equal(fields["grade.5.subjects.6.final"], "92");
+  assert.equal(fields["grade.5.subjects.6.remarks"], "Passed");
+  assert.equal(fields["grade.4.subjects.0.q1"], undefined);
+  const completedFields = helpers.sf10TermGradeFields(gradeIndex, [
+    { grades: { filipino: "88", epp: "91", musicAndArts: "90", physicalEducationAndHealth: "80" } },
+    { grades: { filipino: "89", epp: "92", musicAndArts: "92", physicalEducationAndHealth: "82" } },
+    { grades: { filipino: "90", epp: "93", musicAndArts: "94", physicalEducationAndHealth: "84" } },
+  ], ["filipino", "epp", "mapeh"]);
+  assert.equal(completedFields["grade.5.subjects.7.final"], "87");
+  assert.equal(completedFields["grade.5.subjects.8.final"], "92");
+  assert.equal(completedFields["grade.5.subjects.9.final"], "82");
+  assert.equal(completedFields["grade.5.generalAverage"], "89");
+  assert.equal(completedFields["grade.5.generalAverageRemarks"], "Passed");
+  const boundaryFields = helpers.sf10TermGradeFields(gradeIndex, [
+    { grades: { filipino: "75", epp: "74" } },
+    { grades: { filipino: "75", epp: "74" } },
+    { grades: { filipino: "75", epp: "74" } },
+  ], ["filipino"]);
+  assert.equal(boundaryFields["grade.5.subjects.0.remarks"], "Passed");
+  assert.equal(boundaryFields["grade.5.subjects.6.remarks"], "Failed");
+  assert.equal(boundaryFields["grade.5.generalAverageRemarks"], "Passed");
+  const failingAverage = helpers.sf10TermGradeFields(gradeIndex, [
+    { grades: { filipino: "74" } },
+    { grades: { filipino: "74" } },
+    { grades: { filipino: "74" } },
+  ], ["filipino"]);
+  assert.equal(failingAverage["grade.5.generalAverage"], "74");
+  assert.equal(failingAverage["grade.5.generalAverageRemarks"], "Failed");
+  const gradeInputs = [
+    { dataset: { sf10Field: "grade.5.subjects.1.q2" }, setAttribute() {} },
+    { dataset: { sf10Field: "grade.5.subjects.1.final" }, setAttribute() {} },
+    { dataset: { sf10Field: "grade.5.generalAverage" }, setAttribute() {} },
+    { dataset: { sf10Field: "grade.5.generalAverageRemarks" }, setAttribute() {} },
+    { dataset: { sf10Field: "grade.5.subjects.1.remarks" }, setAttribute() {} },
+    { dataset: { sf10Field: "grade.4.subjects.1.q2" }, setAttribute() {} },
+  ];
+  helpers.sf10LockGradeInputs(gradeIndex, { querySelectorAll: () => gradeInputs });
+  assert.equal(gradeInputs[0].readOnly, true);
+  assert.equal(gradeInputs[1].readOnly, true);
+  assert.equal(gradeInputs[2].readOnly, true);
+  assert.equal(gradeInputs[3].readOnly, true);
+  assert.equal(gradeInputs[4].readOnly, true);
+  assert.equal(gradeInputs[5].readOnly, undefined);
+  const metadata = helpers.sf10GradeMetadataFields(gradeIndex, {
+    grade: "Grade 5",
+    schoolName: "Sample School",
+    schoolId: "123456",
+    district: "Sample District",
+    division: "Sample Division",
+    region: "Region IX",
+    schoolYear: "2026-2027",
+    section: "Mabini",
+  });
+  assert.equal(metadata["grade.5.school"], "Sample School");
+  assert.equal(metadata["grade.5.schoolId"], "123456");
+  assert.equal(metadata["grade.5.district"], "Sample District");
+  assert.equal(metadata["grade.5.division"], "Sample Division");
+  assert.equal(metadata["grade.5.region"], "Region IX");
+  assert.equal(metadata["grade.5.schoolYear"], "2026-2027");
+  assert.equal(metadata["grade.5.section"], "Mabini");
+  assert.equal(metadata["grade.5.classifiedGrade"], "5");
+  assert.equal(metadata["grade.4.school"], undefined);
+  assert.match(portalPage, /api\("\/api\/grades\?studentId="\+encodeURIComponent\(recordKey\)/);
+  assert.match(portalPage, /sf10LockGradeInputs\(gradeIndex,\$\("sf10Form"\)\)/);
+  assert.equal((portalPage.match(/\[1,2,3\]\.map\(function\(term\)/g) || []).length, 2);
+  assert.equal((portalPage.match(/<th colspan="3">Term<\/th>/g) || []).length, 2);
+  assert.doesNotMatch(portalPage, /\[1,2,3,4\]\.map\(function\(/);
+  assert.doesNotMatch(portalPage, /<th colspan="4">Term<\/th>/);
+});
+
+test("developer updates list only changes from the current app version", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const updateContent = portalPage.match(
+    /<p class="developer-update-meta">Version ([^<]+)<\/p>\s*<ul class="developer-update-list">([\s\S]*?)<\/ul>/,
+  );
+  assert.ok(updateContent, "current-version developer updates exist");
+  assert.equal(updateContent[1], require("../package.json").version);
+  assert.deepEqual(
+    Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
+    ["The portal footer is now shown on E-Class pages."],
+  );
+});
+
 test("E-Class score validation enforces each highest-possible-score limit", async () => {
   const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
   const helperSource = portalPage.match(

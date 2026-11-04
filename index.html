@@ -159,6 +159,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .profile-logout{flex:0 0 auto;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink);font-weight:600;white-space:nowrap}
 .page-content{width:100%;max-width:1280px;min-height:max-content;flex:0 0 auto;margin:0 auto;padding:clamp(20px,4vw,48px)}
 .page-content:has(#eClassPage:not([hidden])){max-width:none;margin:0;padding:0}
+#workspace:has(#eClassPage:not([hidden]))>.portal-footer{display:none}
 #eClassPage .page-heading{margin:0}
 #eClassPage .data-card{border-radius:18px;border-color:color-mix(in srgb,var(--accent) 14%,var(--line));box-shadow:0 10px 30px color-mix(in srgb,var(--ink) 7%,transparent)}
 #eClassPage .data-card-header{display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;gap:14px;padding:16px 20px;background:linear-gradient(135deg,color-mix(in srgb,var(--soft) 58%,var(--card)),var(--card) 68%)}
@@ -1643,12 +1644,14 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 #sf10Page{display:block;gap:0;max-width:none}
 #sf10Page[hidden]{display:none}
 #sf10Page .page-heading{margin-bottom:14px}
-.sf10-toolbar{position:relative;display:grid;grid-template-columns:minmax(230px,1fr) auto;align-items:end;gap:8px 14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:none}
-.sf10-toolbar .form-field{margin:0}
-.sf10-toolbar .form-field label{margin:0 0 5px}
-.sf10-toolbar select{min-height:38px;padding:7px 10px}
-.sf10-save-status{grid-column:1/-1;min-height:16px;text-align:left}
-.sf10-roster-notice{grid-column:1/-1}
+.sf10-toolbar{position:relative;display:grid;grid-template-columns:minmax(0,1fr) max-content;align-items:end;gap:12px 18px;padding:16px 18px;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));border-radius:16px;background:linear-gradient(125deg,color-mix(in srgb,var(--soft) 58%,var(--card)),var(--card) 75%);box-shadow:0 4px 16px color-mix(in srgb,var(--ink) 5%,transparent)}
+.sf10-toolbar .form-field{width:100%;min-width:0;max-width:none;margin:0;flex:none}
+.sf10-toolbar .form-field label{margin:0 0 7px;font-size:.72rem;font-weight:750}
+.sf10-toolbar select{width:100%;min-width:0;min-height:44px;padding:8px 12px;border-radius:10px}
+.sf10-actions{min-width:max-content;justify-content:flex-end;flex-wrap:nowrap;gap:10px}
+.sf10-actions .btn{min-height:44px;padding:9px 16px;white-space:nowrap}
+.sf10-save-status{grid-column:1/-1;display:flex;align-items:center;min-height:28px;margin:0;padding-top:9px;border-top:1px solid var(--line);text-align:left}
+.sf10-roster-notice{grid-column:1/-1;margin:-4px 0 0}
 .sf10-note{margin:10px 0;color:var(--muted)}
 .sf10-pages{display:grid;justify-items:center;gap:22px;overflow-x:auto;padding:5px 0 18px}
 .sf10-page-tabs{display:flex;gap:8px;margin:12px 0 10px;padding:5px;border:1px solid var(--line);border-radius:13px;background:var(--card)}
@@ -1747,7 +1750,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 .sf10-cert-statement input{display:inline-block;width:100px;min-height:14px;padding:0 2px;border:0;border-bottom:1px solid #555;border-radius:0;background:transparent;font:inherit;vertical-align:baseline}
 .sf10-cert-card .sf10-fields .sf10-field:last-child{border-right:0}
 .sf10-cert-card .sf10-cert-signatures span:nth-child(2){border-right:0}
-@media(max-width:680px){.sf10-toolbar{grid-template-columns:1fr}.sf10-actions .btn{flex:1 1 130px}.sf10-save-status,.sf10-roster-notice{grid-column:auto}.sf10-sheet{flex:none}.sf10-pages{justify-items:start}.sf10-page-tabs{display:grid;grid-template-columns:1fr 1fr}.sf10-page-tab{justify-content:center;padding:8px}.sf10-note{font-size:.74rem}}
+@media(max-width:680px){.sf10-toolbar{grid-template-columns:minmax(0,1fr);gap:12px;padding:14px}.sf10-toolbar .form-field{max-width:none}.sf10-actions{width:100%;min-width:0;justify-content:stretch;flex-wrap:wrap}.sf10-actions .btn{flex:1 1 140px}.sf10-save-status,.sf10-roster-notice{grid-column:auto}.sf10-sheet{flex:none}.sf10-pages{justify-items:start}.sf10-page-tabs{display:grid;grid-template-columns:1fr 1fr}.sf10-page-tab{justify-content:center;padding:8px}.sf10-note{font-size:.74rem}}
 @media print{
   @page sf10form{size:legal portrait;margin:.18in}
   body.sf10-printing{display:block!important;min-height:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
@@ -3214,23 +3217,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.45</p>
+                  <p class="developer-update-meta">Version 1.0.54</p>
                   <ul class="developer-update-list">
-                    <li>Local account, classroom, grade, E-Class, MPS, attendance and settings data now use one protected device storage location.</li>
-                    <li>Automatic rotating backups are created at startup, every six hours, and before an update download or installation.</li>
-                    <li>Missing or damaged database files can recover automatically from the newest valid local backup or a recognized legacy database.</li>
-                    <li>Settings now allows users to create a backup immediately and view the latest successful backup status.</li>
-                    <li>Classroom records, accounts and settings are now saved locally on this device through SQLite.</li>
-                    <li>The online database and automatic cloud account synchronization have been removed from the active portal.</li>
-                    <li>App updates remain available through the secure GitHub release installer.</li>
-                    <li>Installing an app update keeps existing local data intact.</li>
-                    <li>Settings now includes separate cards for appearance, performance, app updates, local data and developer updates.</li>
-                    <li>Long-running desktop sessions now clear interrupted drag-scroll and pointer state automatically.</li>
-                    <li>Active sessions are refreshed against the local account database so account changes and classroom links stay current.</li>
-                    <li>Bootstrap setup no longer overwrites or converts an existing teacher account.</li>
-                    <li>E-Class scores and calculated student grades now save as database drafts before the record is locked.</li>
-                    <li>E-Class data remains linked to each student ID, classroom, term, subject, and section after sign out or restart.</li>
-                    <li>MPS reports now read saved E-Class and term-grade data from the local database backend.</li>
+                    <li>The portal footer is now shown on E-Class pages.</li>
                   </ul>
                 </div>
               </section>
@@ -3506,6 +3495,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   var sf10Students=[];
   var sf10ActiveRecordKey="manual";
   var sf10Initialized=false;
+  var sf10GradeSyncRequestId=0;
   var rosterStudents=[];
   var rosterParents=[];
   var inactiveStudentIds=new Set();
@@ -6880,7 +6870,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           ?subject
           :'<input aria-label="Grade '+grade+' additional learning area '+(subjectIndex+1)+'" data-sf10-field="'+base+'.name">';
         return "<tr><td>"+subjectName+"</td>"
-          +[1,2,3,4].map(function(quarter){return '<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="'+subject+" Quarter "+quarter+'" data-sf10-field="'+base+".q"+quarter+'"></td>';}).join("")
+          +[1,2,3].map(function(term){return '<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="'+subject+" Term "+term+'" data-sf10-field="'+base+".q"+term+'"></td>';}).join("")
           +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="'+(subject||"Additional learning area")+' final rating" data-sf10-field="'+base+'.final"></td>'
           +'<td><input aria-label="'+(subject||"Additional learning area")+' remarks" data-sf10-field="'+base+'.remarks"></td></tr>';
       }).join("");
@@ -6904,8 +6894,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         +sf10FieldMarkup("School Year","grade."+grade+".schoolYear","text","","sf10-meta-span-2")
         +sf10FieldMarkup("Name of Adviser/Teacher","grade."+grade+".adviser","text","","sf10-meta-span-3")
         +sf10FieldMarkup("Signature","grade."+grade+".signature")
-        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-grade-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th rowspan="2">Learning Areas</th><th colspan="4">Quarterly Rating</th><th rowspan="2">Final Rating</th><th rowspan="2">Remarks</th></tr><tr><th>1</th><th>2</th><th>3</th><th>4</th></tr></thead><tbody>'
-        +rows+'<tr class="sf10-average-row"><td colspan="5">General Average</td><td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Grade '+grade+' general average" data-sf10-field="grade.'+grade+'.generalAverage"></td><td></td></tr>'
+        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-grade-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th rowspan="2">Learning Areas</th><th colspan="3">Term</th><th rowspan="2">Final Rating</th><th rowspan="2">Remarks</th></tr><tr><th>1</th><th>2</th><th>3</th></tr></thead><tbody>'
+        +rows+'<tr class="sf10-average-row"><td colspan="4">General Average</td><td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Grade '+grade+' general average" data-sf10-field="grade.'+grade+'.generalAverage"></td><td><input aria-label="Grade '+grade+' general average remarks" data-sf10-field="grade.'+grade+'.generalAverageRemarks" readonly aria-readonly="true" title="Generated from SF9 Term Grades."></td></tr>'
         +'</tbody></table></div><div class="sf10-remedial"><h4>Remedial Classes</h4><div class="sf10-remedial-dates">'
         +sf10FieldMarkup("Conducted from","grade."+grade+".remedialFrom","date")
         +sf10FieldMarkup("To","grade."+grade+".remedialTo","date")
@@ -6924,7 +6914,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       var rows=Array.from({length:16},function(_,index){
         var subjectKey=base+".subjects."+index;
         return '<tr><td><input aria-label="Additional record '+recordNumber+' learning area '+(index+1)+'" data-sf10-field="'+subjectKey+'.name"></td>'
-          +[1,2,3,4].map(function(quarter){return '<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record quarterly rating" data-sf10-field="'+subjectKey+".q"+quarter+'"></td>';}).join("")
+          +[1,2,3].map(function(term){return '<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record term rating" data-sf10-field="'+subjectKey+".q"+term+'"></td>';}).join("")
           +'<td><input type="number" min="60" max="100" step="1" inputmode="numeric" aria-label="Additional record final rating" data-sf10-field="'+subjectKey+'.final"></td>'
           +'<td><input aria-label="Additional record remarks" data-sf10-field="'+subjectKey+'.remarks"></td></tr>';
       }).join("");
@@ -6949,8 +6939,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         +sf10FieldMarkup("School Year",base+".schoolYear","text","","sf10-meta-span-2")
         +sf10FieldMarkup("Adviser/Teacher",base+".adviser","text","","sf10-meta-span-3")
         +sf10FieldMarkup("Signature",base+".signature")
-        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-grade-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th rowspan="2">Learning Areas</th><th colspan="4">Quarterly Rating</th><th rowspan="2">Final Rating</th><th rowspan="2">Remarks</th></tr><tr><th>1</th><th>2</th><th>3</th><th>4</th></tr></thead><tbody>'
-        +rows+'<tr class="sf10-average-row"><td colspan="5">General Average</td><td><input type="number" min="60" max="100" step="1" inputmode="numeric" data-sf10-field="'+base+'.generalAverage"></td><td></td></tr></tbody></table></div>'
+        +'</div><div class="sf10-table-wrap"><table class="sf10-table sf10-grade-table"><colgroup><col class="sf10-subject-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-grade-col"><col class="sf10-remarks-col"></colgroup><thead><tr><th rowspan="2">Learning Areas</th><th colspan="3">Term</th><th rowspan="2">Final Rating</th><th rowspan="2">Remarks</th></tr><tr><th>1</th><th>2</th><th>3</th></tr></thead><tbody>'
+        +rows+'<tr class="sf10-average-row"><td colspan="4">General Average</td><td><input type="number" min="60" max="100" step="1" inputmode="numeric" data-sf10-field="'+base+'.generalAverage"></td><td><input aria-label="Additional record general average remarks" data-sf10-field="'+base+'.generalAverageRemarks" readonly aria-readonly="true" title="Generated from SF9 Term Grades."></td></tr></tbody></table></div>'
         +'<div class="sf10-remedial"><h4>Remedial Classes</h4><div class="sf10-remedial-dates">'
         +sf10FieldMarkup("Date Conducted From",base+".remedialFrom","date")
         +sf10FieldMarkup("To",base+".remedialTo","date")
@@ -7048,6 +7038,140 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     return fields;
   }
 
+  function sf10ClassifiedGradeIndex(classifiedGrades,classGrade){
+    function gradeNumber(value){
+      var match=/^(?:grade\s*)?([1-6])$/i.exec(String(value||"").trim());
+      return match?Number(match[1]):0;
+    }
+    var targetGrade=gradeNumber(classGrade);
+    if(!targetGrade)return -1;
+    var matches=[];
+    classifiedGrades.forEach(function(value,index){
+      if(gradeNumber(value)===targetGrade)matches.push(index);
+    });
+    return matches.length===1?matches[0]:-1;
+  }
+
+  function sf10TermGradeFields(gradeIndex,termResults,generalAverageSubjects){
+    var subjects=sf10GradeSubjects[gradeIndex];
+    if(!subjects)return {};
+    var aliases={
+      gmrc:["gmrc","goodmannersandrightconduct"],
+      epp:["epp"],
+      epptle:["epp","tle"],
+      tle:["tle"],
+      musicandarts:["musicarts"],
+      physicaleducationandhealth:["physicaleducationhealth"]
+    };
+    var fields={};
+    var termGradesBySubject=[];
+    var subjectTermGrades={};
+    subjects.forEach(function(_,subjectIndex){
+      var base="grade."+(gradeIndex+1)+".subjects."+subjectIndex;
+      fields[base+".q1"]="";
+      fields[base+".q2"]="";
+      fields[base+".q3"]="";
+      fields[base+".final"]="";
+      fields[base+".remarks"]="";
+    });
+    termResults.slice(0,3).forEach(function(result,termIndex){
+      if(!result||!result.grades||typeof result.grades!=="object"){
+        throw new Error("A Term Grades response did not contain subject grades.");
+      }
+      var sourceGrades=result.grades;
+      var music=Number(sourceGrades.musicAndArts);
+      var physicalEducation=Number(sourceGrades.physicalEducationAndHealth);
+      var hasMapeh=sourceGrades.musicAndArts!==""&&sourceGrades.musicAndArts!==null
+        &&sourceGrades.musicAndArts!==undefined
+        &&sourceGrades.physicalEducationAndHealth!==""&&sourceGrades.physicalEducationAndHealth!==null
+        &&sourceGrades.physicalEducationAndHealth!==undefined
+        &&Number.isFinite(music)&&Number.isFinite(physicalEducation);
+      var termGrades=Object.assign({},sourceGrades,{
+        mapeh:hasMapeh?String(Math.round(((music+physicalEducation)/2)*100)/100):""
+      });
+      termGradesBySubject.push(termGrades);
+      Object.keys(termGrades).forEach(function(subjectKey){
+        var key=subjectKey.replace(/[^a-zA-Z0-9]/g,"").toLowerCase();
+        var names=aliases[key]||[key];
+        var subjectIndex=subjects.findIndex(function(subject){
+          var normalized=subject.replace(/[^a-zA-Z0-9]/g,"").toLowerCase();
+          return names.some(function(name){return normalized.indexOf(name)!==-1});
+        });
+        if(subjectIndex<0)return;
+        var value=termGrades[subjectKey];
+        var base="grade."+(gradeIndex+1)+".subjects."+subjectIndex;
+        fields[base+".q"+(termIndex+1)]=value===null||value===undefined?"":String(value);
+        var numericValue=value!==null&&value!==undefined&&String(value).trim()!==""?Number(value):NaN;
+        (subjectTermGrades[subjectIndex]||(subjectTermGrades[subjectIndex]=[]))[termIndex]
+          =Number.isFinite(numericValue)?numericValue:null;
+      });
+    });
+    Object.keys(subjectTermGrades).forEach(function(subjectIndex){
+      var grades=subjectTermGrades[subjectIndex];
+      var base="grade."+(gradeIndex+1)+".subjects."+subjectIndex;
+      var finalGrade=grades.length===3&&[0,1,2].every(function(index){return Number.isFinite(grades[index])})
+        ?Math.round(grades.reduce(function(total,value){return total+value},0)/grades.length)
+        :null;
+      fields[base+".final"]=finalGrade===null?"":String(finalGrade);
+      fields[base+".remarks"]=finalGrade===null?"":finalGrade>=75?"Passed":"Failed";
+    });
+    var annualSubjectGrades=Array.isArray(generalAverageSubjects)
+      ?generalAverageSubjects.map(function(subjectKey){
+        var grades=termGradesBySubject.map(function(termGrades){
+          var value=termGrades[subjectKey];
+          var numericValue=value!==null&&value!==undefined&&String(value).trim()!==""?Number(value):NaN;
+          return Number.isFinite(numericValue)?numericValue:null;
+        });
+        return grades.length===3&&grades.every(function(value){return typeof value==="number"})
+          ?Math.round(grades.reduce(function(total,value){return total+value},0)/grades.length)
+          :null;
+      })
+      :[];
+    var generalAverage=annualSubjectGrades.length&&annualSubjectGrades.every(function(value){return typeof value==="number"})
+      ?Math.round(annualSubjectGrades.reduce(function(total,value){return total+value},0)/annualSubjectGrades.length)
+      :null;
+    var generalAverageBase="grade."+(gradeIndex+1)+".generalAverage";
+    fields[generalAverageBase]=generalAverage===null?"":String(generalAverage);
+    fields[generalAverageBase+"Remarks"]=generalAverage===null?"":generalAverage>=75?"Passed":"Failed";
+    return fields;
+  }
+
+  function sf10LockGradeInputs(gradeIndex,form){
+    var base="grade."+(gradeIndex+1)+".";
+    var subjectPrefix=base+"subjects.";
+    form.querySelectorAll("[data-sf10-field]").forEach(function(field){
+      var key=field.dataset.sf10Field;
+      if(key===base+"generalAverage"||key===base+"generalAverageRemarks"
+        ||(key.indexOf(subjectPrefix)===0&&/\.q[1-3]$|\.final$|\.remarks$/.test(key))){
+        field.readOnly=true;
+        field.setAttribute("aria-readonly","true");
+        field.title="Generated from SF9 Term Grades.";
+      }
+    });
+  }
+
+  function sf10GradeMetadataFields(gradeIndex,profile){
+    var base="grade."+(gradeIndex+1)+".";
+    var profileFields={
+      school:"schoolName",
+      schoolId:"schoolId",
+      district:"district",
+      division:"division",
+      region:"region",
+      schoolYear:"schoolYear",
+      section:"section"
+    };
+    var fields={};
+    Object.keys(profileFields).forEach(function(field){
+      var value=profile[profileFields[field]];
+      if(value!==undefined&&value!==null&&String(value).trim()){
+        fields[base+field]=String(value);
+      }
+    });
+    fields[base+"classifiedGrade"]=String(gradeIndex+1);
+    return fields;
+  }
+
   function sf10LoadRecord(recordKey){
     sf10ActiveRecordKey=recordKey||"manual";
     var student=sf10Students.find(function(candidate){return String(candidate.id)===sf10ActiveRecordKey});
@@ -7055,7 +7179,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       var records=sf10ReadRecords();
       var record=records[sf10ActiveRecordKey];
       if(record&&record.fields){
-        sf10ApplyFields(record.fields);
+        sf10ApplyFields(Object.assign({},student?sf10RosterFields(student):{},record.fields));
         sf10SetStatus("Saved draft loaded from this browser.",false);
       }else{
         sf10ApplyFields(student?sf10RosterFields(student):{});
@@ -7064,6 +7188,41 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     }catch(error){
       sf10ApplyFields(student?sf10RosterFields(student):{});
       sf10SetStatus("Could not load the saved draft: "+error.message,true);
+    }
+  }
+
+  async function sf10SyncTermGrades(recordKey){
+    var requestId=++sf10GradeSyncRequestId;
+    if(!recordKey||recordKey==="manual")return;
+    try{
+      var profile=await api("/api/teacher/profile");
+      if(requestId!==sf10GradeSyncRequestId||sf10ActiveRecordKey!==recordKey)return;
+      if(!profile||!profile.grade)throw new Error("The active class grade could not be determined.");
+      var classifiedGrades=Array.from({length:sf10GradeSubjects.length},function(_,index){
+        var field=$("sf10_grade_"+(index+1)+"_classifiedGrade");
+        return field?field.value:"";
+      });
+      var gradeIndex=sf10ClassifiedGradeIndex(classifiedGrades,profile.grade);
+      if(gradeIndex<0){
+        throw new Error("Set exactly one SF 10 Classified as Grade field to match "+profile.grade+".");
+      }
+      sf10LockGradeInputs(gradeIndex,$("sf10Form"));
+      var terms=["Term 1","Term 2","Term 3"];
+      var termResults=await Promise.all(terms.map(function(term){
+        return api("/api/grades?studentId="+encodeURIComponent(recordKey)+"&term="+encodeURIComponent(term));
+      }));
+      if(requestId!==sf10GradeSyncRequestId||sf10ActiveRecordKey!==recordKey)return;
+      var fields=sf10CollectFields();
+      Object.assign(fields,sf10TermGradeFields(gradeIndex,termResults,profile.generalAverageSubjects));
+      Object.assign(fields,sf10GradeMetadataFields(gradeIndex,profile));
+      sf10ApplyFields(fields);
+      if(sf10PersistRecord(recordKey)){
+        sf10SetStatus("SF9 grades synchronized to "+profile.grade+".",false);
+      }
+    }catch(error){
+      if(requestId===sf10GradeSyncRequestId&&sf10ActiveRecordKey===recordKey){
+        sf10SetStatus("Could not synchronize Term Grades: "+error.message,true);
+      }
     }
   }
 
@@ -7095,7 +7254,14 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("sf10Form").addEventListener("submit",function(event){event.preventDefault();sf10PersistRecord()});
     $("sf10LearnerSelect").addEventListener("change",function(){
       sf10PersistRecord(sf10ActiveRecordKey);
-      sf10LoadRecord(this.value||"manual");
+      var recordKey=this.value||"manual";
+      sf10LoadRecord(recordKey);
+      sf10SyncTermGrades(recordKey);
+    });
+    $("sf10Form").addEventListener("change",function(event){
+      if(event.target.matches('[data-sf10-field$=".classifiedGrade"]')){
+        sf10SyncTermGrades(sf10ActiveRecordKey);
+      }
     });
     $("sf10Save").addEventListener("click",function(){sf10PersistRecord()});
     $("sf10Print").addEventListener("click",function(){
@@ -7134,6 +7300,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       }
       learnerSelect.disabled=false;
       sf10LoadRecord(learnerSelect.value);
+      sf10SyncTermGrades(learnerSelect.value);
     }catch(error){
       sf10Students=[];
       learnerSelect.value="manual";
@@ -7144,7 +7311,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   function showDashboardPage(page){
-    if((page==="sf10"||page==="assessmentDifficultyIndex"||page==="assessmentItemAnalysis"||page==="assessmentLeastMastered")
+    if((page==="assessmentDifficultyIndex"||page==="assessmentItemAnalysis"||page==="assessmentLeastMastered")
       &&(!currentUser||!currentUser.isAdmin)){
       page="students";
     }
@@ -10086,9 +10253,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("navAttendance").hidden=false;
     $("navEClass").hidden=false;
     $("navTermGrades").hidden=false;
-    $("navSf10").hidden=!user.isAdmin;
-    $("navSf10").setAttribute("aria-disabled",String(!user.isAdmin));
-    $("navSf10").title=user.isAdmin?"Open SF 10":"Available to administrators only";
+    $("navSf10").hidden=false;
+    $("navSf10").setAttribute("aria-disabled","false");
+    $("navSf10").title="Open SF 10";
     $("navGradeSummary").hidden=false;
     $("navPhilIri").hidden=false;
     $("navRma").hidden=false;
