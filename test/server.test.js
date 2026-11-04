@@ -237,6 +237,18 @@ test("SF 10 is available to teachers in the Term Grade menu", async () => {
   assert.doesNotMatch(portalPage, /page==="sf10"\|\|page==="assessmentDifficultyIndex"/);
 });
 
+test("Phil-Iri and RMA are nested under Assessment Dashboard", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const assessmentSubnav = portalPage.match(
+    /<div class="sidebar-subnav" id="assessmentDashboardSubnav" hidden>([\s\S]*?)<\/div>/,
+  );
+  assert.ok(assessmentSubnav, "Assessment Dashboard navigation group exists");
+  assert.match(assessmentSubnav[1], /id="navPhilIri"/);
+  assert.match(assessmentSubnav[1], /id="navRma"/);
+  assert.equal((portalPage.match(/id="navPhilIri"/g) || []).length, 1);
+  assert.equal((portalPage.match(/id="navRma"/g) || []).length, 1);
+});
+
 test("SF 10 term grades follow the matching Classified as Grade field", async () => {
   const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
   const gradeSubjects = portalPage.match(/var sf10GradeSubjects=\[[\s\S]*?\n  \];/);
@@ -363,7 +375,12 @@ test("developer updates list only changes from the current app version", async (
   assert.equal(updateContent[1], require("../package.json").version);
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
-    ["The portal footer is now shown on E-Class pages."],
+    [
+      "SF 10 now synchronizes the selected learner's three term grades from SF 9, including Music and Arts and Physical Education and Health.",
+      "School and classroom details are filled from the teacher profile for the matching classified grade.",
+      "SF 10 final ratings, General Average, and Passed/Failed remarks are generated from SF 9 grades and locked against manual edits.",
+      "SF 10 follows the three-term curriculum and has a more organized toolbar.",
+    ],
   );
 });
 
@@ -1963,6 +1980,9 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /\.sidebar-footer-icon\{display:block;width:48px;height:48px;margin:14px auto 0/);
   assert.ok(portalPage.includes(`class="sidebar-footer-version">GraceDesk · Version ${require("../package.json").version}</span>`));
   assert.ok(portalPage.includes(`class="brand-version">${require("../package.json").version}</span>`));
+  assert.match(portalPage, /class="brand-contact" aria-label="Contact information"/);
+  assert.match(portalPage, /mailto:demogorgon37846@gmail\.com/);
+  assert.match(portalPage, /09561209923/);
   assert.match(portalPage, /\.teacher-profile-card\{display:flex;max-width:920px;align-items:center/);
   assert.match(portalPage, /\.teacher-profile-form\{max-width:920px;padding:0 22px 22px\}/);
   assert.match(portalPage, /\.teacher-profile-form \.form-field\.full\{grid-column:1\/-1\}/);

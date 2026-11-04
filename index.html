@@ -1134,11 +1134,15 @@ body:not(.portal-active) .brand::after{
   pointer-events:none;
 }
 body:not(.portal-active) .brand>*{position:relative;z-index:1}
-body:not(.portal-active) .brand .mark{width:104px;height:104px;margin:0 0 24px;border-radius:28px}
+body:not(.portal-active) .brand .mark{width:88px;height:88px;margin:0 0 18px;border-radius:24px}
 body:not(.portal-active) .brand h1{max-width:520px;font-size:clamp(2rem,4vw,3.15rem);line-height:1.12;letter-spacing:-.055em}
 body:not(.portal-active) .brand h1 span[aria-label="GraceDesk"]{color:var(--accent)}
-body:not(.portal-active) .brand p{margin-top:12px;color:var(--muted);font-size:1.04rem}
-body:not(.portal-active) .brand .brand-version{margin-top:14px;color:var(--accent);font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+body:not(.portal-active) .brand p{margin-top:10px;color:var(--muted);font-size:.96rem}
+body:not(.portal-active) .brand .brand-version{display:inline-flex;width:max-content;margin-top:14px;padding:6px 10px;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--accent) 8%,transparent);color:var(--accent);font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+body:not(.portal-active) .brand-contact{display:grid!important;width:100%;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px!important;margin:10px 0 0!important;padding:10px;border:1px solid color-mix(in srgb,var(--accent) 16%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--card) 86%,var(--accent));font-size:.68rem!important;line-height:1.35}
+body:not(.portal-active) .brand-contact a{display:block;min-width:0;padding:6px 8px;border-radius:8px;background:color-mix(in srgb,var(--field) 58%,transparent);color:var(--muted);font-weight:700;text-decoration:none;overflow-wrap:anywhere}
+body:not(.portal-active) .brand-contact a:first-child{grid-column:1/-1}
+body:not(.portal-active) .brand-contact a:hover{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
 .brand-acronym{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;margin:10px 0 0;padding-left:12px;border-left:3px solid var(--accent);color:var(--muted);font-size:.9rem;font-weight:500;letter-spacing:.01em;line-height:1.5}
 .brand-acronym b{color:var(--accent);font-size:1.12em;font-weight:800}
 .brand-acronym .amp{color:var(--muted);opacity:.7}
@@ -1313,6 +1317,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   body:not(.portal-active) .brand .mark{width:76px;height:76px;margin-bottom:14px;border-radius:22px}
   body:not(.portal-active) .brand h1{font-size:clamp(1.7rem,7vw,2.25rem)}
   body:not(.portal-active) .brand p{margin-top:7px;font-size:.92rem}
+  body:not(.portal-active) .brand-contact{margin-top:9px!important}
   body:not(.portal-active) #authCard{padding:24px}
   .page-content{padding:24px}
 }
@@ -1777,6 +1782,11 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       <span><b>G</b>rade</span><span><b>R</b>ecords,</span><span><b>A</b>ssessment</span><span class="amp">&amp;</span><span><b>C</b>lassroom</span><span><b>E</b>ssentials</span>
     </div>
     <span class="brand-version">1.0.52</span>
+    <p class="brand-contact" aria-label="Contact information">
+      <a href="mailto:demogorgon37846@gmail.com">Email: demogorgon37846@gmail.com</a>
+      <a href="https://www.facebook.com/bonnervin.lugatiman.1" target="_blank" rel="noopener noreferrer">Facebook</a>
+      <a href="tel:09561209923">Mobile No.: 09561209923</a>
+    </p>
     <p id="tagline">Welcome back. Sign in to your classroom.</p>
   </header>
 
@@ -1909,13 +1919,13 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
             <button class="nav-link" id="navAssessmentLeastMastered" type="button" hidden aria-disabled="true" title="Available to administrators only">
               <span class="nav-icon" aria-hidden="true">◉</span>Least Mastered Competencies
             </button>
+            <button class="nav-link" id="navPhilIri" type="button">
+              <span class="nav-icon" aria-hidden="true">▥</span>Phil-Iri
+            </button>
+            <button class="nav-link" id="navRma" type="button" title="Open RMA">
+              <span class="nav-icon" aria-hidden="true">∑</span>RMA
+            </button>
           </div>
-          <button class="nav-link" id="navPhilIri" type="button">
-            <span class="nav-icon" aria-hidden="true">▥</span>Phil-Iri
-          </button>
-          <button class="nav-link" id="navRma" type="button" title="Open RMA">
-            <span class="nav-icon" aria-hidden="true">∑</span>RMA
-          </button>
           <button class="nav-link" id="navNutritionalStatus" type="button">
             <span class="nav-icon" aria-hidden="true">◉</span>Nutritional Status
           </button>
@@ -3217,9 +3227,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.54</p>
+                  <p class="developer-update-meta">Version 1.0.56</p>
                   <ul class="developer-update-list">
-                    <li>The portal footer is now shown on E-Class pages.</li>
+                    <li>SF 10 now synchronizes the selected learner's three term grades from SF 9, including Music and Arts and Physical Education and Health.</li>
+                    <li>School and classroom details are filled from the teacher profile for the matching classified grade.</li>
+                    <li>SF 10 final ratings, General Average, and Passed/Failed remarks are generated from SF 9 grades and locked against manual edits.</li>
+                    <li>SF 10 follows the three-term curriculum and has a more organized toolbar.</li>
                   </ul>
                 </div>
               </section>
