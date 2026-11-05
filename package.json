@@ -59,8 +59,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "Bontoy2025",
-        "repo": "Advisers_Portal"
+        "owner": "bloodheaddemogorgon-ops",
+        "repo": "avera-portal"
       }
     ],
     "productName": "GraceDesk",
