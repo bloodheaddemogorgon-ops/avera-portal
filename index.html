@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>GraceDesk · Every record, one desk.</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f6f7fb;--card:#fff;--ink:#1b2236;--muted:#69718a;--line:#e3e6ef;--field:#f6f7fb;--accent:#2f7f70;--accent-ink:#fff;--soft:#e4f2ee;--err:#c2410c;--shadow:0 1px 2px rgba(20,28,50,.04),0 12px 40px rgba(20,28,50,.07);
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -439,6 +439,157 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .settings-card-body select{min-height:44px}
 .settings-card-body .field-hint{margin:9px 0 0}
 .settings-card-body .notice{margin:14px 0 0}
+.tools-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;padding:0 0 10px;border-bottom:1px solid var(--line)}
+.tools-tab{min-height:40px;padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--muted);font:inherit;font-size:.82rem;font-weight:700;cursor:pointer}
+.tools-tab[aria-selected="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.tools-panel{min-width:0}
+.tarpaulin-editor{display:grid;grid-template-columns:minmax(290px,.78fr) minmax(0,1.22fr);gap:18px;align-items:start}
+.tool-controls{display:grid;gap:14px}
+.tool-field{min-width:0}
+.tool-field label{margin:0 0 6px;font-size:.8rem}
+.tool-field input,.tool-field textarea,.tool-field select{width:100%;min-height:44px;margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);font:inherit;font-size:.88rem}
+.tool-field textarea{min-height:110px;resize:vertical}
+.tool-actions{display:flex;flex-wrap:wrap;gap:9px}
+.tool-actions .btn{width:auto;min-width:130px;margin:0;padding:10px 14px;font-size:.86rem}
+.tarpaulin-controls-card{overflow:hidden}
+.tarpaulin-editor-heading{padding:18px 20px 15px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,color-mix(in srgb,var(--soft) 54%,var(--card)),var(--card) 74%)}
+.tarpaulin-editor-heading h2{margin:0;font-size:1rem}
+.tarpaulin-editor-heading p{margin:4px 0 0;color:var(--muted);font-size:.78rem}
+.tarpaulin-control-section{display:grid;gap:12px;padding:0 0 15px;border-bottom:1px solid var(--line)}
+.tarpaulin-control-section:last-child{padding-bottom:0;border-bottom:0}
+.tarpaulin-control-section h3{margin:0;font-size:.76rem;letter-spacing:.045em;text-transform:uppercase}
+.tarpaulin-image-actions{display:flex;flex-wrap:wrap;gap:8px}
+.tarpaulin-upload-button{display:inline-flex;min-height:44px;align-items:center;justify-content:center;gap:8px;margin:0;padding:10px 14px;border:1px solid color-mix(in srgb,var(--accent) 38%,var(--line));border-radius:11px;background:var(--soft);color:var(--accent);font:inherit;font-size:.82rem;font-weight:800;cursor:pointer}
+.tarpaulin-upload-button:hover{border-color:var(--accent);filter:brightness(.98)}
+.tarpaulin-image-name{min-width:0;align-self:center;overflow:hidden;color:var(--muted);font-size:.74rem;text-overflow:ellipsis;white-space:nowrap}
+.tarpaulin-remove-image{width:auto;min-height:34px;margin:0;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--muted);font:inherit;font-size:.72rem;font-weight:700;cursor:pointer}
+.tarpaulin-notice{margin:0;color:var(--muted);font-size:.74rem}
+.tarpaulin-notice.error{color:var(--err);font-weight:700}
+.tarpaulin-dimensions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 92px;gap:9px;align-items:end}
+.tarpaulin-sheet-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.tarpaulin-sheet-grid[hidden]{display:none}
+.tarpaulin-dimensions .tool-field label span{color:var(--muted);font-weight:500}
+.tarpaulin-dimensions .tool-field select{padding-right:7px}
+.tarpaulin-preview-card{overflow:hidden}
+.tarpaulin-preview-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line)}
+.tarpaulin-preview-toolbar h2{margin:0;font-size:.9rem}
+.tarpaulin-preview-size{flex:none;padding:5px 9px;border-radius:999px;background:var(--soft);color:var(--accent);font-size:.7rem;font-weight:800}
+.tarpaulin-zoom-controls{display:inline-flex;align-items:center;gap:6px}
+.tarpaulin-zoom-controls button{min-width:32px;min-height:32px;margin:0;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:.9rem;font-weight:800;cursor:pointer}
+.tarpaulin-zoom-controls button:disabled{opacity:.5;cursor:not-allowed}
+.tarpaulin-zoom-level{min-width:3.5em;color:var(--muted);font-size:.72rem;font-weight:700;text-align:center}
+.tarpaulin-preview-wrap{display:block;min-height:420px;height:clamp(420px,65vh,760px);overflow:auto;padding:clamp(14px,3vw,30px);background:radial-gradient(ellipse at center,color-mix(in srgb,var(--soft) 60%,var(--field)),var(--field) 75%)}
+.tarpaulin-preview{position:relative;isolation:isolate;width:100%;aspect-ratio:auto;overflow:visible;border:0;border-radius:0;background:transparent;box-shadow:none;transition:width .2s ease}
+.tarpaulin-preview-image,.tarpaulin-preview-empty{display:none!important}
+.tarpaulin-preview-empty span{font-size:1.5rem}
+.tarpaulin-sheet-guides{position:static;z-index:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(var(--tarpaulin-sheet-min-width,190px),1fr));gap:12px;overflow:visible;pointer-events:none}
+.tarpaulin-sheet-guide{position:relative;box-sizing:border-box;display:block;aspect-ratio:var(--paper-aspect,1);overflow:hidden;border:1px solid #cbd5e1;border-radius:4px;background:#fff;box-shadow:0 8px 18px rgba(0,0,0,.2)}
+.tarpaulin-sheet-printable{position:absolute;overflow:hidden;background:#fff}
+.tarpaulin-sheet-art{position:absolute;display:block}
+.tarpaulin-sheet-image{position:absolute;inset:0;width:100%;height:100%}
+.tarpaulin-sheet-printable-boundary{position:absolute;z-index:1;inset:0;border:1px dashed rgba(71,85,105,.8)}
+.tarpaulin-sheet-guide-label{position:absolute;z-index:2;top:3px;left:3px;min-width:16px;padding:1px 5px;border-radius:999px;background:rgba(15,23,42,.82);color:#fff;font-size:10px;font-weight:800;line-height:1.5;text-align:center}
+.tarpaulin-size-label{margin:12px 0 0;color:var(--muted);font-size:.74rem;line-height:1.5;text-align:center}
+#tarpaulinPrintPages{display:none}
+.tarpaulin-print-page{position:relative;box-sizing:border-box;overflow:hidden;break-after:page;page-break-after:always;background:#fff;color:#111}
+.tarpaulin-print-page:last-child{break-after:auto;page-break-after:auto}
+.tarpaulin-print-tile{position:absolute;overflow:hidden;background:#fff;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.tarpaulin-print-canvas{position:absolute;overflow:hidden;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.tarpaulin-print-image{position:absolute;inset:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.tarpaulin-print-cut-line{position:absolute;z-index:2;border-color:#999;border-style:dashed;opacity:.85}
+.tarpaulin-print-cut-line.vertical{width:0;border-width:0 0 0 .25mm}
+.tarpaulin-print-cut-line.horizontal{height:0;border-width:.25mm 0 0}
+.tarpaulin-print-cut-line.seam-trim{border-color:#4b5563;opacity:1}
+.tarpaulin-print-cut-line.vertical.seam-trim{border-left-width:.45mm}
+.tarpaulin-print-cut-line.horizontal.seam-trim{border-top-width:.45mm}
+.tarpaulin-print-page-number,.tarpaulin-print-scissors{position:absolute;z-index:3;color:#888}
+.tarpaulin-print-page-number{font:7pt Arial,sans-serif;line-height:1;transform:translate(-50%,-50%)}
+.tarpaulin-print-scissors{width:5.5mm;height:5.5mm;transform:translate(-50%,-50%)}
+.tarpaulin-print-scissors svg{display:block;width:100%;height:100%;fill:none;stroke:#888;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.6}
+.wheel-layout{display:grid;grid-template-columns:minmax(0,.8fr) minmax(240px,1.2fr);gap:24px;align-items:center}
+.wheel-canvas-wrap{display:grid;place-items:center;gap:12px}
+.wheel-pointer{width:0;height:0;border-right:13px solid transparent;border-left:13px solid transparent;border-top:22px solid var(--ink);filter:drop-shadow(0 2px 2px rgba(0,0,0,.2))}
+.spin-wheel{width:min(100%,360px);height:auto;aspect-ratio:1;border:5px solid var(--card);border-radius:50%;box-shadow:0 8px 26px rgba(20,28,50,.2);transition:transform 4.5s cubic-bezier(.12,.72,.16,1)}
+.wheel-result{min-height:1.5em;margin:4px 0 0;color:var(--accent);font-size:1.05rem;font-weight:800;text-align:center}
+.wheel-roster-controls{display:grid;gap:14px}
+.wheel-roster-meta,.wheel-removed-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.wheel-roster-meta{color:var(--muted);font-size:.8rem;font-weight:700}
+.wheel-roster-meta .btn{width:auto;min-height:38px;margin:0;padding:8px 12px;font-size:.78rem}
+.wheel-removed-heading h3{margin:0;font-size:.8rem}
+.wheel-removed-empty{margin:0;color:var(--muted);font-size:.78rem}
+.wheel-removed-list{display:grid;gap:7px;margin:0;padding:0;list-style:none}
+.wheel-removed-list:empty{display:none}
+.wheel-return-button{width:100%;min-height:38px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--field);color:var(--ink);font:inherit;font-size:.82rem;font-weight:700;text-align:left;cursor:pointer}
+.wheel-return-button:hover{border-color:var(--accent);color:var(--accent)}
+.wheel-return-button:disabled{opacity:.55;cursor:not-allowed}
+#spinWheelPanel{
+  --wheel-cream:color-mix(in srgb,var(--card) 88%,#fff0d5);
+  --wheel-peach:color-mix(in srgb,var(--card) 88%,#ffe2d5);
+  --wheel-lavender:color-mix(in srgb,var(--card) 90%,#eee7ff);
+  --wheel-mint:color-mix(in srgb,var(--card) 90%,#e6f4ea);
+  --wheel-border:color-mix(in srgb,var(--line) 72%,#d89b78);
+  --wheel-shadow:color-mix(in srgb,#80543e 12%,transparent);
+  font-family:"Nunito","Trebuchet MS",sans-serif;
+}
+#spinWheelPanel>.data-card{border:1px solid var(--wheel-border);border-radius:20px;box-shadow:0 12px 30px var(--wheel-shadow)}
+#spinWheelPanel>.data-card>.data-card-header{padding:20px 24px;border-color:var(--wheel-border);background:linear-gradient(120deg,var(--wheel-cream),var(--wheel-peach) 62%,var(--wheel-lavender))}
+#spinWheelPanel .data-card-header h2{font-family:inherit;font-size:1.12rem;font-weight:800;letter-spacing:-.02em}
+#spinWheelPanel .data-card-header p{margin:0;color:var(--muted);font-family:inherit;font-size:.86rem}
+#spinWheelPanel .wheel-layout{padding:22px;background:linear-gradient(135deg,var(--wheel-cream),var(--wheel-peach) 56%,var(--wheel-mint));font-family:inherit}
+#spinWheelPanel .tool-field label,#spinWheelPanel .wheel-removed-heading h3{color:color-mix(in srgb,var(--ink) 88%,#865c48);font-family:inherit;font-weight:800}
+#spinWheelPanel .tool-field textarea{border-color:var(--wheel-border);border-radius:16px;background:color-mix(in srgb,var(--card) 88%,#fffaf2);box-shadow:inset 0 1px 3px rgba(100,65,43,.06);font-family:inherit;line-height:1.55}
+#spinWheelPanel .field-hint{font-family:inherit}
+#spinWheelPanel #spinWheelButton{
+  min-height:52px;
+  padding:13px 22px;
+  border-radius:16px;
+  background:linear-gradient(135deg,#b5533f,#a94439);
+  color:#fff;
+  font-family:inherit;
+  font-size:.96rem;
+  font-weight:800;
+  letter-spacing:.01em;
+  box-shadow:0 5px 0 #85362d,0 9px 18px rgba(133,54,45,.2);
+  transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
+}
+#spinWheelPanel #spinWheelButton:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.05);box-shadow:0 7px 0 #85362d,0 12px 22px rgba(133,54,45,.23)}
+#spinWheelPanel #spinWheelButton:active:not(:disabled){transform:translateY(2px) scale(.97);box-shadow:0 2px 0 #85362d,0 4px 10px rgba(133,54,45,.18)}
+#spinWheelPanel #spinWheelButton:focus-visible,#spinWheelPanel .wheel-return-button:focus-visible,#spinWheelPanel #spinWheelReset:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 58%,#f4b77a);outline-offset:3px}
+#spinWheelPanel #spinWheelButton:disabled{filter:saturate(.6);box-shadow:0 3px 0 #85362d;cursor:wait}
+#spinWheelPanel .wheel-result{color:#a3483b;font-family:inherit;font-size:1.08rem}
+#spinWheelPanel .wheel-roster-controls{padding:15px;border:1px solid var(--wheel-border);border-radius:18px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 80%,#fff5e8),color-mix(in srgb,var(--card) 82%,#f2edff));box-shadow:0 7px 18px var(--wheel-shadow)}
+#spinWheelPanel .wheel-roster-meta{font-family:inherit}
+#spinWheelPanel .wheel-roster-meta .btn{min-height:40px;padding:8px 14px;border:1px solid var(--wheel-border);border-radius:13px;background:color-mix(in srgb,var(--card) 82%,#fff5e8);font-family:inherit;font-weight:800}
+#spinWheelPanel .wheel-roster-meta .btn:hover:not(:disabled){border-color:#d58b68;background:var(--wheel-peach);color:var(--ink)}
+#spinWheelPanel .wheel-removed-heading{margin-bottom:5px}
+#spinWheelPanel .wheel-removed-empty{font-family:inherit}
+#spinWheelPanel .wheel-removed-list{display:flex;flex-wrap:wrap;gap:8px}
+#spinWheelPanel .wheel-removed-list li{flex:0 1 auto;min-width:0}
+#spinWheelPanel .wheel-return-button{display:inline-flex;width:auto;min-height:38px;align-items:center;gap:8px;padding:8px 14px;border:1px solid color-mix(in srgb,#d58b68 42%,var(--line));border-radius:999px;background:linear-gradient(135deg,var(--wheel-cream),var(--wheel-peach));color:var(--ink);font-family:inherit;font-size:.84rem;font-weight:800;box-shadow:0 3px 8px var(--wheel-shadow);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+#spinWheelPanel .wheel-return-button::after{content:"↩";color:#a3483b;font-size:.9rem}
+#spinWheelPanel .wheel-return-button:hover:not(:disabled){transform:translateY(-1px);border-color:#c87958;color:#873e34;box-shadow:0 5px 12px var(--wheel-shadow)}
+#spinWheelPanel .wheel-return-button:active:not(:disabled){transform:scale(.97)}
+#spinWheelPanel .wheel-canvas-wrap{padding:18px;border:1px solid var(--wheel-border);border-radius:24px;background:linear-gradient(145deg,var(--wheel-cream),var(--wheel-lavender));box-shadow:0 8px 20px var(--wheel-shadow)}
+#spinWheelPanel .wheel-pointer{border-top-color:#bd674f}
+#spinWheelPanel .spin-wheel{border:8px solid color-mix(in srgb,var(--card) 75%,#ffe6d2);box-shadow:0 10px 24px var(--wheel-shadow)}
+@media(max-width:760px){
+  .tarpaulin-editor,.wheel-layout{grid-template-columns:minmax(0,1fr)}
+}
+@media print{
+  body.tools-printing{display:block!important;min-height:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
+  body.tools-printing *{visibility:hidden!important}
+  body.tools-printing #toolsPage,body.tools-printing #toolsPage *{visibility:visible!important}
+  body.tools-printing #toolsPage{position:absolute;inset:0;width:100%;padding:0;background:#fff;color:#111}
+  body.tools-printing #toolsPage>.page-heading,body.tools-printing .tools-tabs,body.tools-printing #spinWheelPanel,body.tools-printing #moreToolsPanel,body.tools-printing #tarpaulinControls,body.tools-printing #tarpaulinActions,body.tools-printing .tarpaulin-size-label{display:none!important}
+  body.tools-printing #tarpaulinPanel{display:block!important;margin:0!important;padding:0!important}
+  body.tools-printing #tarpaulinPanel .tarpaulin-editor{display:none!important}
+  body.tools-printing #tarpaulinPrintPages{display:block!important;visibility:visible!important;margin:0!important;padding:0!important}
+  body.tools-printing #tarpaulinPanel .tarpaulin-editor>.data-card{border:0;box-shadow:none}
+  body.tools-printing #tarpaulinPanel .tarpaulin-editor-heading,body.tools-printing #tarpaulinPanel .tarpaulin-preview-toolbar{display:none!important}
+  body.tools-printing #tarpaulinPanel .tarpaulin-preview-wrap{display:block;min-height:0;padding:0;border:0;background:#fff}
+  body.tools-printing #tarpaulinPreviewEmpty{display:none!important}
+  body.tools-printing #tarpaulinPreview{width:100%!important;height:auto;aspect-ratio:var(--tarpaulin-ratio,3/1);border:0;border-radius:0;box-shadow:none;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
 .settings-update-link{display:inline-flex;width:auto;align-items:center;justify-content:center;margin:14px 0 0;padding:11px 16px;text-decoration:none}
 .update-progress{margin-top:16px}
 .update-progress-bar{height:12px;overflow:hidden;border-radius:999px;background:var(--soft);border:1px solid var(--line)}
@@ -1938,6 +2089,9 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
           <button class="nav-link" id="navSettings" type="button">
             <span class="nav-icon" aria-hidden="true">⚙</span>Settings
           </button>
+          <button class="nav-link" id="navTools" type="button">
+            <span class="nav-icon" aria-hidden="true">🔧</span>Tools
+          </button>
         </nav>
         <nav id="parentSidebarNav" aria-label="Learner information navigation" hidden>
           <button class="nav-link" type="button" data-parent-target="parentStudentInfo" aria-current="page">
@@ -3238,6 +3392,97 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
               </section>
             </div>
           </section>
+          <section id="toolsPage" aria-label="Tools" hidden>
+            <div class="page-heading">
+              <div><h1>Tools</h1><p>Quick tools for classroom activities and school events.</p></div>
+            </div>
+            <div class="tools-tabs" role="tablist" aria-label="Tools">
+              <button class="tools-tab" id="tarpaulinTab" type="button" role="tab" aria-controls="tarpaulinPanel" aria-selected="true" tabindex="0">Tarpapel Maker</button>
+              <button class="tools-tab" id="spinWheelTab" type="button" role="tab" aria-controls="spinWheelPanel" aria-selected="false" tabindex="-1">Spin the Wheel</button>
+              <button class="tools-tab" id="moreToolsTab" type="button" role="tab" aria-controls="moreToolsPanel" aria-selected="false" tabindex="-1">More tools</button>
+            </div>
+            <section class="tools-panel" id="tarpaulinPanel" role="tabpanel" aria-labelledby="tarpaulinTab">
+              <div class="tarpaulin-editor">
+                <section class="data-card tarpaulin-controls-card" aria-labelledby="tarpaulinMakerTitle">
+                  <div class="tarpaulin-editor-heading"><h2 id="tarpaulinMakerTitle">Design your banner</h2><p>Upload a picture, set the banner size, and adjust how it fits.</p></div>
+                  <div class="settings-card-body tool-controls" id="tarpaulinControls">
+                    <section class="tarpaulin-control-section" aria-labelledby="tarpaulinPictureHeading">
+                      <h3 id="tarpaulinPictureHeading">Picture</h3>
+                      <div class="tarpaulin-image-actions">
+                        <button class="tarpaulin-upload-button" id="uploadTarpaulinImage" type="button"><span aria-hidden="true">▧</span>Upload a picture</button>
+                        <input id="tarpaulinImageInput" type="file" accept="image/*" hidden aria-label="Choose a picture for the banner">
+                        <span class="tarpaulin-image-name" id="tarpaulinImageName">No picture selected</span>
+                        <button class="tarpaulin-remove-image" id="removeTarpaulinImage" type="button" hidden>Remove</button>
+                      </div>
+                      <p class="field-hint">Your picture stays on this device and is included in the exported design.</p>
+                      <p class="tarpaulin-notice" id="tarpaulinNotice" role="status" aria-live="polite" hidden></p>
+                    </section>
+                    <section class="tarpaulin-control-section" aria-labelledby="tarpaulinSizeHeading">
+                      <h3 id="tarpaulinSizeHeading">Banner size</h3>
+                      <div class="tarpaulin-dimensions">
+                        <div class="tool-field"><label for="tarpaulinWidth">Width <span id="tarpaulinWidthUnit">(cm)</span></label><input id="tarpaulinWidth" type="number" min="1" max="1000" step="any" value="300" inputmode="decimal"></div>
+                        <div class="tool-field"><label for="tarpaulinHeight">Height <span id="tarpaulinHeightUnit">(cm)</span></label><input id="tarpaulinHeight" type="number" min="1" max="1000" step="any" value="100" inputmode="decimal"></div>
+                        <div class="tool-field"><label for="tarpaulinUnit">Units</label><select id="tarpaulinUnit"><option value="cm">cm</option><option value="in">in</option></select></div>
+                      </div>
+                      <div class="tool-field"><label for="tarpaulinPaperSize">Paper size</label><select id="tarpaulinPaperSize"><option value="a4">A4</option><option value="legal">Legal (8.5 × 13 in)</option></select></div>
+                      <div class="tool-field"><label for="tarpaulinOrientation">Orientation</label><select id="tarpaulinOrientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
+                      <div class="tool-field"><label for="tarpaulinSheetLayout">Paper count</label><select id="tarpaulinSheetLayout"><option value="auto">Automatic (based on banner size)</option><option value="custom">Choose a paper grid</option></select></div>
+                      <div class="tarpaulin-sheet-grid" id="tarpaulinCustomSheetGrid" hidden>
+                        <div class="tool-field"><label for="tarpaulinSheetsAcross">Sheets across</label><input id="tarpaulinSheetsAcross" type="number" min="1" max="53" step="1" value="1" inputmode="numeric"></div>
+                        <div class="tool-field"><label for="tarpaulinSheetsDown">Sheets down</label><input id="tarpaulinSheetsDown" type="number" min="1" max="53" step="1" value="1" inputmode="numeric"></div>
+                      </div>
+                      <p class="field-hint" id="tarpaulinSheetGridHint">Choose a grid to scale the banner to fit those sheets while preserving its proportions.</p>
+                    </section>
+                    <section class="tarpaulin-control-section" aria-labelledby="tarpaulinAppearanceHeading">
+                      <h3 id="tarpaulinAppearanceHeading">Appearance</h3>
+                      <div class="form-grid">
+                        <div class="tool-field"><label for="tarpaulinColor">Background color</label><select id="tarpaulinColor"><option value="#1f5a85">Deep blue</option><option value="#28734e">Green</option><option value="#982f3f">Red</option><option value="#704a9b">Purple</option><option value="#f0c84b">Yellow</option><option value="#ffffff">White</option></select></div>
+                        <div class="tool-field"><label for="tarpaulinImageFit">Picture fit</label><select id="tarpaulinImageFit"><option value="cover">Fill banner</option><option value="contain">Fit inside</option></select></div>
+                      </div>
+                    </section>
+                  </div>
+                  <div class="settings-card-body tool-actions" id="tarpaulinActions">
+                    <button class="btn" id="printTarpaulin" type="button">Print / Save PDF</button>
+                    <button class="btn ghost" id="downloadTarpaulinPdf" type="button">Download PDF</button>
+                    <button class="btn ghost" id="downloadTarpaulinSvg" type="button">Download SVG</button>
+                  </div>
+                </section>
+                <section class="data-card tarpaulin-preview-card" aria-labelledby="tarpaulinPreviewHeading">
+                  <div class="tarpaulin-preview-toolbar"><h2 id="tarpaulinPreviewHeading">Live preview</h2><span class="tarpaulin-preview-size" id="tarpaulinDimensions">300 cm × 100 cm</span><span class="tarpaulin-preview-size" id="tarpaulinSheetCount" aria-live="polite">Calculating sheets</span><div class="tarpaulin-zoom-controls" role="group" aria-label="Live preview zoom"><button id="tarpaulinZoomOut" type="button" aria-label="Zoom out" title="Zoom out">−</button><output class="tarpaulin-zoom-level" id="tarpaulinZoomLevel" aria-live="polite">100%</output><button id="tarpaulinZoomIn" type="button" aria-label="Zoom in" title="Zoom in">+</button></div></div>
+                  <div class="settings-card-body">
+                    <div class="tarpaulin-preview-wrap"><div class="tarpaulin-preview" id="tarpaulinPreview"><img class="tarpaulin-preview-image" id="tarpaulinPreviewImage" alt="" hidden><div class="tarpaulin-preview-empty" id="tarpaulinPreviewEmpty"><span aria-hidden="true">▧</span><strong>Upload a picture to begin</strong><span>Your banner will appear here</span></div><div class="tarpaulin-sheet-guides" id="tarpaulinSheetGuides" aria-hidden="true"></div></div></div>
+                    <p class="tarpaulin-size-label" id="tarpaulinPrintHint">Margins: 1 in at the top and left, 0.5 in at the right and bottom. Each page prints a unique banner segment; align the scissor-marked printable edges and tape from the back.</p>
+                  </div>
+                </section>
+              </div>
+              <div id="tarpaulinPrintPages" hidden aria-hidden="true"></div>
+            </section>
+            <section class="tools-panel" id="spinWheelPanel" role="tabpanel" aria-labelledby="spinWheelTab" hidden>
+              <div class="data-card">
+                <div class="data-card-header"><h2>Spin the Wheel</h2><p>The wheel uses active pupils from the selected roster section.</p></div>
+                <div class="settings-card-body wheel-layout">
+                  <div class="tool-controls">
+                    <div class="tool-field"><label for="spinWheelEntries">Pupils (first names)</label><textarea id="spinWheelEntries" readonly aria-describedby="spinWheelHint"></textarea><p class="field-hint" id="spinWheelHint">Active pupils are synced automatically from the selected roster section.</p></div>
+                    <div class="tool-actions"><button class="btn" id="spinWheelButton" type="button">Spin the wheel</button></div>
+                    <p class="wheel-result" id="spinWheelResult" role="status" aria-live="polite"></p>
+                    <div class="wheel-roster-controls">
+                      <div class="wheel-roster-meta"><span id="spinWheelAvailability" aria-live="polite">0 pupils available</span><button class="btn ghost" id="spinWheelReset" type="button" disabled>Return all to wheel</button></div>
+                      <div>
+                        <div class="wheel-removed-heading"><h3>Removed from the wheel</h3></div>
+                        <p class="wheel-removed-empty" id="spinWheelRemovedHelp">Select a pupil's first name to return that pupil.</p>
+                        <p class="wheel-removed-empty" id="spinWheelRemovedEmpty">Selected pupils will appear here.</p>
+                        <ul class="wheel-removed-list" id="spinWheelRemovedList" aria-label="Pupils removed from the wheel"></ul>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="wheel-canvas-wrap"><div class="wheel-pointer" aria-hidden="true"></div><canvas class="spin-wheel" id="spinWheelCanvas" width="600" height="600" role="img" aria-label="Wheel of active pupils"></canvas></div>
+                </div>
+              </div>
+            </section>
+            <section class="tools-panel" id="moreToolsPanel" role="tabpanel" aria-labelledby="moreToolsTab" hidden>
+              <div class="data-card empty-state"><h2>More tools are on the way</h2><p>Additional classroom tools can be added here.</p></div>
+            </section>
+          </section>
           <section id="parentPage" aria-labelledby="parentPortalTitle" hidden>
             <div class="page-heading parent-welcome">
               <div><h1 id="parentPortalTitle">Parent Portal</h1><p id="parentWelcomeMessage">Welcome.</p><p class="field-hint" id="parentPortalSyncStatus" role="status" aria-live="polite">Teacher updates sync automatically while this portal is open.</p></div>
@@ -3511,6 +3756,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   var sf10GradeSyncRequestId=0;
   var rosterStudents=[];
   var rosterParents=[];
+  var spinWheelRosterEntries=[];
+  var spinWheelRemovedIds=new Set();
   var inactiveStudentIds=new Set();
   var handledSections=[];
   var sectionGrades={};
@@ -3588,6 +3835,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   var appearanceStorageError="";
   var appearancePreferenceChanged=false;
   var $=function(i){return document.getElementById(i)};
+  var releasedDesktop=false;
   var studentFields=[
     ["lrn","LRN"],["lastName","Last name"],["firstName","First name"],["middleName","Middle name"],
     ["gender","Gender"],["birthdate","Birthdate"],["mothersMaidenName","Mother's Maiden name"],
@@ -3884,6 +4132,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     setStudentListVisible(true);
     var visibleStudents=filterStudentsForActiveSection(students);
     var activeStudents=visibleStudents.filter(function(s){return !s.enrollmentStatus});
+    syncSpinWheelEntriesFromRoster(activeStudents);
     var inactiveCount=visibleStudents.length-activeStudents.length;
     inactiveStudentIds=new Set(students.filter(function(s){return s.enrollmentStatus}).map(function(s){return s.id}));
     $("studentCount").textContent=activeStudents.length+" active student"+(activeStudents.length===1?"":"s")
@@ -4123,6 +4372,77 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       var text=row.cells[0].textContent.toLowerCase()+" "+row.cells[1].textContent.toLowerCase();
       row.hidden=Boolean(term)&&text.indexOf(term)===-1;
     });
+  }
+
+  function updateSpinWheelEntriesDisplay(forceUpdate){
+    var availableEntries=spinWheelRosterEntries.filter(function(entry){return !spinWheelRemovedIds.has(entry.id);});
+    var wheelEntries=$("spinWheelEntries");
+    var updatedValue=availableEntries.map(function(entry){return entry.name;}).join("\n");
+    var removedCount=spinWheelRosterEntries.length-availableEntries.length;
+    $("spinWheelHint").textContent=availableEntries.length
+      ?removedCount
+        ?availableEntries.length+" of "+spinWheelRosterEntries.length+" active pupils remain on the wheel."
+        :availableEntries.length+" active pupil"+(availableEntries.length===1?"":"s")+" loaded from the selected roster section. At least two are required to spin."
+      :spinWheelRosterEntries.length
+        ?"All active pupils have been selected. Return pupils or reset the list to spin again."
+        :"No active pupils in the selected roster section. Add pupils to the roster first.";
+    if(wheelEntries.value===updatedValue&&!forceUpdate)return;
+    wheelEntries.value=updatedValue;
+    wheelEntries.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+
+  function syncSpinWheelEntriesFromRoster(students){
+    var previousState=JSON.stringify([
+      spinWheelRosterEntries.map(function(entry){return [entry.id,entry.name];}),
+      Array.from(spinWheelRemovedIds).sort()
+    ]);
+    var nameOccurrences=Object.create(null);
+    spinWheelRosterEntries=(Array.isArray(students)?students:[])
+      .filter(function(student){return student&&!student.enrollmentStatus;})
+      .map(function(student){
+        var name=String(student.firstName||"").replace(/\s+/g," ").trim();
+        if(!name)return null;
+        var id=student.id==null?"":String(student.id).trim();
+        if(!id){
+          var nameKey=name.toLowerCase();
+          nameOccurrences[nameKey]=(nameOccurrences[nameKey]||0)+1;
+          id="name:"+nameKey+":"+nameOccurrences[nameKey];
+        }else{
+          id="student:"+id;
+        }
+        return {id:id,name:name};
+      })
+      .filter(Boolean);
+    var activeIds=new Set(spinWheelRosterEntries.map(function(entry){return entry.id;}));
+    spinWheelRemovedIds.forEach(function(id){
+      if(!activeIds.has(id))spinWheelRemovedIds.delete(id);
+    });
+    var currentState=JSON.stringify([
+      spinWheelRosterEntries.map(function(entry){return [entry.id,entry.name];}),
+      Array.from(spinWheelRemovedIds).sort()
+    ]);
+    updateSpinWheelEntriesDisplay(previousState!==currentState);
+  }
+
+  function removeSpinWheelPupil(id){
+    if(!spinWheelRosterEntries.some(function(entry){return entry.id===id;})||spinWheelRemovedIds.has(id))return false;
+    spinWheelRemovedIds.add(id);
+    updateSpinWheelEntriesDisplay();
+    return true;
+  }
+
+  function returnSpinWheelPupil(id){
+    if(!spinWheelRemovedIds.has(id))return false;
+    spinWheelRemovedIds.delete(id);
+    updateSpinWheelEntriesDisplay();
+    return true;
+  }
+
+  function resetSpinWheelPupils(){
+    if(!spinWheelRemovedIds.size)return false;
+    spinWheelRemovedIds.clear();
+    updateSpinWheelEntriesDisplay();
+    return true;
   }
   $("studentSearch").addEventListener("input",filterStudentRows);
 
@@ -6717,8 +7037,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
         eClassNotice.textContent="Learner scores cannot be saved because the active class is unavailable.";
         return;
       }
-      var key="gradePortalEClassScores:"+String(classId)+":"+encodeURIComponent(selectedTerm)+":"
-        +encodeURIComponent(selectedSubject)+mapehStorageSuffix+":"+encodeURIComponent(row.dataset.studentId);
       try{
         var storedScores=eClassRecord.scores&&eClassRecord.scores[row.dataset.studentId];
         var rowScores=storedScores;
@@ -6737,7 +7055,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
             }
             input.dataset.lastValidScore=input.value.trim();
           });
-          if(localScores)persistStudentScores(row);
         }
         updateStudentRow(row);
       }catch(error){
@@ -7324,6 +7641,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   function showDashboardPage(page){
+    if(page==="tools"&&releasedDesktop)return;
     if((page==="assessmentDifficultyIndex"||page==="assessmentItemAnalysis"||page==="assessmentLeastMastered")
       &&(!currentUser||!currentUser.isAdmin)){
       page="students";
@@ -7348,6 +7666,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var leavingAttendance=!$("attendancePage").hidden&&!showAttendance;
     var leavingProfile=!$("teacherProfilePage").hidden&&page!=="profile";
     var showSettings=page==="settings";
+    var showTools=page==="tools";
     if((leavingReading&&readingDirty||leavingRma&&rmaDirty||leavingAttendance&&attendanceDirty
       ||leavingProfile&&(teacherProfileDirty||teacherPasswordDirty))
       &&!window.confirm("Discard unsaved changes?"))return;
@@ -7363,7 +7682,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       ||(showEClass&&!$("eClassPage").hidden)
       ||(showSf10&&!$("sf10Page").hidden)
       ||(page==="profile"&&!$("teacherProfilePage").hidden)
-      ||(showSettings&&!$("settingsPage").hidden))return;
+      ||(showSettings&&!$("settingsPage").hidden)
+      ||(showTools&&!$("toolsPage").hidden))return;
     refreshAttendanceYears();
     var showGrades=page==="grades";
     var showSummary=page==="summary";
@@ -7377,7 +7697,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       teacherPasswordDirty=false;
       $("teacherPasswordForm").reset();
     }
-    $("studentsPage").hidden=showAttendance||showEClass||showGrades||showSf10||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||showInventory||page==="profile"||showSettings;
+    $("studentsPage").hidden=showAttendance||showEClass||showGrades||showSf10||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||showInventory||page==="profile"||showSettings||showTools;
     $("nutritionalStatusPage").hidden=!showNutritionalStatus;
     $("inventoryPage").hidden=!showInventory;
     $("attendancePage").hidden=!showAttendance;
@@ -7396,7 +7716,8 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     var showProfile=page==="profile";
     $("teacherProfilePage").hidden=!showProfile;
     $("settingsPage").hidden=!showSettings;
-    [["navStudents",!showAttendance&&!showEClass&&!showGrades&&!showSf10&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showInventory&&!showProfile&&!showSettings],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navSf10",showSf10],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navInventory",showInventory],["navTeacherProfile",showProfile],["navSettings",showSettings]]
+    $("toolsPage").hidden=!showTools;
+    [["navStudents",!showAttendance&&!showEClass&&!showGrades&&!showSf10&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showInventory&&!showProfile&&!showSettings&&!showTools],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navSf10",showSf10],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navInventory",showInventory],["navTeacherProfile",showProfile],["navSettings",showSettings],["navTools",showTools]]
       .forEach(function(entry){
         if(entry[1])$(entry[0]).setAttribute("aria-current","page");
         else $(entry[0]).removeAttribute("aria-current");
@@ -7423,6 +7744,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
       inventory:["GraceDesk","Inventory"],
       profile:["GraceDesk","Teacher Profile"],
       settings:["GraceDesk","Settings"],
+      tools:["GraceDesk","Tools"],
     };
     var pageLabel=pageLabels[page]||pageLabels.students;
     $("topbarPageSubtitle").textContent=pageLabel[0];
@@ -10301,6 +10623,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
     $("inventoryPage").hidden=true;
     $("teacherProfilePage").hidden=true;
     $("settingsPage").hidden=true;
+    $("toolsPage").hidden=true;
     $("parentPage").hidden=user.role==="teacher";
     if(user.role==="teacher"){
       $("classSummary").textContent="Manage the student records for your class.";
@@ -10321,6 +10644,10 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   async function enter(user){
+    if(window.gradePortal&&typeof window.gradePortal.isPackaged==="function"){
+      releasedDesktop=await window.gradePortal.isPackaged()===true;
+      if(releasedDesktop)$("navTools").hidden=true;
+    }
     var session=await api("/api/auth/session");
     var sessionUser=session.user;
     var wrongPortal=(entryType==="parents"&&sessionUser.role!=="parent")
@@ -10843,6 +11170,889 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   };
   $("navTeacherProfile").onclick=function(){showDashboardPage("profile")};
   $("navSettings").onclick=function(){showDashboardPage("settings")};
+  $("navTools").onclick=function(){showDashboardPage("tools")};
+  (function(){
+    var tabIds=["tarpaulinTab","spinWheelTab","moreToolsTab"];
+    var panelIds=["tarpaulinPanel","spinWheelPanel","moreToolsPanel"];
+    function selectToolTab(index,focus){
+      tabIds.forEach(function(id,tabIndex){
+        var selected=tabIndex===index;
+        $(id).setAttribute("aria-selected",String(selected));
+        $(id).tabIndex=selected?0:-1;
+        $(panelIds[tabIndex]).hidden=!selected;
+      });
+      if(focus)$(tabIds[index]).focus();
+    }
+    tabIds.forEach(function(id,index){
+      $(id).onclick=function(){selectToolTab(index,false)};
+      $(id).onkeydown=function(event){
+        var next=index;
+        if(event.key==="ArrowRight")next=(index+1)%tabIds.length;
+        else if(event.key==="ArrowLeft")next=(index+tabIds.length-1)%tabIds.length;
+        else if(event.key==="Home")next=0;
+        else if(event.key==="End")next=tabIds.length-1;
+        else return;
+        event.preventDefault();
+        selectToolTab(next,true);
+      };
+    });
+
+    var bannerWidth=$("tarpaulinWidth"),bannerHeight=$("tarpaulinHeight");
+    var bannerUnit=$("tarpaulinUnit"),bannerPaperSize=$("tarpaulinPaperSize"),bannerOrientation=$("tarpaulinOrientation"),bannerColor=$("tarpaulinColor");
+    var bannerSheetLayout=$("tarpaulinSheetLayout"),customSheetGrid=$("tarpaulinCustomSheetGrid");
+    var bannerSheetsAcross=$("tarpaulinSheetsAcross"),bannerSheetsDown=$("tarpaulinSheetsDown");
+    var bannerImageFit=$("tarpaulinImageFit"),preview=$("tarpaulinPreview");
+    var previewImage=$("tarpaulinPreviewImage"),bannerImageFile=null,bannerImageUrl="";
+    var tarpaulinZoom=1;
+    var tarpaulinNotice=$("tarpaulinNotice"),previousUnit=bannerUnit.value;
+    var tarpaulinPaperSizes={a4:{portrait:"A4 portrait",landscape:"A4 landscape"},legal:{portrait:"8.5in 13in",landscape:"13in 8.5in"}};
+    var tarpaulinPaperDimensions={a4:{width:210,height:297},legal:{width:215.9,height:330.2}};
+    var tarpaulinPrintMarginsMm={top:25.4,right:12.7,bottom:12.7,left:25.4},tarpaulinOverlapMm=0;
+    var tarpaulinSheetGridError="";
+    var tarpaulinPdfLibraryPromise=null;
+    var tarpaulinPrintPageStyle=document.createElement("style");
+    function showTarpaulinNotice(message,isError){
+      tarpaulinNotice.textContent=message;
+      tarpaulinNotice.hidden=!message;
+      tarpaulinNotice.classList.toggle("error",!!isError);
+    }
+    function updateDimensionUnits(){
+      var isInches=bannerUnit.value==="in";
+      [bannerWidth,bannerHeight].forEach(function(input){
+        input.min=isInches?"0.394":"1";
+        input.max=isInches?"393.8":"1000";
+        input.step="any";
+      });
+      $("tarpaulinWidthUnit").textContent="("+bannerUnit.value+")";
+      $("tarpaulinHeightUnit").textContent="("+bannerUnit.value+")";
+    }
+    function bannerDimensions(){
+      var width=Number(bannerWidth.value),height=Number(bannerHeight.value);
+      var scale=bannerUnit.value==="in"?2.54:1;
+      var widthCm=width*scale,heightCm=height*scale;
+      return Number.isFinite(widthCm)&&Number.isFinite(heightCm)&&widthCm>=0.999&&heightCm>=0.999&&widthCm<=1000.001&&heightCm<=1000.001
+        ?{width:width,height:height,widthCm:widthCm,heightCm:heightCm,unit:bannerUnit.value}
+        :null;
+    }
+    function syncBannerSizeToImage(image){
+      if(!image.naturalWidth||!image.naturalHeight)return false;
+      var unitScale=bannerUnit.value==="in"?2.54:1;
+      var widthCm=Number(bannerWidth.value)*unitScale;
+      if(!Number.isFinite(widthCm)||widthCm<1||widthCm>1000)widthCm=300;
+      var heightCm=widthCm*image.naturalHeight/image.naturalWidth;
+      var minScale=Math.max(1/widthCm,1/heightCm);
+      var maxScale=Math.min(1000/widthCm,1000/heightCm);
+      if(minScale>maxScale)return false;
+      var fitScale=Math.max(minScale,Math.min(1,maxScale));
+      var outputScale=bannerUnit.value==="in"?1/2.54:1;
+      var precision=bannerUnit.value==="in"?3:2;
+      bannerWidth.value=(widthCm*fitScale*outputScale).toFixed(precision);
+      bannerHeight.value=(heightCm*fitScale*outputScale).toFixed(precision);
+      return true;
+    }
+    function getTarpaulinPrintLayout(dimensions,paperSize,orientation,requestedGrid){
+      var paper=tarpaulinPaperDimensions[paperSize];
+      var margins=tarpaulinPrintMarginsMm;
+      var paperWidthMm=orientation==="landscape"?paper.height:paper.width;
+      var paperHeightMm=orientation==="landscape"?paper.width:paper.height;
+      var tileWidthMm=paperWidthMm-margins.left-margins.right;
+      var tileHeightMm=paperHeightMm-margins.top-margins.bottom;
+      var strideWidthMm=tileWidthMm-tarpaulinOverlapMm;
+      var strideHeightMm=tileHeightMm-tarpaulinOverlapMm;
+      var bannerWidthMm=dimensions.widthCm*10;
+      var bannerHeightMm=dimensions.heightCm*10;
+      var columns=requestedGrid?requestedGrid.columns:Math.max(1,Math.ceil((bannerWidthMm-tarpaulinOverlapMm)/strideWidthMm));
+      var rows=requestedGrid?requestedGrid.rows:Math.max(1,Math.ceil((bannerHeightMm-tarpaulinOverlapMm)/strideHeightMm));
+      return {
+        paperWidthMm:paperWidthMm,
+        paperHeightMm:paperHeightMm,
+        tileWidthMm:tileWidthMm,
+        tileHeightMm:tileHeightMm,
+        strideWidthMm:strideWidthMm,
+        strideHeightMm:strideHeightMm,
+        bannerWidthMm:bannerWidthMm,
+        bannerHeightMm:bannerHeightMm,
+        columns:columns,
+        rows:rows,
+        total:columns*rows
+      };
+    }
+    function tarpaulinBannerScaleForGrid(dimensions,layout){
+      var maxWidthCm=(layout.tileWidthMm+(layout.columns-1)*layout.strideWidthMm)/10;
+      var maxHeightCm=(layout.tileHeightMm+(layout.rows-1)*layout.strideHeightMm)/10;
+      var minScale=Math.max(1/dimensions.widthCm,1/dimensions.heightCm);
+      var fitScale=Math.min(
+        maxWidthCm/dimensions.widthCm,
+        maxHeightCm/dimensions.heightCm,
+        1000/dimensions.widthCm,
+        1000/dimensions.heightCm
+      );
+      return fitScale>=minScale?fitScale:null;
+    }
+    function getTarpaulinPdfImagePlacement(imageWidth,imageHeight,bannerWidthMm,bannerHeightMm,fit){
+      var scale=fit==="cover"
+        ?Math.max(bannerWidthMm/imageWidth,bannerHeightMm/imageHeight)
+        :Math.min(bannerWidthMm/imageWidth,bannerHeightMm/imageHeight);
+      var width=imageWidth*scale,height=imageHeight*scale;
+      return {
+        x:(bannerWidthMm-width)/2,
+        y:(bannerHeightMm-height)/2,
+        width:width,
+        height:height
+      };
+    }
+    function getTarpaulinPdfVisibleArea(layout,offsetX,offsetY){
+      return {
+        width:Math.max(0,Math.min(layout.tileWidthMm,layout.bannerWidthMm-offsetX)),
+        height:Math.max(0,Math.min(layout.tileHeightMm,layout.bannerHeightMm-offsetY))
+      };
+    }
+    function getTarpaulinBottomCutOffsetMm(layout,visibleArea,hasNextRow){
+      if(hasNextRow)return layout.tileHeightMm;
+      var blankHeight=layout.tileHeightMm-visibleArea.height;
+      if(blankHeight<tarpaulinPrintMarginsMm.bottom)return null;
+      return visibleArea.height+tarpaulinPrintMarginsMm.bottom;
+    }
+    function drawTarpaulinPdfScissor(doc,centerX,centerY,rotation){
+      var angle=rotation*Math.PI/180;
+      var cosine=Math.cos(angle),sine=Math.sin(angle);
+      var markerScale=1.8;
+      function point(x,y){
+        return [
+          centerX+(x*cosine-y*sine)*markerScale,
+          centerY+(x*sine+y*cosine)*markerScale
+        ];
+      }
+      doc.saveGraphicsState();
+      doc.setDrawColor(136,136,136);
+      doc.setLineWidth(0.45);
+      [[-1.1,-0.65],[-1.1,0.65]].forEach(function(handle){
+        var center=point(handle[0],handle[1]);
+        doc.circle(center[0],center[1],0.42*markerScale,"S");
+      });
+      var pivot=point(0.15,0);
+      var upperBladeStart=point(-0.68,-0.35),upperBladeEnd=point(1.25,0.95);
+      var lowerBladeStart=point(-0.68,0.35),lowerBladeEnd=point(1.25,-0.95);
+      doc.line(upperBladeStart[0],upperBladeStart[1],upperBladeEnd[0],upperBladeEnd[1]);
+      doc.line(lowerBladeStart[0],lowerBladeStart[1],lowerBladeEnd[0],lowerBladeEnd[1]);
+      doc.circle(pivot[0],pivot[1],0.16*markerScale,"S");
+      doc.restoreGraphicsState();
+    }
+    function drawTarpaulinPdfPageMarks(doc,layout,visibleArea,pageNumber,hasNextColumn,hasNextRow){
+      var margins=tarpaulinPrintMarginsMm;
+      var left=margins.left,top=margins.top;
+      var right=left+visibleArea.width,bottom=top+visibleArea.height;
+      var bottomCutOffset=getTarpaulinBottomCutOffsetMm(layout,visibleArea,hasNextRow);
+      doc.setDrawColor(153,153,153);
+      doc.setLineWidth(0.25);
+      doc.setLineDashPattern([1,1],0);
+      doc.line(left,top,right,top);
+      if(hasNextRow){
+        doc.line(left,bottom,right,bottom);
+      }else if(bottomCutOffset!==null){
+        doc.setDrawColor(75,85,99);
+        doc.setLineWidth(0.45);
+        doc.line(left,top+bottomCutOffset,right,top+bottomCutOffset);
+      }
+      doc.line(left,top,left,bottom);
+      if(hasNextColumn)doc.line(right,top,right,bottom);
+      if(hasNextColumn||hasNextRow){
+        doc.setDrawColor(75,85,99);
+        doc.setLineWidth(0.45);
+        if(hasNextColumn){
+          var verticalTrimX=left+layout.tileWidthMm;
+          doc.line(verticalTrimX,top,verticalTrimX,top+layout.tileHeightMm);
+        }
+        if(hasNextRow){
+          var horizontalTrimY=top+layout.tileHeightMm;
+          doc.line(left,horizontalTrimY,left+layout.tileWidthMm,horizontalTrimY);
+        }
+      }
+      doc.setLineDashPattern([],0);
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(7);
+      doc.setTextColor(136,136,136);
+      doc.text(String(pageNumber),left/2,layout.paperHeightMm/2+1,{align:"center"});
+      if(hasNextColumn){
+        drawTarpaulinPdfScissor(doc,left+layout.tileWidthMm+margins.right/2,top+3,90);
+      }
+      if(hasNextRow){
+        drawTarpaulinPdfScissor(doc,left+3,top+layout.tileHeightMm+margins.bottom/2,0);
+      }else if(bottomCutOffset!==null){
+        drawTarpaulinPdfScissor(doc,left/2,top+bottomCutOffset,0);
+      }
+    }
+    function requestedTarpaulinSheetGrid(){
+      var columns=Number(bannerSheetsAcross.value),rows=Number(bannerSheetsDown.value);
+      var valid=Number.isInteger(columns)&&columns>=1&&columns<=53&&Number.isInteger(rows)&&rows>=1&&rows<=53;
+      bannerSheetsAcross.setCustomValidity(Number.isInteger(columns)&&columns>=1&&columns<=53?"":"Enter a whole number from 1 to 53.");
+      bannerSheetsDown.setCustomValidity(Number.isInteger(rows)&&rows>=1&&rows<=53?"":"Enter a whole number from 1 to 53.");
+      return valid?{columns:columns,rows:rows}:null;
+    }
+    function fitBannerToSheetGrid(){
+      var grid=requestedTarpaulinSheetGrid(),dimensions=bannerDimensions();
+      if(!grid||!dimensions)return false;
+      var layout=getTarpaulinPrintLayout(dimensions,bannerPaperSize.value,bannerOrientation.value,grid);
+      var fitScale=tarpaulinBannerScaleForGrid(dimensions,layout);
+      if(fitScale===null){
+        tarpaulinSheetGridError="This paper grid cannot fit the banner proportions within the supported size limits.";
+        return false;
+      }
+      tarpaulinSheetGridError="";
+      var precision=bannerUnit.value==="in"?3:2;
+      bannerWidth.value=(dimensions.width*fitScale).toFixed(precision);
+      bannerHeight.value=(dimensions.height*fitScale).toFixed(precision);
+      return true;
+    }
+    function updateTarpaulinSheetPreview(dimensions){
+      var guides=$("tarpaulinSheetGuides");
+      guides.textContent="";
+      guides.style.gridTemplateColumns="";
+      if(!dimensions){
+        $("tarpaulinSheetCount").textContent="Check sheet count";
+        return null;
+      }
+      var requestedGrid=bannerSheetLayout.value==="custom"?requestedTarpaulinSheetGrid():null;
+      if(bannerSheetLayout.value==="custom"&&(!requestedGrid||tarpaulinSheetGridError)){
+        $("tarpaulinSheetCount").textContent=tarpaulinSheetGridError||"Enter a valid paper grid";
+        return null;
+      }
+      var layout=getTarpaulinPrintLayout(dimensions,bannerPaperSize.value,bannerOrientation.value,requestedGrid);
+      var sheetNumber=0;
+      for(var row=0;row<layout.rows;row++){
+        for(var column=0;column<layout.columns;column++){
+          sheetNumber++;
+          var offsetX=column*layout.strideWidthMm;
+          var offsetY=row*layout.strideHeightMm;
+          var guide=document.createElement("div");
+          guide.className="tarpaulin-sheet-guide";
+          guide.style.setProperty("--paper-aspect",layout.paperWidthMm+" / "+layout.paperHeightMm);
+          var printable=document.createElement("div");
+          printable.className="tarpaulin-sheet-printable";
+          printable.style.left=(tarpaulinPrintMarginsMm.left/layout.paperWidthMm*100)+"%";
+          printable.style.top=(tarpaulinPrintMarginsMm.top/layout.paperHeightMm*100)+"%";
+          printable.style.width=(layout.tileWidthMm/layout.paperWidthMm*100)+"%";
+          printable.style.height=(layout.tileHeightMm/layout.paperHeightMm*100)+"%";
+          var art=document.createElement("div");
+          art.className="tarpaulin-sheet-art";
+          art.style.left=(-offsetX/layout.tileWidthMm*100)+"%";
+          art.style.top=(-offsetY/layout.tileHeightMm*100)+"%";
+          art.style.width=(layout.bannerWidthMm/layout.tileWidthMm*100)+"%";
+          art.style.height=(layout.bannerHeightMm/layout.tileHeightMm*100)+"%";
+          art.style.backgroundColor=bannerColor.value;
+          if(bannerImageFile){
+            var image=document.createElement("img");
+            image.className="tarpaulin-sheet-image";
+            image.src=previewImage.src;
+            image.alt="";
+            image.style.objectFit=bannerImageFit.value;
+            art.appendChild(image);
+          }
+          printable.appendChild(art);
+          var boundary=document.createElement("span");
+          boundary.className="tarpaulin-sheet-printable-boundary";
+          printable.appendChild(boundary);
+          guide.appendChild(printable);
+          var label=document.createElement("span");
+          label.className="tarpaulin-sheet-guide-label";
+          label.textContent=String(sheetNumber);
+          guide.appendChild(label);
+          guides.appendChild(guide);
+        }
+      }
+      $("tarpaulinSheetCount").textContent=layout.total+" "+(layout.total===1?"sheet":"sheets")+" · "+layout.columns+" × "+layout.rows;
+      return layout;
+    }
+    function updateTarpaulinZoom(){
+      $("tarpaulinSheetGuides").style.setProperty("--tarpaulin-sheet-min-width",Math.round(190*tarpaulinZoom)+"px");
+      preview.style.width="100%";
+      $("tarpaulinZoomLevel").textContent=Math.round(tarpaulinZoom*100)+"%";
+      $("tarpaulinZoomOut").disabled=tarpaulinZoom<=0.5;
+      $("tarpaulinZoomIn").disabled=tarpaulinZoom>=2;
+    }
+    function updateTarpaulin(){
+      var dimensions=bannerDimensions();
+      var printLayout=updateTarpaulinSheetPreview(dimensions);
+      preview.style.backgroundColor="transparent";
+      preview.style.aspectRatio="auto";
+      preview.style.setProperty("--tarpaulin-ratio",dimensions?dimensions.widthCm+" / "+dimensions.heightCm:"3 / 1");
+      $("tarpaulinPreviewEmpty").hidden=true;
+      previewImage.style.objectFit=bannerImageFit.value;
+      if(dimensions){
+        $("tarpaulinDimensions").textContent=dimensions.width+" "+dimensions.unit+" × "+dimensions.height+" "+dimensions.unit;
+        $("tarpaulinSheetGridHint").textContent=bannerSheetLayout.value==="custom"
+          ?tarpaulinSheetGridError||"Banner dimensions are scaled to fit the selected sheet grid while preserving proportions."
+          :"Choose a paper grid to scale the banner to fit that many sheets while preserving its proportions.";
+        $("tarpaulinPrintHint").textContent=printLayout
+          ?"Dashed boundaries show "+printLayout.total+" "+(printLayout.total===1?"sheet":"sheets")+" of "+bannerPaperSize.options[bannerPaperSize.selectedIndex].text+" "+bannerOrientation.options[bannerOrientation.selectedIndex].text.toLowerCase()+" paper at actual size with 1 in top/left and 0.5 in right/bottom margins. Each page prints a unique banner segment; align the scissor-marked printable edges and tape from the back. SVG keeps the selected "+dimensions.width+" × "+dimensions.height+" "+dimensions.unit+" size."
+          :tarpaulinSheetGridError||"Enter valid sheet counts to prepare the tiled print.";
+        bannerWidth.setCustomValidity("");
+        bannerHeight.setCustomValidity("");
+      }else{
+        $("tarpaulinDimensions").textContent="Check the banner dimensions";
+        $("tarpaulinPrintHint").textContent="Enter a width and height between 1 and 1000 cm (0.39 and 393.70 in).";
+        bannerWidth.setCustomValidity("Enter a width between 1 and 1000 cm (0.39 and 393.70 in).");
+        bannerHeight.setCustomValidity("Enter a height between 1 and 1000 cm (0.39 and 393.70 in).");
+      }
+    }
+    bannerUnit.addEventListener("change",function(){
+      var conversion=previousUnit==="cm"&&bannerUnit.value==="in"?1/2.54:2.54;
+      [bannerWidth,bannerHeight].forEach(function(input){
+        if(input.value!=="")input.value=(Number(input.value)*conversion).toFixed(bannerUnit.value==="in"?3:2);
+      });
+      previousUnit=bannerUnit.value;
+      updateDimensionUnits();
+      if(bannerSheetLayout.value==="custom")fitBannerToSheetGrid();
+      updateTarpaulin();
+    });
+    updateDimensionUnits();
+    [bannerWidth,bannerHeight].forEach(function(input){
+      function useAutomaticLayout(){
+        if(bannerSheetLayout.value==="custom"){
+          bannerSheetLayout.value="auto";
+          customSheetGrid.hidden=true;
+          tarpaulinSheetGridError="";
+        }
+        updateTarpaulin();
+      }
+      input.addEventListener("input",useAutomaticLayout);
+      input.addEventListener("change",useAutomaticLayout);
+    });
+    [bannerColor,bannerImageFit].forEach(function(input){
+      input.addEventListener("input",updateTarpaulin);
+      input.addEventListener("change",updateTarpaulin);
+    });
+    [bannerPaperSize,bannerOrientation].forEach(function(input){
+      input.addEventListener("change",function(){
+        if(bannerSheetLayout.value==="custom"){
+          tarpaulinSheetGridError="";
+          fitBannerToSheetGrid();
+        }
+        updateTarpaulin();
+      });
+    });
+    bannerSheetLayout.addEventListener("change",function(){
+      customSheetGrid.hidden=bannerSheetLayout.value!=="custom";
+      tarpaulinSheetGridError="";
+      if(bannerSheetLayout.value==="custom"){
+        var dimensions=bannerDimensions();
+        if(dimensions){
+          var automaticLayout=getTarpaulinPrintLayout(dimensions,bannerPaperSize.value,bannerOrientation.value);
+          bannerSheetsAcross.value=String(automaticLayout.columns);
+          bannerSheetsDown.value=String(automaticLayout.rows);
+          fitBannerToSheetGrid();
+        }
+      }
+      updateTarpaulin();
+    });
+    [bannerSheetsAcross,bannerSheetsDown].forEach(function(input){
+      input.addEventListener("input",function(){
+        tarpaulinSheetGridError="";
+        if(bannerSheetLayout.value==="custom")fitBannerToSheetGrid();
+        updateTarpaulin();
+      });
+      input.addEventListener("change",function(){
+        tarpaulinSheetGridError="";
+        if(bannerSheetLayout.value==="custom")fitBannerToSheetGrid();
+        updateTarpaulin();
+      });
+    });
+    $("tarpaulinZoomOut").onclick=function(){
+      tarpaulinZoom=Math.max(0.5,Math.round((tarpaulinZoom-0.1)*100)/100);
+      updateTarpaulinZoom();
+    };
+    $("tarpaulinZoomIn").onclick=function(){
+      tarpaulinZoom=Math.min(2,Math.round((tarpaulinZoom+0.1)*100)/100);
+      updateTarpaulinZoom();
+    };
+    updateTarpaulinZoom();
+    updateTarpaulin();
+    $("uploadTarpaulinImage").onclick=function(){$("tarpaulinImageInput").click()};
+    $("tarpaulinImageInput").onchange=function(){
+      var file=this.files&&this.files[0];
+      if(!file)return;
+      if(!file.type||!file.type.toLowerCase().startsWith("image/")){
+        showTarpaulinNotice("Choose a supported image file.",true);
+        this.value="";
+        return;
+      }
+      if(bannerImageUrl)URL.revokeObjectURL(bannerImageUrl);
+      bannerImageFile=file;
+      bannerImageUrl=URL.createObjectURL(file);
+      previewImage.hidden=false;
+      previewImage.alt="Banner picture: "+file.name;
+      $("tarpaulinImageName").textContent=file.name;
+      $("removeTarpaulinImage").hidden=false;
+      previewImage.onload=function(){
+        var matchedAspect=syncBannerSizeToImage(previewImage);
+        var fittedGrid=true;
+        if(matchedAspect&&bannerSheetLayout.value==="custom"){
+          tarpaulinSheetGridError="";
+          fittedGrid=fitBannerToSheetGrid();
+        }
+        showTarpaulinNotice(
+          "Picture added ("+previewImage.naturalWidth+" × "+previewImage.naturalHeight+" px). "+(!matchedAspect?"Its aspect ratio is outside the supported banner size range.":!fittedGrid?tarpaulinSheetGridError:"Banner size was adjusted to match its aspect ratio."),
+          !matchedAspect||!fittedGrid
+        );
+        updateTarpaulin();
+      };
+      previewImage.onerror=function(){
+        showTarpaulinNotice("This picture could not be opened. Try another image.",true);
+      };
+      previewImage.src=bannerImageUrl;
+      this.value="";
+      updateTarpaulin();
+    };
+    $("removeTarpaulinImage").onclick=function(){
+      if(bannerImageUrl)URL.revokeObjectURL(bannerImageUrl);
+      bannerImageFile=null;
+      bannerImageUrl="";
+      previewImage.removeAttribute("src");
+      previewImage.hidden=true;
+      previewImage.alt="";
+      $("tarpaulinImageName").textContent="No picture selected";
+      this.hidden=true;
+      showTarpaulinNotice("",false);
+      updateTarpaulin();
+    };
+    function readImageAsDataUrl(file){
+      return new Promise(function(resolve,reject){
+        var reader=new FileReader();
+        reader.onload=function(){
+          if(typeof reader.result==="string")resolve(reader.result);
+          else reject(new Error("The selected picture could not be read."));
+        };
+        reader.onerror=function(){reject(reader.error||new Error("The selected picture could not be read."))};
+        reader.readAsDataURL(file);
+      });
+    }
+    function loadTarpaulinPdfLibrary(){
+      if(window.jspdf&&typeof window.jspdf.jsPDF==="function"){
+        return Promise.resolve(window.jspdf.jsPDF);
+      }
+      if(!tarpaulinPdfLibraryPromise){
+        tarpaulinPdfLibraryPromise=new Promise(function(resolve,reject){
+          var script=document.createElement("script");
+          script.src="/assets/jspdf.umd.min.js";
+          script.async=true;
+          script.onload=function(){
+            if(window.jspdf&&typeof window.jspdf.jsPDF==="function"){
+              resolve(window.jspdf.jsPDF);
+              return;
+            }
+            tarpaulinPdfLibraryPromise=null;
+            reject(new Error("The PDF library could not be initialized."));
+          };
+          script.onerror=function(){
+            tarpaulinPdfLibraryPromise=null;
+            reject(new Error("The PDF library could not be loaded."));
+          };
+          document.head.appendChild(script);
+        });
+      }
+      return tarpaulinPdfLibraryPromise;
+    }
+    $("downloadTarpaulinPdf").onclick=async function(){
+      var button=this;
+      var dimensions=bannerDimensions();
+      if(!dimensions){bannerWidth.reportValidity();bannerHeight.reportValidity();return}
+      var requestedGrid=bannerSheetLayout.value==="custom"?requestedTarpaulinSheetGrid():null;
+      if(bannerSheetLayout.value==="custom"&&(!requestedGrid||tarpaulinSheetGridError)){
+        if(!requestedGrid){
+          bannerSheetsAcross.reportValidity();
+          bannerSheetsDown.reportValidity();
+        }
+        showTarpaulinNotice(tarpaulinSheetGridError||"Enter valid sheet counts to prepare the tiled PDF.",true);
+        return;
+      }
+      button.disabled=true;
+      try{
+        var JsPDF=await loadTarpaulinPdfLibrary();
+        var layout=getTarpaulinPrintLayout(dimensions,bannerPaperSize.value,bannerOrientation.value,requestedGrid);
+        var imageDataUrl="";
+        var imageWidth=0,imageHeight=0;
+        if(bannerImageFile){
+          if(!previewImage.complete||!previewImage.naturalWidth||!previewImage.naturalHeight){
+            throw new Error("Wait for the banner picture to finish loading before downloading the PDF.");
+          }
+          var imageCanvas=document.createElement("canvas");
+          imageCanvas.width=previewImage.naturalWidth;
+          imageCanvas.height=previewImage.naturalHeight;
+          var imageContext=imageCanvas.getContext("2d");
+          if(!imageContext)throw new Error("The banner picture could not be prepared for the PDF.");
+          imageContext.drawImage(previewImage,0,0);
+          imageDataUrl=imageCanvas.toDataURL("image/png");
+          imageWidth=imageCanvas.width;
+          imageHeight=imageCanvas.height;
+        }
+        var doc=new JsPDF({
+          orientation:bannerOrientation.value,
+          unit:"mm",
+          format:[layout.paperWidthMm,layout.paperHeightMm],
+          compress:true
+        });
+        var imagePlacement=imageDataUrl
+          ?getTarpaulinPdfImagePlacement(
+            imageWidth,imageHeight,layout.bannerWidthMm,layout.bannerHeightMm,bannerImageFit.value
+          )
+          :null;
+        var pageOrientation=layout.paperWidthMm>layout.paperHeightMm?"landscape":"portrait";
+        var pageIndex=0;
+        for(var row=0;row<layout.rows;row++){
+          for(var column=0;column<layout.columns;column++){
+            if(pageIndex>0)doc.addPage([layout.paperWidthMm,layout.paperHeightMm],pageOrientation);
+            pageIndex++;
+            var offsetX=column*layout.strideWidthMm;
+            var offsetY=row*layout.strideHeightMm;
+            var visibleArea=getTarpaulinPdfVisibleArea(layout,offsetX,offsetY);
+            doc.setFillColor(255,255,255);
+            doc.rect(
+              tarpaulinPrintMarginsMm.left,tarpaulinPrintMarginsMm.top,
+              layout.tileWidthMm,layout.tileHeightMm,"F"
+            );
+            doc.saveGraphicsState();
+            doc.rect(
+              tarpaulinPrintMarginsMm.left,tarpaulinPrintMarginsMm.top,
+              visibleArea.width,visibleArea.height,null
+            );
+            doc.clip();
+            doc.discardPath();
+            doc.setFillColor(
+              parseInt(bannerColor.value.slice(1,3),16),
+              parseInt(bannerColor.value.slice(3,5),16),
+              parseInt(bannerColor.value.slice(5,7),16)
+            );
+            doc.rect(
+              tarpaulinPrintMarginsMm.left,tarpaulinPrintMarginsMm.top,
+              visibleArea.width,visibleArea.height,"F"
+            );
+            if(imageDataUrl){
+              doc.addImage(
+                imageDataUrl,"PNG",
+                tarpaulinPrintMarginsMm.left-offsetX+imagePlacement.x,
+                tarpaulinPrintMarginsMm.top-offsetY+imagePlacement.y,
+                imagePlacement.width,imagePlacement.height,
+                "tarpaulin-banner","FAST"
+              );
+            }
+            doc.restoreGraphicsState();
+            drawTarpaulinPdfPageMarks(
+              doc,layout,visibleArea,pageIndex,
+              column<layout.columns-1,row<layout.rows-1
+            );
+          }
+        }
+        doc.setLineDashPattern([],0);
+        doc.save("tarpaulin-banner.pdf");
+        showTarpaulinNotice("Tiled PDF downloaded ("+layout.total+" "+(layout.total===1?"page":"pages")+").",false);
+      }catch(error){
+        showTarpaulinNotice(error.message||"The banner PDF could not be downloaded.",true);
+      }finally{
+        button.disabled=false;
+      }
+    };
+    $("downloadTarpaulinSvg").onclick=async function(){
+      var button=this;
+      var dimensions=bannerDimensions();
+      if(!dimensions){bannerWidth.reportValidity();bannerHeight.reportValidity();return}
+      button.disabled=true;
+      try{
+        var imageDataUrl=bannerImageFile?await readImageAsDataUrl(bannerImageFile):"";
+        var pictureSvg=imageDataUrl
+          ?'<image href="'+imageDataUrl+'" x="0" y="0" width="'+dimensions.widthCm+'" height="'+dimensions.heightCm+'" preserveAspectRatio="'+(bannerImageFit.value==="cover"?"xMidYMid slice":"xMidYMid meet")+'"/>'
+          :"";
+        var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+dimensions.width+dimensions.unit+'" height="'+dimensions.height+dimensions.unit+'" viewBox="0 0 '+dimensions.widthCm+' '+dimensions.heightCm+'"><rect width="100%" height="100%" fill="'+bannerColor.value+'"/>'+pictureSvg+"</svg>";
+        var url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));
+        var link=document.createElement("a");
+        link.href=url;
+        link.download="tarpaulin-design.svg";
+        link.click();
+        window.setTimeout(function(){URL.revokeObjectURL(url)},1000);
+        showTarpaulinNotice("SVG design downloaded.",false);
+      }catch(error){
+        showTarpaulinNotice(error.message||"The banner design could not be exported.",true);
+      }finally{
+        button.disabled=false;
+      }
+    };
+    function appendTarpaulinCutLine(page,direction,positionMm,startMm,lengthMm,isSeamTrim){
+      var line=document.createElement("span");
+      line.className="tarpaulin-print-cut-line "+direction+(isSeamTrim?" seam-trim":"");
+      if(direction==="vertical"){
+        line.style.left=positionMm+"mm";
+        line.style.top=startMm+"mm";
+        line.style.height=lengthMm+"mm";
+      }else{
+        line.style.top=positionMm+"mm";
+        line.style.left=startMm+"mm";
+        line.style.width=lengthMm+"mm";
+      }
+      page.appendChild(line);
+    }
+    function appendTarpaulinScissor(page,xMm,yMm,rotation){
+      var marker=document.createElement("span");
+      marker.className="tarpaulin-print-scissors";
+      marker.setAttribute("aria-hidden","true");
+      marker.style.left=xMm+"mm";
+      marker.style.top=yMm+"mm";
+      marker.style.transform="translate(-50%,-50%) rotate("+rotation+"deg)";
+      marker.innerHTML='<svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.7"></circle><circle cx="5" cy="18" r="2.7"></circle><path d="M7.5 7.5 20 17M7.5 16.5 20 7"></path><circle cx="10" cy="12" r="1"></circle></svg>';
+      page.appendChild(marker);
+    }
+    function createTarpaulinPrintPages(dimensions,layout){
+      var pages=$("tarpaulinPrintPages");
+      pages.textContent="";
+      for(var row=0;row<layout.rows;row++){
+        for(var column=0;column<layout.columns;column++){
+          var offsetX=column*layout.strideWidthMm;
+          var offsetY=row*layout.strideHeightMm;
+          var page=document.createElement("section");
+          page.className="tarpaulin-print-page";
+          page.style.width=layout.paperWidthMm+"mm";
+          page.style.height=layout.paperHeightMm+"mm";
+          var tile=document.createElement("div");
+          tile.className="tarpaulin-print-tile";
+          tile.style.left=tarpaulinPrintMarginsMm.left+"mm";
+          tile.style.top=tarpaulinPrintMarginsMm.top+"mm";
+          tile.style.width=layout.tileWidthMm+"mm";
+          tile.style.height=layout.tileHeightMm+"mm";
+          var canvas=document.createElement("div");
+          canvas.className="tarpaulin-print-canvas";
+          canvas.style.left=(-offsetX)+"mm";
+          canvas.style.top=(-offsetY)+"mm";
+          canvas.style.width=layout.bannerWidthMm+"mm";
+          canvas.style.height=layout.bannerHeightMm+"mm";
+          canvas.style.backgroundColor=bannerColor.value;
+          if(bannerImageFile){
+            var image=document.createElement("img");
+            image.className="tarpaulin-print-image";
+            image.src=previewImage.src;
+            image.alt="";
+            image.style.objectFit=bannerImageFit.value;
+            canvas.appendChild(image);
+          }
+          tile.appendChild(canvas);
+          page.appendChild(tile);
+          var visibleArea=getTarpaulinPdfVisibleArea(layout,offsetX,offsetY);
+          var rightEdge=tarpaulinPrintMarginsMm.left+visibleArea.width;
+          var bottomEdge=tarpaulinPrintMarginsMm.top+visibleArea.height;
+          var hasNextColumn=column<layout.columns-1;
+          var hasNextRow=row<layout.rows-1;
+          var bottomCutOffset=getTarpaulinBottomCutOffsetMm(layout,visibleArea,hasNextRow);
+          appendTarpaulinCutLine(page,"vertical",tarpaulinPrintMarginsMm.left,tarpaulinPrintMarginsMm.top,visibleArea.height);
+          appendTarpaulinCutLine(page,"horizontal",tarpaulinPrintMarginsMm.top,tarpaulinPrintMarginsMm.left,visibleArea.width);
+          if(hasNextColumn){
+            appendTarpaulinCutLine(page,"vertical",rightEdge,tarpaulinPrintMarginsMm.top,visibleArea.height);
+            appendTarpaulinCutLine(
+              page,"vertical",tarpaulinPrintMarginsMm.left+layout.tileWidthMm,
+              tarpaulinPrintMarginsMm.top,layout.tileHeightMm,true
+            );
+          }
+          if(hasNextRow){
+            appendTarpaulinCutLine(page,"horizontal",bottomEdge,tarpaulinPrintMarginsMm.left,visibleArea.width);
+            appendTarpaulinCutLine(
+              page,"horizontal",tarpaulinPrintMarginsMm.top+layout.tileHeightMm,
+              tarpaulinPrintMarginsMm.left,layout.tileWidthMm,true
+            );
+          }else if(bottomCutOffset!==null){
+            appendTarpaulinCutLine(
+              page,"horizontal",tarpaulinPrintMarginsMm.top+bottomCutOffset,
+              tarpaulinPrintMarginsMm.left,visibleArea.width,true
+            );
+          }
+          var pageNumber=document.createElement("span");
+          pageNumber.className="tarpaulin-print-page-number";
+          pageNumber.textContent=String(row*layout.columns+column+1);
+          pageNumber.style.left=(tarpaulinPrintMarginsMm.left/2)+"mm";
+          pageNumber.style.top=(layout.paperHeightMm/2)+"mm";
+          page.appendChild(pageNumber);
+          if(hasNextColumn){
+            appendTarpaulinScissor(
+              page,
+              tarpaulinPrintMarginsMm.left+layout.tileWidthMm+tarpaulinPrintMarginsMm.right/2,
+              tarpaulinPrintMarginsMm.top+3,
+              90
+            );
+          }
+          if(hasNextRow){
+            appendTarpaulinScissor(
+              page,
+              tarpaulinPrintMarginsMm.left+3,
+              tarpaulinPrintMarginsMm.top+layout.tileHeightMm+tarpaulinPrintMarginsMm.bottom/2,
+              0
+            );
+          }else if(bottomCutOffset!==null){
+            appendTarpaulinScissor(
+              page,
+              tarpaulinPrintMarginsMm.left/2,
+              tarpaulinPrintMarginsMm.top+bottomCutOffset,
+              0
+            );
+          }
+          pages.appendChild(page);
+        }
+      }
+    }
+    $("printTarpaulin").onclick=async function(){
+      var button=this;
+      var dimensions=bannerDimensions();
+      if(!dimensions){bannerWidth.reportValidity();bannerHeight.reportValidity();return}
+      var requestedGrid=bannerSheetLayout.value==="custom"?requestedTarpaulinSheetGrid():null;
+      if(bannerSheetLayout.value==="custom"&&(!requestedGrid||tarpaulinSheetGridError)){
+        if(!requestedGrid){
+          bannerSheetsAcross.reportValidity();
+          bannerSheetsDown.reportValidity();
+        }
+        showTarpaulinNotice(tarpaulinSheetGridError||"Enter valid sheet counts to prepare the tiled print.",true);
+        return;
+      }
+      button.disabled=true;
+      try{
+        var layout=getTarpaulinPrintLayout(dimensions,bannerPaperSize.value,bannerOrientation.value,requestedGrid);
+        createTarpaulinPrintPages(dimensions,layout);
+        var printImages=Array.from($("tarpaulinPrintPages").querySelectorAll("img"));
+        await Promise.all(printImages.map(function(image){return image.decode()}));
+        tarpaulinPrintPageStyle.textContent="@page{size:"+tarpaulinPaperSizes[bannerPaperSize.value][bannerOrientation.value]+";margin:0}";
+        document.head.appendChild(tarpaulinPrintPageStyle);
+        $("tarpaulinPrintPages").hidden=false;
+        document.body.classList.add("tools-printing");
+        window.print();
+      }catch(error){
+        document.body.classList.remove("tools-printing");
+        tarpaulinPrintPageStyle.remove();
+        $("tarpaulinPrintPages").hidden=true;
+        $("tarpaulinPrintPages").textContent="";
+        showTarpaulinNotice(error.message||"The banner print pages could not be prepared.",true);
+      }finally{
+        button.disabled=false;
+      }
+    };
+    window.addEventListener("afterprint",function(){
+      document.body.classList.remove("tools-printing");
+      tarpaulinPrintPageStyle.remove();
+      $("tarpaulinPrintPages").hidden=true;
+      $("tarpaulinPrintPages").textContent="";
+    });
+
+    var wheelCanvas=$("spinWheelCanvas"),wheelContext=wheelCanvas.getContext("2d");
+    var wheelEntries=$("spinWheelEntries"),wheelAngle=0,wheelBusy=false,wheelNeedsRedraw=false;
+    var wheelColors=["#2f7f70","#4776a8","#c07732","#9b5b83","#648b42","#5364a8","#b25346","#258994"];
+    function getWheelEntries(){
+      return wheelEntries.value.split(/\r?\n/).map(function(entry){return entry.trim()}).filter(Boolean);
+    }
+    function getAvailableWheelPupils(){
+      return spinWheelRosterEntries.filter(function(entry){return !spinWheelRemovedIds.has(entry.id);});
+    }
+    function renderWheelRosterControls(){
+      var availableCount=getAvailableWheelPupils().length;
+      var removedEntries=spinWheelRosterEntries.filter(function(entry){return spinWheelRemovedIds.has(entry.id);});
+      $("spinWheelAvailability").textContent=availableCount+" of "+spinWheelRosterEntries.length+" active pupil"+(spinWheelRosterEntries.length===1?"":"s")+" available";
+      $("spinWheelReset").disabled=wheelBusy||removedEntries.length===0;
+      $("spinWheelRemovedHelp").hidden=removedEntries.length===0;
+      var removedList=$("spinWheelRemovedList");
+      removedList.textContent="";
+      $("spinWheelRemovedEmpty").hidden=removedEntries.length>0;
+      removedEntries.forEach(function(entry,index){
+        var item=document.createElement("li");
+        var button=document.createElement("button");
+        button.className="wheel-return-button";
+        button.type="button";
+        button.textContent=entry.name;
+        button.setAttribute("aria-label","Return pupil "+(index+1)+", "+entry.name+" to the wheel");
+        button.disabled=wheelBusy;
+        button.onclick=function(){
+          if(wheelBusy)return;
+          if(returnSpinWheelPupil(entry.id)){
+            $("spinWheelResult").textContent="Returned: "+entry.name;
+            renderWheelRosterControls();
+          }
+        };
+        item.appendChild(button);
+        removedList.appendChild(item);
+      });
+    }
+    function drawWheel(){
+      var entries=getWheelEntries();
+      var center=wheelCanvas.width/2,radius=center-8,segment=Math.PI*2/Math.max(entries.length,1);
+      wheelContext.clearRect(0,0,wheelCanvas.width,wheelCanvas.height);
+      entries.forEach(function(entry,index){
+        var start=-Math.PI/2+index*segment,end=start+segment;
+        wheelContext.beginPath();
+        wheelContext.moveTo(center,center);
+        wheelContext.arc(center,center,radius,start,end);
+        wheelContext.closePath();
+        wheelContext.fillStyle=wheelColors[index%wheelColors.length];
+        wheelContext.fill();
+        wheelContext.strokeStyle="#ffffff";
+        wheelContext.lineWidth=3;
+        wheelContext.stroke();
+        wheelContext.save();
+        wheelContext.translate(center,center);
+        wheelContext.rotate(start+segment/2);
+        wheelContext.textAlign="right";
+        wheelContext.textBaseline="middle";
+        wheelContext.fillStyle="#ffffff";
+        wheelContext.font="bold "+Math.max(14,Math.min(25,Math.floor(230/entries.length)))+"px Arial, sans-serif";
+        var label=entry.length>22?entry.slice(0,19)+"…":entry;
+        wheelContext.fillText(label,radius-20,0,Math.max(80,radius*.7));
+        wheelContext.restore();
+      });
+      wheelContext.beginPath();
+      wheelContext.arc(center,center,26,0,Math.PI*2);
+      wheelContext.fillStyle="#ffffff";
+      wheelContext.fill();
+    }
+    wheelEntries.addEventListener("input",function(){
+      if(wheelBusy){
+        wheelNeedsRedraw=true;
+        renderWheelRosterControls();
+        return;
+      }
+      $("spinWheelResult").textContent="";
+      drawWheel();
+      renderWheelRosterControls();
+    });
+    $("spinWheelReset").onclick=function(){
+      if(wheelBusy)return;
+      if(resetSpinWheelPupils()){
+        $("spinWheelResult").textContent="All removed pupils returned to the wheel.";
+        renderWheelRosterControls();
+      }
+    };
+    $("spinWheelButton").onclick=function(){
+      var entries=getWheelEntries();
+      var availablePupils=getAvailableWheelPupils();
+      if(entries.length<2){
+        $("spinWheelResult").textContent="At least two active pupils are needed from the selected roster section to spin.";
+        return;
+      }
+      if(wheelBusy)return;
+      wheelBusy=true;
+      $("spinWheelButton").disabled=true;
+      renderWheelRosterControls();
+      $("spinWheelResult").textContent="Spinning…";
+      var winnerIndex=Math.floor(Math.random()*entries.length);
+      var winner=availablePupils[winnerIndex];
+      var segmentDegrees=360/entries.length;
+      var target=(360-(winnerIndex+.5)*segmentDegrees+360)%360;
+      var current=((wheelAngle%360)+360)%360;
+      wheelAngle+=1800+((target-current+360)%360);
+      wheelCanvas.style.transform="rotate("+wheelAngle+"deg)";
+      window.setTimeout(function(){
+        wheelBusy=false;
+        $("spinWheelButton").disabled=false;
+        var removed=removeSpinWheelPupil(winner.id);
+        if(!removed&&wheelNeedsRedraw){
+          drawWheel();
+          renderWheelRosterControls();
+        }
+        wheelNeedsRedraw=false;
+        $("spinWheelResult").textContent="Selected: "+winner.name;
+      },4600);
+    };
+    drawWheel();
+    renderWheelRosterControls();
+  })();
   $("settingsMenuButton").onclick=function(){$("menuToggle").click()};
   (function(){
     var button=$("updateButton"),notice=$("updateNotice"),manual=$("updateManualLink");

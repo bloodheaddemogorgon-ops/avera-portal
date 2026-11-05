@@ -10655,6 +10655,20 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/assets/jspdf.umd.min.js") {
+        const pdfLibrary = await fs.readFile(
+          path.join(__dirname, "node_modules", "jspdf", "dist", "jspdf.umd.min.js"),
+        );
+        response.writeHead(200, {
+          "Content-Type": "text/javascript; charset=utf-8",
+          "Content-Length": pdfLibrary.length,
+          "Cache-Control": "public, max-age=86400",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(pdfLibrary);
+        return;
+      }
+
       const sf10ImageAssets = {
         "/sf10-deped-seal.png": { filename: "sf10-deped-seal.png", contentType: "image/png" },
         "/sf10-deped-logo.gif": { filename: "sf10-deped-logo.gif", contentType: "image/gif" },

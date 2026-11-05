@@ -9,11 +9,13 @@ const vm = require("node:vm");
 const test = require("node:test");
 const ExcelJS = require("exceljs");
 const JSZip = require("jszip");
+const { jsPDF } = require("jspdf");
 const { SaxesParser } = require("saxes");
 const XLSX = require("@e965/xlsx");
 const sharp = require("sharp");
 const { createAuthRateLimiter } = require("../auth-rate-limiter");
 const { createServer, readPortalDatabaseWorkbook, writePortalDatabaseWorkbook, eClassGradingMethod, computeEClassTermGrade } = require("../server");
+const { createPortalFrontendServer } = require("../portal-frontend");
 const {
   calculateAgeMonths,
   calculateBmiForAge,
@@ -223,6 +225,551 @@ test("E-Class drafts are persisted through the backend and flushed before sign o
   assert.match(portalPage, /window\.flushEClassDraftSave=async function/);
   assert.match(portalPage, /await window\.flushEClassDraftSave\(\)/);
   assert.match(portalPage, /It will remain after sign out/);
+});
+
+test("saved E-Class score rows recalculate when loaded", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const scoreLoader = portalPage.match(
+    /(Array\.from\(body\.querySelectorAll\("tr\[data-student-id\]"\)\)\.forEach\(function\(row\)\{[\s\S]*?\r?\n    \}\);)\r?\n    recordTable=table/,
+  );
+  assert.ok(scoreLoader, "E-Class saved score loader exists");
+
+  const inputs = Array.from({ length: 11 }, (_, index) => ({
+    value: "",
+    dataset: { scoreIndex: String(index) },
+  }));
+  const row = {
+    dataset: { studentId: "student-1", studentName: "Example Learner" },
+    querySelectorAll: () => inputs,
+  };
+  let updatedRows = 0;
+  const noticeClasses = new Set();
+  vm.runInNewContext(scoreLoader[1], {
+    body: { querySelectorAll: () => [row] },
+    classId: "class-1",
+    eClassRecord: { scores: { "student-1": Array(11).fill("10") } },
+    highestScoreMaxima: Array(11).fill("100"),
+    eClassScoreValidationMessage: () => "",
+    updateStudentRow: () => { updatedRows += 1; },
+    eClassNotice: {
+      classList: {
+        add: (value) => noticeClasses.add(value),
+      },
+      textContent: "",
+    },
+    selectedTerm: "Term 1",
+    selectedSubject: "Filipino",
+    mapehStorageSuffix: "",
+  });
+
+  assert.deepEqual(inputs.map((input) => input.value), Array(11).fill("10"));
+  assert.equal(updatedRows, 1);
+  assert.equal(noticeClasses.has("error"), false);
+});
+
+test("Tarpapel banner dimensions follow the uploaded picture aspect ratio", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const sizeSync = portalPage.match(/function syncBannerSizeToImage\(image\)\{[\s\S]*?\n    \}/);
+  assert.ok(sizeSync, "Tarpapel image-size synchronizer exists");
+
+  const bannerWidth = { value: "300" };
+  const bannerHeight = { value: "100" };
+  const bannerUnit = { value: "cm" };
+  const matchedAspect = vm.runInNewContext(`(${sizeSync[0]})(image)`, {
+    bannerWidth,
+    bannerHeight,
+    bannerUnit,
+    image: { naturalWidth: 1600, naturalHeight: 900 },
+  });
+  assert.equal(matchedAspect, true);
+  assert.equal(bannerWidth.value, "300.00");
+  assert.equal(bannerHeight.value, "168.75");
+
+  const unsupportedAspect = vm.runInNewContext(`(${sizeSync[0]})(image)`, {
+    bannerWidth,
+    bannerHeight,
+    bannerUnit,
+    image: { naturalWidth: 100, naturalHeight: 200000 },
+  });
+  assert.equal(unsupportedAspect, false);
+  assert.equal(bannerWidth.value, "300.00");
+  assert.equal(bannerHeight.value, "168.75");
+});
+
+test("Tarpapel print layout uses non-overlapping tiles with joining margins", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const layoutFunction = portalPage.match(/function getTarpaulinPrintLayout\(dimensions,paperSize,orientation,requestedGrid\)\{[\s\S]*?\n    \}/);
+  assert.ok(layoutFunction, "Tarpapel print layout calculator exists");
+  const scaleFunction = portalPage.match(/function tarpaulinBannerScaleForGrid\(dimensions,layout\)\{[\s\S]*?\n    \}/);
+  assert.ok(scaleFunction, "Tarpapel grid scaling calculator exists");
+
+  function getLayout(paperSize, orientation, requestedGrid) {
+    return vm.runInNewContext(`(${layoutFunction[0]})(dimensions,paperSize,orientation,requestedGrid)`, {
+      dimensions: { widthCm: 300, heightCm: 100 },
+      paperSize,
+      orientation,
+      requestedGrid,
+      tarpaulinPaperDimensions: {
+        a4: { width: 210, height: 297 },
+        legal: { width: 215.9, height: 330.2 },
+      },
+      tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 },
+      tarpaulinOverlapMm: 0,
+    });
+  }
+
+  const a4Portrait = getLayout("a4", "portrait");
+  assert.equal(a4Portrait.columns, 18);
+  assert.equal(a4Portrait.rows, 4);
+  assert.equal(a4Portrait.total, 72);
+  assert.ok(Math.abs(a4Portrait.tileWidthMm - 171.9) < 1e-10);
+  assert.equal(a4Portrait.tileWidthMm, a4Portrait.strideWidthMm);
+  const legalLandscape = getLayout("legal", "landscape");
+  assert.equal(legalLandscape.columns, 11);
+  assert.equal(legalLandscape.rows, 6);
+  assert.equal(legalLandscape.total, 66);
+  assert.ok((a4Portrait.columns - 1) * a4Portrait.strideWidthMm + a4Portrait.tileWidthMm >= a4Portrait.bannerWidthMm);
+  assert.ok((a4Portrait.rows - 1) * a4Portrait.strideHeightMm + a4Portrait.tileHeightMm >= a4Portrait.bannerHeightMm);
+
+  const customGrid = getLayout("legal", "landscape", { columns: 2, rows: 1 });
+  assert.equal(customGrid.total, 2);
+  const scale = vm.runInNewContext(`(${scaleFunction[0]})(dimensions,layout)`, {
+    dimensions: { widthCm: 300, heightCm: 100 },
+    layout: customGrid,
+  });
+  assert.ok(Math.abs(scale - 0.1778) < 1e-12);
+});
+
+test("Tarpapel preview renders full paper sheets with margins and unique banner segments", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const previewFunction = portalPage.match(
+    /function updateTarpaulinSheetPreview\(dimensions\)\{[\s\S]*?\n    \}/,
+  );
+  const layoutFunction = portalPage.match(
+    /function getTarpaulinPrintLayout\(dimensions,paperSize,orientation,requestedGrid\)\{[\s\S]*?\n    \}/,
+  );
+  const zoomFunction = portalPage.match(
+    /function updateTarpaulinZoom\(\)\{[\s\S]*?\n    \}/,
+  );
+  assert.ok(previewFunction, "Tarpapel paper preview renderer exists");
+  assert.ok(layoutFunction, "Tarpapel preview uses the print layout calculator");
+  assert.ok(zoomFunction, "Tarpapel zoom controls resize the paper thumbnails");
+  assert.match(
+    portalPage,
+    /\.tarpaulin-sheet-guides\{[^}]*grid-template-columns:repeat\(auto-fit,minmax\(var\(--tarpaulin-sheet-min-width,190px\),1fr\)\)/,
+  );
+
+  function createElement(tagName) {
+    const element = {
+      tagName,
+      children: [],
+      style: {
+        properties: {},
+        setProperty(name, value) { this.properties[name] = value; },
+      },
+      className: "",
+      value: "",
+      src: "",
+      textContent: "",
+      appendChild(child) { this.children.push(child); return child; },
+    };
+    return element;
+  }
+  const guides = createElement("div");
+  const sheetCount = createElement("span");
+  const elements = { tarpaulinSheetGuides: guides, tarpaulinSheetCount: sheetCount };
+  const preview = vm.runInNewContext(
+    `${layoutFunction[0]}\n${previewFunction[0]}\nupdateTarpaulinSheetPreview(dimensions)`,
+    {
+      $: (id) => elements[id],
+      document: { createElement },
+      dimensions: { widthCm: 50, heightCm: 30 },
+      bannerSheetLayout: { value: "automatic" },
+      bannerPaperSize: { value: "legal" },
+      bannerOrientation: { value: "landscape" },
+      bannerColor: { value: "#123456" },
+      bannerImageFile: {},
+      bannerImageFit: { value: "contain" },
+      previewImage: { src: "blob:banner" },
+      tarpaulinSheetGridError: "",
+      tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 },
+      tarpaulinOverlapMm: 0,
+      tarpaulinPaperDimensions: { legal: { width: 215.9, height: 330.2 } },
+    },
+  );
+
+  assert.equal(preview.total, 4);
+  assert.equal(guides.children.length, 4);
+  assert.equal(guides.style.gridTemplateColumns, "");
+  const firstSheet = guides.children[0];
+  const secondSheet = guides.children[1];
+  assert.equal(firstSheet.style.properties["--paper-aspect"], "330.2 / 215.9");
+  assert.equal(firstSheet.children[0].className, "tarpaulin-sheet-printable");
+  assert.equal(firstSheet.children[0].style.left, `${25.4 / 330.2 * 100}%`);
+  assert.equal(firstSheet.children[0].style.top, `${25.4 / 215.9 * 100}%`);
+  assert.equal(firstSheet.children[0].children[0].className, "tarpaulin-sheet-art");
+  assert.equal(firstSheet.children[0].children[0].children[0].src, "blob:banner");
+  assert.equal(secondSheet.children[0].children[0].style.left, "-100%");
+  assert.equal(firstSheet.children[0].children[1].className, "tarpaulin-sheet-printable-boundary");
+  assert.equal(firstSheet.children[1].textContent, "1");
+  assert.equal(sheetCount.textContent, "4 sheets · 2 × 2");
+
+  const zoomPreview = createElement("div");
+  const zoomGuides = createElement("div");
+  const zoomElements = {
+    tarpaulinSheetGuides: zoomGuides,
+    tarpaulinZoomLevel: createElement("span"),
+    tarpaulinZoomOut: createElement("button"),
+    tarpaulinZoomIn: createElement("button"),
+  };
+  const zoomContext = vm.createContext({
+    preview: zoomPreview,
+    tarpaulinZoom: 1,
+    $: (id) => zoomElements[id],
+  });
+  vm.runInContext(zoomFunction[0], zoomContext);
+  for (const [zoom, expectedMinWidth] of [[0.5, "95px"], [1, "190px"], [2, "380px"]]) {
+    zoomContext.tarpaulinZoom = zoom;
+    vm.runInContext("updateTarpaulinZoom()", zoomContext);
+    assert.equal(zoomGuides.style.properties["--tarpaulin-sheet-min-width"], expectedMinWidth);
+    assert.equal(zoomPreview.style.width, "100%");
+  }
+});
+
+test("Spin wheel syncs active roster pupils by first name", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(portalPage, /Pupils \(first names\)<\/label><textarea id="spinWheelEntries" readonly/);
+  assert.match(portalPage, /id="spinWheelReset"[^>]*>Return all to wheel/);
+  assert.match(portalPage, /id="spinWheelRemovedList"/);
+  assert.match(portalPage, /var winner=availablePupils\[winnerIndex\];[\s\S]*?removeSpinWheelPupil\(winner\.id\)/);
+  assert.match(portalPage, /var activeStudents=visibleStudents\.filter\(function\(s\)\{return !s\.enrollmentStatus\}\);\s*syncSpinWheelEntriesFromRoster\(activeStudents\)/);
+  assert.match(portalPage, /function getWheelEntries\(\)\{\s*return wheelEntries\.value\.split\(\/\\r\?\\n\/\)\.map\(function\(entry\)\{return entry\.trim\(\)\}\)\.filter\(Boolean\)/);
+  assert.doesNotMatch(portalPage, /id="spinWheelEntries"[^>]*>[^<]*Learner /);
+  const helperNames = [
+    "updateSpinWheelEntriesDisplay",
+    "syncSpinWheelEntriesFromRoster",
+    "removeSpinWheelPupil",
+    "returnSpinWheelPupil",
+    "resetSpinWheelPupils",
+  ];
+  const helpers = helperNames.map((name) => portalPage.match(
+    new RegExp(`  function ${name}\\([^\\n]*\\)\\{[\\s\\S]*?\\n  \\}`),
+  ));
+  assert.ok(helpers.every(Boolean), "Spin wheel roster helpers exist");
+
+  const textarea = {
+    value: "",
+    events: [],
+    dispatchEvent(event) { this.events.push(event); },
+  };
+  const hint = { textContent: "" };
+  const wheel = vm.runInNewContext(
+    `${helpers.map((helper) => helper[0]).join("\n")}\n({syncSpinWheelEntriesFromRoster,removeSpinWheelPupil,returnSpinWheelPupil,resetSpinWheelPupils})`,
+    {
+      $: (id) => ({ spinWheelEntries: textarea, spinWheelHint: hint })[id],
+      Event: function(type, options) { this.type = type; this.bubbles = options.bubbles; },
+      spinWheelRosterEntries: [],
+      spinWheelRemovedIds: new Set(),
+    },
+  );
+  const pupils = [
+    { id: "ana-1", firstName: "  Ana\nMaria ", lastName: "Santos", enrollmentStatus: "" },
+    { id: "ben", firstName: "Ben", lastName: "Reyes", enrollmentStatus: "NLS" },
+    { id: "cora", firstName: "Cora", lastName: "Cruz", enrollmentStatus: "TO" },
+    { id: "ana-2", firstName: "Ana Maria", lastName: "Garcia", enrollmentStatus: "" },
+    { id: "blank", firstName: "  ", lastName: "Blank", enrollmentStatus: "" },
+  ];
+  wheel.syncSpinWheelEntriesFromRoster(pupils);
+
+  assert.equal(textarea.value, "Ana Maria\nAna Maria");
+  assert.equal(hint.textContent, "2 active pupils loaded from the selected roster section. At least two are required to spin.");
+  assert.deepEqual(textarea.events.map((event) => [event.type, event.bubbles]), [["input", true]]);
+  wheel.syncSpinWheelEntriesFromRoster(pupils);
+  assert.equal(textarea.events.length, 1, "unchanged roster entries do not redraw the wheel");
+  assert.equal(wheel.removeSpinWheelPupil("student:ana-1"), true);
+  assert.equal(textarea.value, "Ana Maria", "removing one pupil preserves another with the same first name");
+  assert.equal(wheel.returnSpinWheelPupil("student:ana-1"), true);
+  assert.equal(textarea.value, "Ana Maria\nAna Maria", "a pupil can be returned individually");
+  wheel.removeSpinWheelPupil("student:ana-1");
+  wheel.removeSpinWheelPupil("student:ana-2");
+  assert.equal(textarea.value, "");
+  assert.equal(wheel.resetSpinWheelPupils(), true);
+  assert.equal(textarea.value, "Ana Maria\nAna Maria", "reset returns every removed pupil");
+  wheel.syncSpinWheelEntriesFromRoster([]);
+  assert.equal(textarea.value, "");
+  assert.match(hint.textContent, /No active pupils/);
+});
+
+test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const bottomCutOffsetFunction = portalPage.match(
+    /function getTarpaulinBottomCutOffsetMm\(layout,visibleArea,hasNextRow\)\{[\s\S]*?\n    \}/,
+  );
+  const helpers = [
+    portalPage.match(/function getTarpaulinPdfVisibleArea\(layout,offsetX,offsetY\)\{[\s\S]*?\n    \}/),
+    bottomCutOffsetFunction,
+    portalPage.match(/function appendTarpaulinCutLine\(page,direction,positionMm,startMm,lengthMm,isSeamTrim\)\{[\s\S]*?\n    \}/),
+    portalPage.match(/function appendTarpaulinScissor\(page,xMm,yMm,rotation\)\{[\s\S]*?\n    \}/),
+    portalPage.match(/function createTarpaulinPrintPages\(dimensions,layout\)\{[\s\S]*?\n    \}/),
+  ];
+  assert.ok(helpers.every(Boolean), "Tarpapel print page marking helpers exist");
+
+  function createElement(tagName) {
+    return {
+      tagName,
+      children: [],
+      style: {},
+      className: "",
+      textContent: "",
+      appendChild(child) { this.children.push(child); return child; },
+      setAttribute() {},
+    };
+  }
+  const pages = createElement("div");
+  vm.runInNewContext(
+    `${helpers.map((helper) => helper[0]).join("\n")}\ncreateTarpaulinPrintPages(dimensions,layout)`,
+    {
+      $: () => pages,
+      document: { createElement },
+      dimensions: { widthCm: 50, heightCm: 30 },
+      layout: {
+        columns: 2,
+        rows: 2,
+        paperWidthMm: 297,
+        paperHeightMm: 210,
+        tileWidthMm: 258.9,
+        tileHeightMm: 171.9,
+        strideWidthMm: 258.9,
+        strideHeightMm: 171.9,
+        bannerWidthMm: 500,
+        bannerHeightMm: 300,
+      },
+      bannerColor: { value: "#123456" },
+      bannerImageFile: null,
+      bannerImageFit: { value: "cover" },
+      previewImage: { src: "" },
+      tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 },
+    },
+  );
+
+  assert.equal(pages.children.length, 4);
+  const pageMarks = pages.children.map((page) => {
+    const lines = page.children.filter((child) => child.className.startsWith("tarpaulin-print-cut-line"));
+    return {
+      lines,
+      scissors: page.children.filter((child) => child.className === "tarpaulin-print-scissors"),
+    };
+  });
+  assert.deepEqual(pageMarks.map(({ lines, scissors }) => [lines.length, scissors.length]), [
+    [6, 2],
+    [4, 1],
+    [5, 2],
+    [3, 1],
+  ]);
+  assert.deepEqual(
+    pageMarks[1].lines.filter((line) => line.className.includes("vertical")).map((line) => line.style.left),
+    ["25.4mm"],
+  );
+  const bottomCutLine = pageMarks[3].lines.find((line) => line.className.includes("seam-trim"));
+  const bottomScissor = pageMarks[3].scissors[0];
+  assert.ok(bottomCutLine, "bottom blank space gets a segmented trim line");
+  assert.ok(Math.abs(parseFloat(bottomCutLine.style.top) - (25.4 + (300 - 171.9) + 12.7)) < 1e-10);
+  assert.equal(bottomScissor.style.left, "12.7mm");
+  assert.ok(Math.abs(parseFloat(bottomScissor.style.top) - parseFloat(bottomCutLine.style.top)) < 1e-10);
+  assert.equal(
+    pageMarks[3].lines.some((line) => line.className.includes("horizontal") && line.style.top === "197.3mm"),
+    false,
+  );
+});
+
+test("Tarpapel PDF download preserves the selected image fit and tiled page layout", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(portalPage, /id="downloadTarpaulinPdf"[^>]*>Download PDF<\/button>/);
+  assert.match(portalPage, /script\.src="\/assets\/jspdf\.umd\.min\.js"/);
+  assert.match(portalPage, /doc\.addPage\(\[layout\.paperWidthMm,layout\.paperHeightMm\],pageOrientation\)/);
+  assert.match(portalPage, /doc\.save\("tarpaulin-banner\.pdf"\)/);
+  assert.match(portalPage, /doc\.setLineDashPattern\(\[1,1\],0\)/);
+  assert.match(portalPage, /tarpaulinPrintMarginsMm\.left-offsetX\+imagePlacement\.x/);
+  assert.match(portalPage, /tarpaulinPrintMarginsMm\.top-offsetY\+imagePlacement\.y/);
+  assert.match(portalPage, /layout\.tileWidthMm,layout\.tileHeightMm,"F"/);
+  assert.match(portalPage, /function drawTarpaulinPdfPageMarks\(doc,layout,visibleArea,pageNumber,hasNextColumn,hasNextRow\)/);
+  assert.match(portalPage, /var verticalTrimX=left\+layout\.tileWidthMm/);
+  assert.match(portalPage, /var horizontalTrimY=top\+layout\.tileHeightMm/);
+  assert.match(portalPage, /doc\.line\(verticalTrimX,top,verticalTrimX,top\+layout\.tileHeightMm\)/);
+  assert.match(portalPage, /doc\.line\(left,horizontalTrimY,left\+layout\.tileWidthMm,horizontalTrimY\)/);
+  assert.match(portalPage, /if\(hasNextColumn\)doc\.line\(right,top,right,bottom\)/);
+  assert.match(portalPage, /if\(hasNextRow\)\{\s*doc\.line\(left,bottom,right,bottom\)/);
+  assert.match(portalPage, /if\(hasNextColumn\)\{\s*drawTarpaulinPdfScissor\(doc,left\+layout\.tileWidthMm\+margins\.right\/2,top\+3,90\)/);
+  assert.match(portalPage, /if\(hasNextRow\)\{\s*drawTarpaulinPdfScissor\(doc,left\+3,top\+layout\.tileHeightMm\+margins\.bottom\/2,0\)/);
+  assert.match(portalPage, /tarpaulinPrintMarginsMm\.left\+layout\.tileWidthMm,[\s\S]*?tarpaulinPrintMarginsMm\.top,layout\.tileHeightMm,true/);
+  assert.match(portalPage, /tarpaulinPrintMarginsMm\.top\+layout\.tileHeightMm,[\s\S]*?tarpaulinPrintMarginsMm\.left,layout\.tileWidthMm,true/);
+  assert.match(portalPage, /tarpaulinPrintMarginsMm\.left\+layout\.tileWidthMm\+tarpaulinPrintMarginsMm\.right\/2/);
+  assert.match(portalPage, /tarpaulinPrintMarginsMm\.top\+layout\.tileHeightMm\+tarpaulinPrintMarginsMm\.bottom\/2/);
+  assert.match(portalPage, /if\(hasNextColumn\)\{\s*appendTarpaulinCutLine\(page,"vertical",rightEdge/);
+  assert.match(portalPage, /if\(hasNextRow\)\{\s*appendTarpaulinCutLine\(page,"horizontal",bottomEdge/);
+  assert.match(portalPage, /if\(hasNextColumn\)\{\s*appendTarpaulinScissor\(/);
+  assert.match(portalPage, /if\(hasNextRow\)\{\s*appendTarpaulinScissor\(/);
+  assert.match(portalPage, /isSeamTrim\?" seam-trim":""/);
+  assert.match(portalPage, /function drawTarpaulinPdfScissor\(doc,centerX,centerY,rotation\)/);
+  assert.match(portalPage, /var markerScale=1\.8/);
+  assert.match(portalPage, /\.tarpaulin-print-scissors\{width:5\.5mm;height:5\.5mm/);
+  assert.match(portalPage, /tarpaulinPrintMarginsMm=\{top:25\.4,right:12\.7,bottom:12\.7,left:25\.4\},tarpaulinOverlapMm=0/);
+  assert.match(portalPage, /\.className="tarpaulin-print-page-number"/);
+  assert.match(portalPage, /\.className="tarpaulin-print-scissors"/);
+  const pdfMarks = portalPage.match(
+    /function drawTarpaulinPdfPageMarks\(doc,layout,visibleArea,pageNumber,hasNextColumn,hasNextRow\)\{[\s\S]*?\n    \}/,
+  );
+  const bottomCutOffsetFunction = portalPage.match(
+    /function getTarpaulinBottomCutOffsetMm\(layout,visibleArea,hasNextRow\)\{[\s\S]*?\n    \}/,
+  );
+  const pdfScissors = portalPage.match(
+    /function drawTarpaulinPdfScissor\(doc,centerX,centerY,rotation\)\{[\s\S]*?\n    \}/,
+  );
+  assert.ok(pdfMarks, "PDF page margin markings exist");
+  assert.ok(bottomCutOffsetFunction, "PDF bottom cut position accounts for blank paper space");
+  assert.ok(pdfScissors, "PDF scissors are drawn as vector paths");
+  const markingHelpers = vm.runInNewContext(
+    `${bottomCutOffsetFunction[0]}\n${pdfScissors[0]}\n${pdfMarks[0]}\n({ drawTarpaulinPdfPageMarks, drawTarpaulinPdfScissor })`,
+    { tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 } },
+  );
+  const markedPdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [297, 210] });
+  const sampleLayout = {
+    paperWidthMm: 297,
+    paperHeightMm: 210,
+    tileWidthMm: 258.9,
+    tileHeightMm: 171.9,
+    strideWidthMm: 258.9,
+    strideHeightMm: 171.9,
+  };
+  const sampleArea = { width: 258.9, height: 171.9 };
+  markingHelpers.drawTarpaulinPdfPageMarks(markedPdf, sampleLayout, sampleArea, 1, true, true);
+  markedPdf.addPage([297, 210], "landscape");
+  markingHelpers.drawTarpaulinPdfPageMarks(markedPdf, sampleLayout, sampleArea, 2);
+  assert.equal(markedPdf.internal.getNumberOfPages(), 2);
+  assert.equal(markedPdf.internal.pageSize.getWidth(), 297);
+  assert.equal(markedPdf.internal.pageSize.getHeight(), 210);
+  assert.match(Buffer.from(markedPdf.output("arraybuffer")).subarray(0, 5).toString(), /^%PDF-/);
+
+  const seamLines = [];
+  const scissorCalls = [];
+  const seamMarkingHelpers = vm.runInNewContext(
+    `${bottomCutOffsetFunction[0]}\n${pdfMarks[0]}\n({ drawTarpaulinPdfPageMarks })`,
+    {
+      tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 },
+      drawTarpaulinPdfScissor: (...args) => scissorCalls.push(args),
+    },
+  );
+  const seamDoc = {
+    setDrawColor() {},
+    setLineWidth() {},
+    setLineDashPattern() {},
+    line(...args) { seamLines.push(args); },
+    setFont() {},
+    setFontSize() {},
+    setTextColor() {},
+    text() {},
+  };
+  for (const { hasNextColumn, hasNextRow, visibleArea, lineCount, scissorRotations } of [
+    { hasNextColumn: true, hasNextRow: true, visibleArea: sampleArea, lineCount: 6, scissorRotations: [90, 0] },
+    { hasNextColumn: false, hasNextRow: true, visibleArea: sampleArea, lineCount: 4, scissorRotations: [0] },
+    { hasNextColumn: true, hasNextRow: false, visibleArea: sampleArea, lineCount: 4, scissorRotations: [90] },
+    { hasNextColumn: false, hasNextRow: false, visibleArea: sampleArea, lineCount: 2, scissorRotations: [] },
+    { hasNextColumn: false, hasNextRow: false, visibleArea: { width: sampleArea.width, height: 130 }, lineCount: 3, scissorRotations: [0] },
+  ]) {
+    seamLines.length = 0;
+    scissorCalls.length = 0;
+    seamMarkingHelpers.drawTarpaulinPdfPageMarks(
+      seamDoc,
+      sampleLayout,
+      visibleArea,
+      1,
+      hasNextColumn,
+      hasNextRow,
+    );
+    assert.equal(seamLines.length, lineCount);
+    assert.deepEqual(scissorCalls.map((call) => call[3]), scissorRotations);
+    if (!hasNextColumn && !hasNextRow && visibleArea.height === 130) {
+      assert.ok(Math.abs(seamLines[1][1] - (25.4 + visibleArea.height) - 12.7) < 1e-10);
+      assert.equal(scissorCalls[0][1], 12.7);
+      assert.equal(scissorCalls[0][2], seamLines[1][1]);
+    }
+  }
+
+  const imagePlacement = portalPage.match(
+    /function getTarpaulinPdfImagePlacement\(imageWidth,imageHeight,bannerWidthMm,bannerHeightMm,fit\)\{[\s\S]*?\n    \}/,
+  );
+  assert.ok(imagePlacement, "PDF image fit calculator exists");
+  const getPlacement = (fit) => vm.runInNewContext(
+    `(${imagePlacement[0]})(1600,900,3000,1000,fit)`,
+    { fit },
+  );
+  assert.deepEqual({ ...getPlacement("cover") }, {
+    x: 0,
+    y: -343.75,
+    width: 3000,
+    height: 1687.5,
+  });
+  assert.deepEqual({ ...getPlacement("contain") }, {
+    x: 611.1111111111111,
+    y: 0,
+    width: 1777.7777777777778,
+    height: 1000,
+  });
+
+  const layoutFunction = portalPage.match(
+    /function getTarpaulinPrintLayout\(dimensions,paperSize,orientation,requestedGrid\)\{[\s\S]*?\n    \}/,
+  );
+  const visibleAreaFunction = portalPage.match(
+    /function getTarpaulinPdfVisibleArea\(layout,offsetX,offsetY\)\{[\s\S]*?\n    \}/,
+  );
+  assert.ok(layoutFunction, "PDF page layout uses the print page calculator");
+  assert.ok(visibleAreaFunction, "PDF tile clipping bounds are calculated");
+  const layout = vm.runInNewContext(
+    `(${layoutFunction[0]})(dimensions,"a4","portrait",null)`,
+    {
+      dimensions: { widthCm: 35, heightCm: 15 },
+      tarpaulinPaperDimensions: { a4: { width: 210, height: 297 } },
+      tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 },
+      tarpaulinOverlapMm: 0,
+    },
+  );
+  const getVisibleArea = (offsetX, offsetY) => vm.runInNewContext(
+    `(${visibleAreaFunction[0]})(layout,offsetX,offsetY)`,
+    { layout, offsetX, offsetY },
+  );
+  assert.equal(layout.columns, 3);
+  assert.equal(layout.rows, 1);
+  assert.equal(layout.strideWidthMm, layout.tileWidthMm);
+  assert.equal(layout.strideHeightMm, layout.tileHeightMm);
+  assert.deepEqual({ ...getVisibleArea(0, 0) }, {
+    width: layout.tileWidthMm,
+    height: layout.bannerHeightMm,
+  });
+  const lastTile = getVisibleArea((layout.columns - 1) * layout.strideWidthMm, 0);
+  assert.equal(lastTile.width, layout.bannerWidthMm - (layout.columns - 1) * layout.strideWidthMm);
+  assert.equal((layout.columns - 1) * layout.strideWidthMm + lastTile.width, layout.bannerWidthMm);
+});
+
+test("portal frontend serves the local jsPDF browser bundle", async (context) => {
+  const frontend = createPortalFrontendServer({
+    entry: "teacher",
+    backendUrl: "http://127.0.0.1:1",
+  });
+  await new Promise((resolve) => frontend.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (frontend.listening) {
+      await new Promise((resolve, reject) => {
+        frontend.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  });
+
+  const response = await fetch(
+    `http://127.0.0.1:${frontend.address().port}/assets/jspdf.umd.min.js`,
+  );
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /^text\/javascript/);
+  assert.ok((await response.arrayBuffer()).byteLength > 100_000);
 });
 
 test("SF 10 is available to teachers in the Term Grade menu", async () => {
@@ -2004,6 +2551,10 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(sf10DepEdLogoResponse.status, 200);
   assert.match(sf10DepEdLogoResponse.headers.get("content-type"), /^image\/gif/);
   assert.ok((await sf10DepEdLogoResponse.arrayBuffer()).byteLength > 0);
+  const pdfLibraryResponse = await fetch(`${baseUrl}/assets/jspdf.umd.min.js`);
+  assert.equal(pdfLibraryResponse.status, 200);
+  assert.match(pdfLibraryResponse.headers.get("content-type"), /^text\/javascript/);
+  assert.ok((await pdfLibraryResponse.arrayBuffer()).byteLength > 100_000);
   const gradeInterpretationSource = portalPage.match(/function getGradeInterpretation\(grade\)\{[\s\S]*?\n  \}/);
   assert.ok(gradeInterpretationSource, "general-average interpretation helper exists");
   const getGradeInterpretation = vm.runInNewContext(`${gradeInterpretationSource[0]}; getGradeInterpretation`);
@@ -2518,7 +3069,32 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /if\(attendanceDirty\)\{[\s\S]*?await \$\("saveAttendance"\)\.onclick\(\);[\s\S]*?if\(attendanceDirty\)return;[\s\S]*?fetch\("\/api\/attendance\/month\/export/);
   assert.match(portalPage, /link\.download=filename;[\s\S]*?link\.click\(\);/);
   assert.ok(portalPage.indexOf('id="navSettings"') > portalPage.indexOf('id="navTeacherProfile"'));
+  assert.ok(portalPage.indexOf('id="navTools"') > portalPage.indexOf('id="navSettings"'));
+  assert.match(portalPage, /id="navTools"[^>]*>[\s\S]*?Tools/);
   assert.match(portalPage, /id="settingsPage"/);
+  assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?id="tarpaulinTab"[\s\S]*?Tarpapel Maker[\s\S]*?id="spinWheelTab"[\s\S]*?Spin the Wheel[\s\S]*?id="moreToolsTab"/);
+  assert.match(portalPage, /\$\("navTools"\)\.onclick=function\(\)\{showDashboardPage\("tools"\)\}/);
+  assert.match(portalPage, /id="uploadTarpaulinImage"[^>]*>[\s\S]*?Upload a picture/);
+  assert.match(portalPage, /id="tarpaulinImageInput"[^>]*type="file"[^>]*accept="image\/\*"/);
+  assert.match(portalPage, /id="tarpaulinUnit"[\s\S]*?<option value="cm">cm<\/option><option value="in">in<\/option>/);
+  assert.match(portalPage, /id="tarpaulinPaperSize"[\s\S]*?<option value="a4">A4<\/option><option value="legal">Legal \(8\.5 × 13 in\)<\/option>/);
+  assert.match(portalPage, /id="tarpaulinOrientation"[\s\S]*?<option value="portrait">Portrait<\/option><option value="landscape">Landscape<\/option>/);
+  assert.match(portalPage, /tarpaulinPaperSizes=\{a4:\{portrait:"A4 portrait",landscape:"A4 landscape"\},legal:\{portrait:"8\.5in 13in",landscape:"13in 8\.5in"\}\}/);
+  assert.match(portalPage, /id="tarpaulinSheetLayout"[\s\S]*?<option value="auto">Automatic \(based on banner size\)<\/option><option value="custom">Choose a paper grid<\/option>/);
+  assert.match(portalPage, /id="tarpaulinSheetsAcross"/);
+  assert.match(portalPage, /id="tarpaulinSheetsDown"/);
+  assert.match(portalPage, /id="tarpaulinZoomOut"[^>]*aria-label="Zoom out"/);
+  assert.match(portalPage, /id="tarpaulinZoomIn"[^>]*aria-label="Zoom in"/);
+  assert.match(portalPage, /tarpaulinZoom=Math\.max\(0\.5/);
+  assert.match(portalPage, /tarpaulinZoom=Math\.min\(2/);
+  assert.match(portalPage, /id="tarpaulinSheetCount"/);
+  assert.match(portalPage, /id="tarpaulinSheetGuides"/);
+  assert.match(portalPage, /createTarpaulinPrintPages\(dimensions,layout\)/);
+  assert.match(portalPage, /tarpaulinPrintPageStyle\.textContent="@page\{size:"\+tarpaulinPaperSizes\[bannerPaperSize\.value\]\[bannerOrientation\.value\]\+";margin:0\}"/);
+  assert.doesNotMatch(portalPage, /id="tarpaulinTitle"/);
+  assert.doesNotMatch(portalPage, /id="tarpaulinSubtitle"/);
+  assert.match(portalPage, /id="downloadTarpaulinSvg"/);
+  assert.match(portalPage, /id="spinWheelButton"/);
   assert.match(portalPage, /id="appearanceSetting"/);
   assert.match(portalPage, /<nav id="parentSidebarNav" aria-label="Learner information navigation" hidden>[\s\S]*?data-parent-target="parentStudentInfo" aria-current="page"[\s\S]*?data-parent-target="parentAttendanceSection"[\s\S]*?data-parent-target="parentReadingSection"[\s\S]*?data-parent-target="parentGradesSection"[\s\S]*?<\/nav>/);
   assert.match(portalPage, /\$\("parentSidebarNav"\)\.hidden=true/);

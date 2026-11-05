@@ -245,6 +245,11 @@ ipcMain.handle("app-version", (event) => {
   return app.getVersion();
 });
 
+ipcMain.handle("app-is-packaged", (event) => {
+  assertTrustedSender(event);
+  return app.isPackaged;
+});
+
 function getRememberedLoginStore() {
   if (!rememberedLoginStore) throw new Error("Secure sign-in storage is not ready.");
   return rememberedLoginStore;

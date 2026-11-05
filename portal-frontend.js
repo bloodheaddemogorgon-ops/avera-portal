@@ -20,6 +20,10 @@ const STATIC_ASSETS = new Map([
   ["/icon.png", { filename: "icon.png", contentType: "image/png" }],
   ["/sf10-deped-seal.png", { filename: "sf10-deped-seal.png", contentType: "image/png" }],
   ["/sf10-deped-logo.gif", { filename: "sf10-deped-logo.gif", contentType: "image/gif" }],
+  ["/assets/jspdf.umd.min.js", {
+    filename: path.join("node_modules", "jspdf", "dist", "jspdf.umd.min.js"),
+    contentType: "text/javascript; charset=utf-8",
+  }],
 ]);
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
