@@ -500,6 +500,13 @@ test("Spin wheel syncs active roster pupils by first name", async () => {
   assert.match(hint.textContent, /No active pupils/);
 });
 
+test("Tools navigation remains available in the packaged desktop app", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(portalPage, /id="navTools" type="button">[\s\S]*?Tools/);
+  assert.match(portalPage, /\$\("navTools"\)\.onclick=function\(\)\{showDashboardPage\("tools"\)\}/);
+  assert.doesNotMatch(portalPage, /releasedDesktop|isPackaged/);
+});
+
 test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks", async () => {
   const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
   const bottomCutOffsetFunction = portalPage.match(
@@ -5669,7 +5676,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   ) * 0.99;
   assert.ok(
     Math.abs(Number(batchPrintScale[1]) - expectedBatchPrintScale) < 0.000001,
-    "Print All scales reports inside the exact A4 page with a 6mm safe content buffer", 
+    "Print All scales reports inside the exact A4 page with a 6mm safe content buffer",
   );
   const sf9ProfileResponse = await fetch(`${baseUrl}/api/teacher/profile`, {
     headers: { Cookie: teacherCookie },

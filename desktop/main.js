@@ -208,7 +208,7 @@ ipcMain.handle("update-check", async (event) => {
     if (/releases\.atom|No published versions|Cannot find latest\.yml|\b404\b/i.test(error.message)) {
       return {
         state: "error",
-        message: "The update source is unavailable. The GitHub repository bloodheaddemogorgon-ops/avera-portal must be public and have a published release containing latest.yml.",
+        message: "The update source is unavailable. The GitHub repository Bontoy2025/Advisers_Portal must be public and have a published release containing latest.yml.",
       };
     }
     throw error;

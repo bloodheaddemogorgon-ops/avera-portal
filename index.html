@@ -3381,7 +3381,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.56</p>
+                  <p class="developer-update-meta">Version 1.0.58</p>
                   <ul class="developer-update-list">
                     <li>SF 10 now synchronizes the selected learner's three term grades from SF 9, including Music and Arts and Physical Education and Health.</li>
                     <li>School and classroom details are filled from the teacher profile for the matching classified grade.</li>
@@ -3835,7 +3835,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   var appearanceStorageError="";
   var appearancePreferenceChanged=false;
   var $=function(i){return document.getElementById(i)};
-  var releasedDesktop=false;
   var studentFields=[
     ["lrn","LRN"],["lastName","Last name"],["firstName","First name"],["middleName","Middle name"],
     ["gender","Gender"],["birthdate","Birthdate"],["mothersMaidenName","Mother's Maiden name"],
@@ -7641,7 +7640,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   function showDashboardPage(page){
-    if(page==="tools"&&releasedDesktop)return;
     if((page==="assessmentDifficultyIndex"||page==="assessmentItemAnalysis"||page==="assessmentLeastMastered")
       &&(!currentUser||!currentUser.isAdmin)){
       page="students";
@@ -10644,10 +10642,6 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   }
 
   async function enter(user){
-    if(window.gradePortal&&typeof window.gradePortal.isPackaged==="function"){
-      releasedDesktop=await window.gradePortal.isPackaged()===true;
-      if(releasedDesktop)$("navTools").hidden=true;
-    }
     var session=await api("/api/auth/session");
     var sessionUser=session.user;
     var wrongPortal=(entryType==="parents"&&sessionUser.role!=="parent")
