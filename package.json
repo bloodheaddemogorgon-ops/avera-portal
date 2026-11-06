@@ -1,6 +1,6 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.58",
+  "version": "1.0.59",
   "private": true,
   "description": "Grade 5 Class Portal desktop application",
   "main": "desktop/main.js",
@@ -106,7 +106,7 @@
     "nsis": {
       "artifactName": "GraceDesk-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "perMachine": true,
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico"
     }
