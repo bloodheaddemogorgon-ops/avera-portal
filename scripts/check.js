@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const projectRoot = path.join(__dirname, "..");
-const sourceDirectories = ["desktop", "scripts", "test"];
+const sourceDirectories = ["assets", "desktop", "scripts", "test"];
 const rootJavaScriptFiles = [
   "auth-rate-limiter.js",
   "server.js",

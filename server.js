@@ -48,6 +48,16 @@ const MIGRATION_WORKBOOK_PATH = process.env.PORTAL_MIGRATION_WORKBOOK
           ? LEGACY_DATABASE_PATH
           : path.join(__dirname, "grade5-portal-database-template.xlsx");
 const INDEX_PATH = path.join(__dirname, "index.html");
+const PORTAL_ASSETS = new Map([
+  ["/assets/portal.css", {
+    filename: path.join(__dirname, "assets", "portal.css"),
+    contentType: "text/css; charset=utf-8",
+  }],
+  ["/assets/portal.js", {
+    filename: path.join(__dirname, "assets", "portal.js"),
+    contentType: "text/javascript; charset=utf-8",
+  }],
+]);
 const PORTAL_ENTRY_PATHS = new Map([
   ["/", "main"],
   ["/index.html", "main"],
@@ -11460,6 +11470,19 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           "X-Content-Type-Options": "nosniff",
         });
         response.end(favicon);
+        return;
+      }
+
+      const portalAsset = request.method === "GET" ? PORTAL_ASSETS.get(url.pathname) : null;
+      if (portalAsset) {
+        const content = await fs.readFile(portalAsset.filename);
+        response.writeHead(200, {
+          "Content-Type": portalAsset.contentType,
+          "Content-Length": content.length,
+          "Cache-Control": "public, max-age=86400",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(content);
         return;
       }
 

@@ -27,6 +27,14 @@ const STATIC_ASSETS = new Map([
   ["/icon.png", { filename: "icon.png", contentType: "image/png" }],
   ["/sf10-deped-seal.png", { filename: "sf10-deped-seal.png", contentType: "image/png" }],
   ["/sf10-deped-logo.gif", { filename: "sf10-deped-logo.gif", contentType: "image/gif" }],
+  ["/assets/portal.css", {
+    filename: path.join("assets", "portal.css"),
+    contentType: "text/css; charset=utf-8",
+  }],
+  ["/assets/portal.js", {
+    filename: path.join("assets", "portal.js"),
+    contentType: "text/javascript; charset=utf-8",
+  }],
   ["/assets/jspdf.umd.min.js", {
     filename: path.join("node_modules", "jspdf", "dist", "jspdf.umd.min.js"),
     contentType: "text/javascript; charset=utf-8",

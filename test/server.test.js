@@ -56,6 +56,19 @@ const sf2StudentRows = [
   ...Array.from({ length: 50 }, (_, index) => 64 + index),
 ];
 
+async function includePortalAssets(html) {
+  const [styles, script] = await Promise.all([
+    fs.readFile(path.join(__dirname, "..", "assets", "portal.css"), "utf8"),
+    fs.readFile(path.join(__dirname, "..", "assets", "portal.js"), "utf8"),
+  ]);
+  return `${html}\n${styles}\n${script}`;
+}
+
+async function readPortalPageSource() {
+  const html = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  return includePortalAssets(html);
+}
+
 function attendanceWeekdays(month) {
   const [year, monthNumber] = month.split("-").map(Number);
   const dayCount = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
@@ -166,7 +179,7 @@ test("installed app opens teacher profile pictures with the native file picker",
   const [desktopMain, desktopPreload, portalPage] = await Promise.all([
     fs.readFile(path.join(__dirname, "..", "desktop", "main.js"), "utf8"),
     fs.readFile(path.join(__dirname, "..", "desktop", "preload.js"), "utf8"),
-    fs.readFile(path.join(__dirname, "..", "index.html"), "utf8"),
+    readPortalPageSource(),
   ]);
   assert.ok(desktopMain.includes('ipcMain.handle("choose-teacher-photo", async (event) => {'));
   assert.ok(desktopMain.includes("dialog.showOpenDialog(mainWindow, {"));
@@ -177,7 +190,7 @@ test("installed app opens teacher profile pictures with the native file picker",
 });
 
 test("dashboard display filter offers specific categories without an Everything option", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   assert.match(portalPage, /<label for="dashboardDisplayFilter">Show on dashboard<\/label>/);
   const dropdownMarkup = portalPage.match(/<select id="dashboardDisplayFilter">[\s\S]*?<\/select>/)[0];
   const optionCategories = [...dropdownMarkup.matchAll(/<option value="([^"]+)">/g)]
@@ -290,7 +303,7 @@ test("successful sign-ins release their source-address reservation", () => {
 });
 
 test("E-Class score inputs reconcile with refreshed and cleared student rosters", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const helperSource = portalPage.match(
     /function reconcileEClassScoresWithRoster\(students\)\{[\s\S]*?\n  \}/,
   );
@@ -327,7 +340,7 @@ test("E-Class score inputs reconcile with refreshed and cleared student rosters"
 });
 
 test("E-Class drafts are persisted through the backend and flushed before sign out", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
 
   assert.match(serverSource, /\/api\/e-class\/draft/);
@@ -340,7 +353,7 @@ test("E-Class drafts are persisted through the backend and flushed before sign o
 });
 
 test("saved E-Class score rows recalculate when loaded", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const scoreLoader = portalPage.match(
     /(Array\.from\(body\.querySelectorAll\("tr\[data-student-id\]"\)\)\.forEach\(function\(row\)\{[\s\S]*?\r?\n    \}\);)\r?\n    recordTable=table/,
   );
@@ -380,7 +393,7 @@ test("saved E-Class score rows recalculate when loaded", async () => {
 });
 
 test("Tarpapel banner dimensions follow the uploaded picture aspect ratio", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const sizeSync = portalPage.match(/function syncBannerSizeToImage\(image\)\{[\s\S]*?\n    \}/);
   assert.ok(sizeSync, "Tarpapel image-size synchronizer exists");
 
@@ -409,7 +422,7 @@ test("Tarpapel banner dimensions follow the uploaded picture aspect ratio", asyn
 });
 
 test("Tarpapel print layout uses non-overlapping tiles with joining margins", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const layoutFunction = portalPage.match(/function getTarpaulinPrintLayout\(dimensions,paperSize,orientation,requestedGrid\)\{[\s\S]*?\n    \}/);
   assert.ok(layoutFunction, "Tarpapel print layout calculator exists");
   const scaleFunction = portalPage.match(/function tarpaulinBannerScaleForGrid\(dimensions,layout\)\{[\s\S]*?\n    \}/);
@@ -453,7 +466,7 @@ test("Tarpapel print layout uses non-overlapping tiles with joining margins", as
 });
 
 test("Tarpapel preview renders full paper sheets with margins and unique banner segments", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const previewFunction = portalPage.match(
     /function updateTarpaulinSheetPreview\(dimensions\)\{[\s\S]*?\n    \}/,
   );
@@ -575,7 +588,7 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
 });
 
 test("Tarpapel controls and preview can be resized with pointer or keyboard", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   assert.match(portalPage, /id="tarpaulinResizeHandle" role="separator" tabindex="0"/);
   assert.match(portalPage, /tarpaulinResizeHandle\.addEventListener\("pointerdown"/);
   assert.match(portalPage, /if\(event\.key==="ArrowLeft"\)nextWidth-=24/);
@@ -609,7 +622,7 @@ test("Tarpapel controls and preview can be resized with pointer or keyboard", as
 });
 
 test("Spin wheel syncs active roster pupils by first name", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   assert.match(portalPage, /Pupils \(first names\)<\/label><textarea id="spinWheelEntries" readonly/);
   assert.match(portalPage, /id="spinWheelReset"[^>]*>Return all to wheel/);
   assert.match(portalPage, /id="spinWheelRemovedList"/);
@@ -673,14 +686,14 @@ test("Spin wheel syncs active roster pupils by first name", async () => {
 });
 
 test("Tools navigation remains available in the packaged desktop app", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   assert.match(portalPage, /id="navTools" type="button">[\s\S]*?Tools/);
   assert.match(portalPage, /\$\("navTools"\)\.onclick=function\(\)\{showDashboardPage\("tools"\)\}/);
   assert.doesNotMatch(portalPage, /releasedDesktop|isPackaged/);
 });
 
 test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const bottomCutOffsetFunction = portalPage.match(
     /function getTarpaulinBottomCutOffsetMm\(layout,visibleArea,hasNextRow\)\{[\s\S]*?\n    \}/,
   );
@@ -773,7 +786,7 @@ test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks
 });
 
 test("Tarpapel PDF download preserves the selected image fit and tiled page layout", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   assert.match(portalPage, /id="downloadTarpaulinPdf"[^>]*>Download PDF<\/button>/);
   assert.match(portalPage, /script\.src="\/assets\/jspdf\.umd\.min\.js"/);
   assert.match(portalPage, /doc\.addPage\(\[layout\.paperWidthMm,layout\.paperHeightMm\],pageOrientation\)/);
@@ -958,7 +971,7 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
   assert.equal((layout.columns - 1) * layout.strideWidthMm + lastTile.width, layout.bannerWidthMm);
 });
 
-test("portal frontend serves the local jsPDF browser bundle", async (context) => {
+test("portal frontend serves its extracted assets and the local jsPDF browser bundle", async (context) => {
   const frontend = createPortalFrontendServer({
     entry: "teacher",
     backendUrl: "http://127.0.0.1:1",
@@ -971,6 +984,20 @@ test("portal frontend serves the local jsPDF browser bundle", async (context) =>
       });
     }
   });
+
+  for (const [pathname, filename, contentType] of [
+    ["/assets/portal.css", "portal.css", /^text\/css/],
+    ["/assets/portal.js", "portal.js", /^text\/javascript/],
+  ]) {
+    const response = await fetch(`http://127.0.0.1:${frontend.address().port}${pathname}`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), contentType);
+    assert.equal(response.headers.get("cache-control"), "public, max-age=86400");
+    assert.deepEqual(
+      Buffer.from(await response.arrayBuffer()),
+      await fs.readFile(path.join(__dirname, "..", "assets", filename)),
+    );
+  }
 
   const response = await fetch(
     `http://127.0.0.1:${frontend.address().port}/assets/jspdf.umd.min.js`,
@@ -1031,6 +1058,21 @@ test("portal frontend compresses text responses and leaves binary assets unchang
   assert.deepEqual(zlib.gunzipSync(gzipPage.body), identity.body);
   const repeatedBrotliPage = await requestRaw("/", "br");
   assert.deepEqual(repeatedBrotliPage.body, brotli.body);
+
+  for (const [pathname, filename, contentType] of [
+    ["/assets/portal.css", "portal.css", /^text\/css/],
+    ["/assets/portal.js", "portal.js", /^text\/javascript/],
+  ]) {
+    const compressedAsset = await requestRaw(pathname, "gzip");
+    assert.equal(compressedAsset.statusCode, 200);
+    assert.match(compressedAsset.headers["content-type"], contentType);
+    assert.equal(compressedAsset.headers["content-encoding"], "gzip");
+    assert.equal(compressedAsset.headers.vary, "Accept-Encoding");
+    assert.deepEqual(
+      zlib.gunzipSync(compressedAsset.body),
+      await fs.readFile(path.join(__dirname, "..", "assets", filename)),
+    );
+  }
 
   const gzipAsset = await requestRaw("/assets/jspdf.umd.min.js", "gzip");
   assert.equal(gzipAsset.headers["content-encoding"], "gzip");
@@ -1302,7 +1344,7 @@ test("lesson-plan source preview extracts PDF, Word, and Excel files without per
 });
 
 test("SF 10 is available to teachers in the Term Grade menu", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const termGradeSubnav = portalPage.match(
     /<div class="sidebar-subnav" id="termGradeSubnav" hidden>([\s\S]*?)<\/div>/,
   );
@@ -1314,7 +1356,7 @@ test("SF 10 is available to teachers in the Term Grade menu", async () => {
 });
 
 test("Phil-Iri and RMA are nested under Assessment Dashboard", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const assessmentSubnav = portalPage.match(
     /<div class="sidebar-subnav" id="assessmentDashboardSubnav" hidden>([\s\S]*?)<\/div>/,
   );
@@ -1326,7 +1368,7 @@ test("Phil-Iri and RMA are nested under Assessment Dashboard", async () => {
 });
 
 test("SF 10 term grades follow the matching Classified as Grade field", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const gradeSubjects = portalPage.match(/var sf10GradeSubjects=\[[\s\S]*?\n  \];/);
   const classifiedGradeHelper = portalPage.match(
     /function sf10ClassifiedGradeIndex\([\s\S]*?\n  \}/,
@@ -1443,7 +1485,7 @@ test("SF 10 term grades follow the matching Classified as Grade field", async ()
 });
 
 test("developer updates list only changes from the current app version", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const updateContent = portalPage.match(
     /<p class="developer-update-meta">Version ([^<]+)<\/p>\s*<ul class="developer-update-list">([\s\S]*?)<\/ul>/,
   );
@@ -1462,7 +1504,7 @@ test("developer updates list only changes from the current app version", async (
 });
 
 test("E-Class score validation enforces each highest-possible-score limit", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const helperSource = portalPage.match(
     /function eClassScoreValidationMessage\(value,maximumValue\)\{[\s\S]*?\n  \}/,
   );
@@ -1524,7 +1566,7 @@ test("E-Class term grades follow the DO 015 s. 2026 worked examples and transiti
 });
 
 test("E-Class uses every DO 015 s. 2026 transmutation band before saving all subject grades", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
   const rangesMatch = portalPage.match(/var eClassTransmutationRanges=(\[[\s\S]*?\]);/);
   const gradeFunctionMatch = portalPage.match(/function eClassGradeForInitial\(initialGrade,method\)\{[\s\S]*?\n  \}/);
@@ -1604,7 +1646,7 @@ test("E-Class uses every DO 015 s. 2026 transmutation band before saving all sub
 });
 
 test("E-Class card provides a scoped workbook download", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
   assert.match(portalPage, /id="downloadEClass"[^>]*disabled[\s\S]*?Download E-Class/);
   assert.match(portalPage, /class="data-card-header"[\s\S]*?class="eclass-controls"[\s\S]*?id="downloadEClass"/);
@@ -1626,7 +1668,7 @@ test("E-Class card provides a scoped workbook download", async () => {
 });
 
 test("term grade page makes the lock state prominent", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   assert.match(portalPage, /id="gradeLockControl" data-locked=""/);
   assert.match(portalPage, /id="gradeLockBadge" aria-hidden="true">CHECKING<\/span>/);
   assert.match(portalPage, /id="gradeLockStatus" role="status" aria-live="polite"/);
@@ -1926,7 +1968,7 @@ test("E-Class export fills the project workbook template with current app record
 });
 
 test("section selection is applied across learner lists and summaries", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
   const helperSource = portalPage.match(
     /function filterStudentsForActiveSection\(students,sectionFilter\)\{[\s\S]*?\n  \}/,
@@ -2172,7 +2214,7 @@ test("clearing a selected student section preserves students in other sections",
 });
 
 test("teacher profile marks the assigned advisory grade and section as read-only", async () => {
-  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  const portalPage = await readPortalPageSource();
   const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
 
   assert.match(portalPage, /id="teacherProfileTabs" role="tablist"/);
@@ -3176,7 +3218,25 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.deepEqual(await health.json(), { status: "ok", storage: "sqlite" });
   const portalPageResponse = await fetch(baseUrl);
   assert.equal(portalPageResponse.status, 200);
-  const portalPage = await portalPageResponse.text();
+  const portalPageHtml = await portalPageResponse.text();
+  assert.match(portalPageHtml, /<link rel="stylesheet" href="\/assets\/portal\.css">/);
+  assert.match(portalPageHtml, /<script src="\/assets\/portal\.js"><\/script>/);
+  assert.doesNotMatch(portalPageHtml, /<style>/);
+  assert.doesNotMatch(portalPageHtml, /<script(?![^>]*\bsrc=)[^>]*>/);
+  assert.ok(portalPageHtml.indexOf('<script src="/assets/portal.js">') < portalPageHtml.lastIndexOf("</body>"));
+  const portalPage = await includePortalAssets(portalPageHtml);
+  for (const [pathname, filename, contentType] of [
+    ["/assets/portal.css", "portal.css", /^text\/css/],
+    ["/assets/portal.js", "portal.js", /^text\/javascript/],
+  ]) {
+    const assetResponse = await fetch(`${baseUrl}${pathname}`);
+    assert.equal(assetResponse.status, 200);
+    assert.match(assetResponse.headers.get("content-type"), contentType);
+    assert.deepEqual(
+      Buffer.from(await assetResponse.arrayBuffer()),
+      await fs.readFile(path.join(__dirname, "..", "assets", filename)),
+    );
+  }
   for (const [entryPath, entryName] of [["/parents", "parents"]]) {
     const entryResponse = await fetch(`${baseUrl}${entryPath}`);
     assert.equal(entryResponse.status, 200);
