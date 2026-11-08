@@ -1,10 +1,24 @@
-// Single swap point for identity. Every Server Action gets its user from here and never from client input.
-// TODO: replace with the signed-in session user once authentication is wired to Server Actions.
-const MOCK_USER_ID = "dev-user-123";
+import { cookies } from "next/headers";
+import { portalRequest, type PortalRequestIdentity } from "@/lib/portal-api";
 
-export async function getCurrentUserId(): Promise<string> {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Unauthorized");
+const MOCK_USER_ID = "dev-user-123";
+const TEACHER_SESSION_COOKIE = "grade5_session_teacher";
+
+export async function getCurrentUser(): Promise<PortalRequestIdentity & { userId: string }> {
+  if (process.env.NODE_ENV !== "production") {
+    return { userId: MOCK_USER_ID };
   }
-  return MOCK_USER_ID;
+
+  const sessionCookie = (await cookies()).get(TEACHER_SESSION_COOKIE);
+  if (!sessionCookie?.value) throw new Error("Unauthorized");
+
+  const identity = {
+    sessionCookie: `${TEACHER_SESSION_COOKIE}=${sessionCookie.value}`,
+  };
+  const { user } = await portalRequest<{
+    user?: { userId?: string; role?: string };
+  }>("/api/auth/session", identity);
+
+  if (!user?.userId || user.role !== "teacher") throw new Error("Unauthorized");
+  return { ...identity, userId: user.userId };
 }

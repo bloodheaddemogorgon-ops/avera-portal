@@ -14,11 +14,15 @@ const os = require("node:os");
 const path = require("node:path");
 const { promisify } = require("node:util");
 const bcrypt = require("bcryptjs");
+const Busboy = require("busboy");
 const ExcelJS = require("exceljs");
 const JSZip = require("jszip");
 const XLSX = require("@e965/xlsx");
+const WordExtractor = require("word-extractor");
+const mammoth = require("mammoth");
 const sharp = require("sharp");
 const { createAuthRateLimiter } = require("./auth-rate-limiter");
+const { CalendarValidationError, createTeacherCalendarStore } = require("./teacher-calendar-store");
 const { calculateBmiForAge } = require("./who-growth-reference");
 
 const DOWNLOADS_DIRECTORY = path.join(os.homedir(), "Downloads");
@@ -53,6 +57,13 @@ const PORTAL_ENTRY_PATHS = new Map([
 const APP_VERSION = require("./package.json").version;
 const MAX_SF1_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_SF2_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_LESSON_PLAN_SOURCE_BYTES = 100 * 1024 * 1024;
+const MAX_LESSON_PLAN_SOURCE_FILES = 100;
+const MAX_LESSON_PLAN_SOURCE_PREVIEW_CHARS = 500000;
+const DAILY_LESSON_LOG_TEMPLATE_PATHS = {
+  english: path.join(__dirname, "DLL TEMPLATE ENGLISH.docx"),
+  filipino: path.join(__dirname, "DLL TEMPLATE FILIPINO.docx"),
+};
 const MAX_SF1_STUDENTS = 1000;
 const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 const APPEARANCE_THEMES = new Set([
@@ -321,7 +332,7 @@ const SF2_ABSENCE_REASONS_MARKER = "[Grade Portal absence reasons]\n";
 const SF2_STATUS_BY_MARK = new Map([
   ["", "Present"],
   ["-", "Present"],
-  ["x", "Absent"],
+  ["x", "AbsentX"],
   ["cc", "Absent"],
   ["h", "Absent"],
   ["l", "Tardy"],
@@ -333,6 +344,7 @@ const SF2_STATUS_BY_MARK = new Map([
 const SF2_MARK_BY_STATUS = new Map([
   ["Present", ""],
   ["Absent", "CC"],
+  ["AbsentX", "X"],
   ["Tardy", "T"],
   ["Excused", "E"],
 ]);
@@ -577,7 +589,7 @@ function getPhilIriStartingPassage(score, guide, language) {
     : `${gradeDescription} (lowest available ${language} passage)`;
 }
 
-const ATTENDANCE_STATUSES = ["Present", "Absent", "Tardy", "Excused"];
+const ATTENDANCE_STATUSES = ["Present", "Absent", "AbsentX", "Tardy", "Excused"];
 const GRADE_1_SUBJECTS = [
   ["language", "Language"],
   ["readingAndLiteracy", "Reading and Literacy"],
@@ -1926,6 +1938,570 @@ async function extractTosCompetencies(buffer, fileName) {
   throw new HttpError(400, "Import a TOS in .docx, .xlsx, or .xls format.");
 }
 
+function readLessonPlanSourceUploads(request) {
+  const contentType = String(request.headers["content-type"] || "");
+  if (!/^multipart\/form-data(?:;|$)/i.test(contentType)) {
+    throw new HttpError(400, "Upload source files using the lesson-plan source form.");
+  }
+
+  let parser;
+  try {
+    parser = Busboy({
+      headers: request.headers,
+      limits: {
+        files: MAX_LESSON_PLAN_SOURCE_FILES,
+        fileSize: MAX_LESSON_PLAN_SOURCE_BYTES + 1,
+      },
+    });
+  } catch {
+    throw new HttpError(400, "The source-file upload could not be read.");
+  }
+
+  return new Promise((resolve, reject) => {
+    const uploads = [];
+    let totalBytes = 0;
+    let failure = null;
+    let settled = false;
+
+    const fail = (error) => {
+      if (!failure) failure = error;
+    };
+
+    parser.on("file", (fieldName, stream, info) => {
+      if (failure) {
+        stream.resume();
+        return;
+      }
+      if (fieldName !== "sources") {
+        fail(new HttpError(400, "The upload contains an unexpected form field."));
+        stream.resume();
+        return;
+      }
+
+      const fileName = String(info.filename || "").replace(/\\/g, "/").split("/").pop().trim().slice(0, 255);
+      const extension = path.extname(fileName).toLowerCase();
+      if (!fileName || ![".pdf", ".doc", ".docx", ".xls", ".xlsx"].includes(extension)) {
+        fail(new HttpError(400, "Choose PDF, Word, or Excel source files."));
+        stream.resume();
+        return;
+      }
+
+      const chunks = [];
+      let fileSize = 0;
+      stream.on("data", (chunk) => {
+        if (failure) return;
+        fileSize += chunk.length;
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_LESSON_PLAN_SOURCE_BYTES) {
+          fail(new HttpError(413, "Source files must total 100 MB or less."));
+          chunks.length = 0;
+          return;
+        }
+        chunks.push(chunk);
+      });
+      stream.on("limit", () => {
+        chunks.length = 0;
+        fail(new HttpError(413, "Source files must total 100 MB or less."));
+      });
+      stream.on("end", () => {
+        if (failure) return;
+        if (!fileSize) {
+          fail(new HttpError(400, `The source file "${fileName}" is empty.`));
+          return;
+        }
+        uploads.push({ fileName, extension, buffer: Buffer.concat(chunks) });
+      });
+    });
+    parser.on("field", () => fail(new HttpError(400, "The upload contains an unexpected form field.")));
+    parser.on("filesLimit", () => fail(new HttpError(400, `Upload no more than ${MAX_LESSON_PLAN_SOURCE_FILES} source files at a time.`)));
+    parser.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(failure || new HttpError(400, error.message || "The source-file upload could not be read."));
+    });
+    parser.on("close", () => {
+      if (settled) return;
+      settled = true;
+      if (failure) {
+        reject(failure);
+      } else if (!uploads.length) {
+        reject(new HttpError(400, "Choose at least one source file."));
+      } else {
+        resolve(uploads);
+      }
+    });
+    request.pipe(parser);
+  });
+}
+
+function boundedLessonPlanSourceText(value, maxChars) {
+  const normalized = String(value || "").replace(/\u0000/g, "").replace(/\r\n?/g, "\n").trim();
+  return {
+    text: normalized.slice(0, maxChars),
+    truncated: normalized.length > maxChars,
+  };
+}
+
+function lessonPlanHtmlToText(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|li|h[1-6])\s*>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCodePoint(Number.parseInt(code, 10)))
+    .replace(/\u00a0/g, " ")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function extractLessonPlanDocxText(html, maxChars) {
+  const parts = [];
+  let cursor = 0;
+  const tablePattern = /<table\b[^>]*>[\s\S]*?<\/table>/gi;
+  let tableMatch;
+  while ((tableMatch = tablePattern.exec(html))) {
+    const paragraphText = lessonPlanHtmlToText(html.slice(cursor, tableMatch.index));
+    if (paragraphText) parts.push(paragraphText);
+    const rowTexts = [...tableMatch[0].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((rowMatch) => {
+      const cells = [...rowMatch[1].matchAll(/<(?:td|th)\b([^>]*)>([\s\S]*?)<\/(?:td|th)>/gi)];
+      const values = [];
+      for (const cellMatch of cells) {
+        const text = lessonPlanHtmlToText(cellMatch[2]).replace(/\n+/g, " / ");
+        const spanMatch = cellMatch[1].match(/\bcolspan\s*=\s*["']?(\d+)/i);
+        const span = Math.max(1, Math.min(20, Number(spanMatch?.[1] || 1)));
+        values.push(text, ...Array(span - 1).fill(""));
+      }
+      return values.join("\t");
+    });
+    if (rowTexts.length) parts.push(rowTexts.join("\n"));
+    cursor = tablePattern.lastIndex;
+  }
+  const trailingText = lessonPlanHtmlToText(html.slice(cursor));
+  if (trailingText) parts.push(trailingText);
+  const text = parts.join("\n").replace(/\n{3,}/g, "\n\n");
+  return {
+    text: text.slice(0, maxChars),
+    truncated: text.length > maxChars,
+  };
+}
+
+let pdfJsModulePromise;
+const dailyLessonLogTemplatePromises = new Map();
+
+function formatLessonPlanPdfPageText(items) {
+  const positioned = [];
+  const unpositioned = [];
+  for (const item of items) {
+    const text = typeof item.str === "string" ? item.str.replace(/\s+/g, " ").trim() : "";
+    if (!text) continue;
+    const transform = item.transform;
+    if (!Array.isArray(transform) || !Number.isFinite(transform[4]) || !Number.isFinite(transform[5])) {
+      unpositioned.push(text);
+      continue;
+    }
+    positioned.push({
+      text,
+      x: transform[4],
+      y: transform[5],
+      width: Number.isFinite(item.width) ? item.width : 0,
+      fontSize: Math.abs(Number(transform[3]) || Number(item.height) || 10),
+    });
+  }
+  positioned.sort((left, right) => right.y - left.y || left.x - right.x);
+  const lines = [];
+  for (const item of positioned) {
+    let line = lines.at(-1);
+    if (!line || Math.abs(line.y - item.y) > 2.5) {
+      line = { y: item.y, items: [] };
+      lines.push(line);
+    }
+    line.items.push(item);
+  }
+
+  const renderedLines = lines.map((line) => {
+    let text = "";
+    let previous = null;
+    for (const item of line.items) {
+      if (previous) {
+        const gap = item.x - previous.x - previous.width;
+        const columnGap = Math.max(14, Math.min(previous.fontSize, item.fontSize) * 1.5);
+        text += gap >= columnGap ? "\t" : " ";
+      }
+      text += item.text;
+      previous = item;
+    }
+    return text;
+  }).filter(Boolean);
+  if (unpositioned.length) renderedLines.push(unpositioned.join(" "));
+  return renderedLines.join("\n");
+}
+
+function normalizeDailyLessonLogTemplate(html) {
+  const withoutSchoolHeader = html.replace(/^(?:<p\b[^>]*>[\s\S]*?<\/p>\s*)+(?=<table\b)/i, "");
+  const normalizedRows = withoutSchoolHeader.replace(/<tr>([\s\S]*?)<\/tr>/g, (rowMarkup, rowContent) => {
+    const cells = rowContent.match(/<td(?:\s[^>]*)?>[\s\S]*?<\/td>/g) || [];
+    if (cells.length === 2) {
+      const fullWidthCell = cells[1].replace(/\scolspan="\d+"/, ' colspan="5"');
+      return `<tr>${cells[0]}${fullWidthCell}</tr>`;
+    }
+    if (cells.length === 6) {
+      const sessionHeader = /<strong>\s*(?:SESSION|SESYON)\s*1\s*<\/strong>/i.test(rowMarkup);
+      const rowStart = sessionHeader ? '<tr class="daily-lesson-log-session-row">' : "<tr>";
+      return `${rowStart}${cells[0]}${cells.slice(1).map((cell) =>
+        cell.replace(/\scolspan="\d+"/, ""),
+      ).join("")}</tr>`;
+    }
+    return rowMarkup;
+  });
+  const signatureParagraphs = normalizedRows.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) || [];
+  const signatureParagraph = signatureParagraphs.find((paragraph) =>
+    /Prepared by:|Checked and Reviewed by:|Inihanda ni:|Sinuri at Nirepaso nina:/i.test(paragraph),
+  );
+  const tableEnd = normalizedRows.lastIndexOf("</table>");
+  const signatureStart = signatureParagraph ? normalizedRows.indexOf(signatureParagraph) : -1;
+  return signatureStart > tableEnd ? normalizedRows.slice(0, signatureStart) : normalizedRows;
+}
+
+async function getDailyLessonLogTemplate(language = "filipino") {
+  if (!Object.hasOwn(DAILY_LESSON_LOG_TEMPLATE_PATHS, language)) {
+    throw new HttpError(400, "Choose English or Filipino for the Daily Lesson Log template.");
+  }
+  const templatePath = DAILY_LESSON_LOG_TEMPLATE_PATHS[language];
+  if (!dailyLessonLogTemplatePromises.has(language)) {
+    dailyLessonLogTemplatePromises.set(language, (async () => {
+      let buffer;
+      try {
+        buffer = await fs.readFile(templatePath);
+      } catch (error) {
+        if (error.code === "ENOENT") {
+          throw new HttpError(500, "The Daily Lesson Log source document is missing from the project.");
+        }
+        throw error;
+      }
+
+      const result = await mammoth.convertToHtml({ buffer });
+      return { html: normalizeDailyLessonLogTemplate(result.value) };
+    })());
+  }
+  return dailyLessonLogTemplatePromises.get(language);
+}
+
+async function createDailyLessonLogExcelExport(data) {
+  const allowedLanguages = new Set(["filipino", "english"]);
+  if (!data || !allowedLanguages.has(data.language)) {
+    throw new HttpError(400, "Choose English or Filipino for the Daily Lesson Log.");
+  }
+  if (!Array.isArray(data.rows) || data.rows.length === 0 || data.rows.length > 300) {
+    throw new HttpError(400, "The Daily Lesson Log must contain between 1 and 300 table rows.");
+  }
+
+  const rows = data.rows.map((row) => {
+    if (!row || !Array.isArray(row.cells) || row.cells.length > 6) {
+      throw new HttpError(400, "The Daily Lesson Log contains an invalid table row.");
+    }
+    let columnsUsed = 0;
+    const cells = row.cells.map((cell) => {
+      const span = Number(cell?.span || 1);
+      if (!Number.isInteger(span) || span < 1 || span > 6 || columnsUsed + span > 6) {
+        throw new HttpError(400, "The Daily Lesson Log contains an invalid merged cell.");
+      }
+      const text = String(cell?.text || "").trim();
+      if (text.length > 32_000) {
+        throw new HttpError(400, "A Daily Lesson Log cell exceeds Excel's 32,000-character limit.");
+      }
+      columnsUsed += span;
+      return { text, span };
+    });
+    return { cells, sessionHeader: Boolean(row.sessionHeader) };
+  });
+
+  const period = data.period && typeof data.period === "object" ? data.period : {};
+  const periodLabels = [
+    ["TERM", period.term],
+    ["WEEK", period.week],
+    ["DATE FROM", period.dateFrom],
+    ["TO", period.dateTo],
+    ["YEAR", period.year],
+  ].filter(([, value]) => String(value || "").trim())
+    .map(([label, value]) => `${label}: ${String(value).trim()}`);
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "GraceDesk";
+  workbook.subject = "Daily Lesson Log";
+  workbook.created = new Date();
+  const worksheet = workbook.addWorksheet(data.language === "filipino" ? "DLL" : "Daily Lesson Log", {
+    pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+    views: [{ state: "frozen", ySplit: 2 }],
+  });
+  worksheet.columns = [
+    { width: 34 },
+    { width: 25 },
+    { width: 25 },
+    { width: 25 },
+    { width: 25 },
+    { width: 25 },
+  ];
+  const titleRow = worksheet.addRow(["DAILY LESSON LOG"]);
+  worksheet.mergeCells(titleRow.number, 1, titleRow.number, 6);
+  titleRow.height = 24;
+  titleRow.getCell(1).font = { bold: true, size: 16, color: { argb: "FF244B45" } };
+  titleRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+  const periodRow = worksheet.addRow([periodLabels.join("     ")]);
+  worksheet.mergeCells(periodRow.number, 1, periodRow.number, 6);
+  periodRow.height = 22;
+  periodRow.getCell(1).font = { bold: true, size: 10 };
+  periodRow.getCell(1).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+
+  rows.forEach((sourceRow) => {
+    const row = worksheet.addRow([]);
+    let column = 1;
+    sourceRow.cells.forEach((sourceCell) => {
+      worksheet.getCell(row.number, column).value = sourceCell.text;
+      if (sourceCell.span > 1) {
+        worksheet.mergeCells(row.number, column, row.number, column + sourceCell.span - 1);
+      }
+      column += sourceCell.span;
+    });
+    for (let cellColumn = 1; cellColumn <= 6; cellColumn += 1) {
+      const cell = worksheet.getCell(row.number, cellColumn);
+      cell.font = sourceRow.sessionHeader
+        ? { bold: true, size: 10, color: { argb: "FF244B45" } }
+        : { size: 10, color: { argb: "FF202A38" } };
+      cell.alignment = { vertical: "top", wrapText: true };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFD8DEE8" } },
+        left: { style: "thin", color: { argb: "FFD8DEE8" } },
+        bottom: { style: "thin", color: { argb: "FFD8DEE8" } },
+        right: { style: "thin", color: { argb: "FFD8DEE8" } },
+      };
+      if (sourceRow.sessionHeader) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8F1EF" } };
+      }
+    }
+  });
+
+  const filenamePart = (value, fallback) => String(value || fallback)
+    .replace(/[^A-Za-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40) || fallback;
+  const term = filenamePart(period.term, "1").replace(/^term[_-]?/i, "");
+  const week = filenamePart(period.week, "1").replace(/^week[_-]?/i, "");
+  const year = filenamePart(period.year, String(new Date().getFullYear()));
+  return {
+    buffer: Buffer.from(await workbook.xlsx.writeBuffer()),
+    filename: `Daily_Lesson_Log_Term_${term}_Week_${week}_${year}.xlsx`,
+  };
+}
+
+async function extractLessonPlanPdfText(buffer, maxChars) {
+  pdfJsModulePromise ||= import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = await pdfJsModulePromise;
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+  const document = await loadingTask.promise;
+  const parts = [];
+  let length = 0;
+  let truncated = false;
+
+  try {
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      if (length >= maxChars) {
+        truncated = true;
+        break;
+      }
+      const page = await document.getPage(pageNumber);
+      try {
+        const content = await page.getTextContent();
+        const pageText = formatLessonPlanPdfPageText(content.items);
+        const addition = `${pageText}\n`;
+        const remaining = maxChars - length;
+        parts.push(addition.slice(0, remaining));
+        length += Math.min(addition.length, remaining);
+        if (addition.length > remaining) {
+          truncated = true;
+          break;
+        }
+      } finally {
+        page.cleanup();
+      }
+    }
+  } finally {
+    await loadingTask.destroy();
+  }
+
+  return { text: parts.join("").trim(), truncated };
+}
+
+function extractLessonPlanSpreadsheetText(buffer, maxChars) {
+  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  const parts = [];
+  let length = 0;
+  let truncated = false;
+
+  const append = (value) => {
+    if (length >= maxChars) {
+      truncated = true;
+      return;
+    }
+    const text = String(value || "");
+    const remaining = maxChars - length;
+    parts.push(text.slice(0, remaining));
+    length += Math.min(text.length, remaining);
+    if (text.length > remaining) truncated = true;
+  };
+
+  for (const sheetName of workbook.SheetNames) {
+    append(`Sheet: ${sheetName}\n`);
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      header: 1,
+      raw: false,
+      defval: "",
+      blankrows: false,
+      range: 0,
+    });
+    for (const row of rows) {
+      if (truncated) break;
+      const line = row.map((cell) => cell == null ? "" : String(cell)).join("\t");
+      if (row.some((cell) => String(cell == null ? "" : cell).trim())) append(`${line}\n`);
+    }
+    if (truncated) break;
+  }
+
+  return { text: parts.join("").replace(/\n+$/, ""), truncated };
+}
+
+async function extractLessonPlanSourceText(upload, maxChars) {
+  try {
+    if (upload.extension === ".pdf") {
+      const extracted = await extractLessonPlanPdfText(upload.buffer, maxChars);
+      if (!extracted.text) {
+        throw new HttpError(422, `No selectable text was found in "${upload.fileName}". Scanned PDFs cannot be previewed.`);
+      }
+      return extracted;
+    }
+    if (upload.extension === ".docx") {
+      const document = await mammoth.convertToHtml({ buffer: upload.buffer });
+      const extracted = extractLessonPlanDocxText(document.value, maxChars);
+      if (!extracted.text) throw new HttpError(422, `No readable text was found in "${upload.fileName}".`);
+      return extracted;
+    }
+    if (upload.extension === ".doc") {
+      const document = await new WordExtractor().extract(upload.buffer);
+      const extracted = boundedLessonPlanSourceText(document.getBody(), maxChars);
+      if (!extracted.text) throw new HttpError(422, `No readable text was found in "${upload.fileName}".`);
+      return extracted;
+    }
+
+    const extracted = extractLessonPlanSpreadsheetText(upload.buffer, maxChars);
+    if (!extracted.text) throw new HttpError(422, `No readable text was found in "${upload.fileName}".`);
+    return extracted;
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(422, `Could not extract text from "${upload.fileName}". The file may be damaged, encrypted, or unsupported.`);
+  }
+}
+
+const LESSON_PLAN_SOURCE_LABELS = {
+  title: ["Pamagat ng Aralin", "Lesson Title", "Title", "Topic", "Paksa"],
+  learningArea: ["Larangan ng Pagkatuto", "Learning Area", "Subject", "Asignatura"],
+  teacherName: ["Pangalan ng Guro", "Teacher's Name", "Teacher Name"],
+  gradeSection: ["Baitang at Seksyon", "Grade Level and Section", "Grade and Section"],
+  sessionCount: ["Bilang ng mga Sesyon", "Bilang ng Sesyon", "Number of Sessions", "Session Count"],
+  references: ["Mga Sanggunian", "Sanggunian", "References", "Reference"],
+  aiDeclaration: ["Pagpapahayag ng Paggamit ng AI", "Pahayag sa Paggamit ng AI", "AI Use Declaration", "AI Declaration"],
+  contentStandard: ["Pamantayang Pangnilalaman", "Content Standard"],
+  performanceStandard: ["Pamantayan sa Pagganap", "Performance Standard"],
+  learningCompetency: ["Kasanayang Pampagkatuto", "Learning Competency"],
+  objectives: ["Mga Layuning Pampagkatuto", "Mga Layunin sa Pagkatuto", "Learning Objectives", "Objectives", "Expected Outcomes"],
+  preLesson: ["Panimulang Gawain", "Bago ang Aralin", "Pre-Lesson", "Prelesson"],
+  flow: ["Daloy ng mga Sesyon", "Daloy", "Session Flow", "Learning Flow", "Flow", "Lesson Procedure"],
+  learningResources: ["Mga Kagamitang Panturo", "Mga Kagamitan sa Pagkatuto", "Learning Resources", "Teaching Materials", "Materials"],
+  integration: ["Mga Oportunidad para sa Integrasyon", "Oportunidad sa Integrasyon", "Opportunities for Integration", "Integration"],
+  assessment: ["Pormatibong Pagtataya", "Formative Assessment", "Assessment"],
+  extendedLearning: ["Pinalawak na Oportunidad sa Pagkatuto", "Extended Learning Opportunities", "Extended Learning"],
+  reflections: ["Pagninilay", "Mga Pagninilay", "Reflections", "Reflection"],
+};
+
+function lessonPlanLabelPattern(labels) {
+  return labels
+    .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+"))
+    .sort((left, right) => right.length - left.length)
+    .join("|");
+}
+
+const LESSON_PLAN_ALL_LABEL_PATTERN = lessonPlanLabelPattern(
+  Object.values(LESSON_PLAN_SOURCE_LABELS).flat(),
+);
+const LESSON_PLAN_ALL_STOP_PATTERN = `${LESSON_PLAN_ALL_LABEL_PATTERN}|(?:session|sesyon|day|araw)\\s*[1-5]`;
+
+function extractLessonPlanLabeledValue(text, labels) {
+  const labelPattern = lessonPlanLabelPattern(labels);
+  const expression = new RegExp(
+    `(?:^|\\n|\\s)(${labelPattern})\\s*(?::|：|[-–—])\\s*([\\s\\S]*?)(?=\\s+(?:${LESSON_PLAN_ALL_STOP_PATTERN})\\b|$)`,
+    "i",
+  );
+  const match = String(text || "").match(expression);
+  return match ? match[2].replace(/\s+/g, " ").trim() : "";
+}
+
+function parseLessonPlanSourceText(text) {
+  const global_info = {
+    pamagat: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.title),
+    larangan: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.learningArea),
+    teacher: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.teacherName),
+    gradeSection: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.gradeSection),
+    sessionCount: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.sessionCount),
+    sanggunian: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.references),
+    aiDeclaration: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.aiDeclaration),
+    contentStandard: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.contentStandard),
+    performanceStandard: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.performanceStandard),
+    learningCompetency: extractLessonPlanLabeledValue(text, LESSON_PLAN_SOURCE_LABELS.learningCompetency),
+  };
+  const sessions = {};
+  const markers = Array.from(
+    String(text || "").matchAll(/\b(?:session|sesyon|day|araw)\s*([1-5])\b(?:\s*\([^)]{1,40}\))?/gi),
+  );
+
+  markers.forEach((marker, index) => {
+    const sessionNumber = Number(marker[1]);
+    const start = marker.index + marker[0].length;
+    const end = index + 1 < markers.length ? markers[index + 1].index : String(text || "").length;
+    const sessionText = String(text || "").slice(start, end);
+    const fields = {};
+    for (const [field, labels] of Object.entries(LESSON_PLAN_SOURCE_LABELS)) {
+      if (["title", "learningArea", "teacherName", "gradeSection", "sessionCount", "references", "aiDeclaration"].includes(field)) {
+        continue;
+      }
+      fields[field] = extractLessonPlanLabeledValue(sessionText, labels);
+    }
+    const key = `session_${sessionNumber}`;
+    if (!sessions[key]) sessions[key] = fields;
+    else {
+      for (const [field, value] of Object.entries(fields)) {
+        if (!sessions[key][field] && value) sessions[key][field] = value;
+      }
+    }
+    if (!Object.values(fields).some(Boolean)) {
+      fields.flow = sessionText.replace(/^[\s:：–—-]+/, "").trim();
+    }
+  });
+
+  if (!global_info.sessionCount && Object.keys(sessions).length) {
+    global_info.sessionCount = String(Object.keys(sessions).length);
+  }
+  return { global_info, sessions };
+}
+
 function sendJson(response, status, data) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -2483,6 +3059,10 @@ function parseEClassWorkbook(buffer, selection) {
 
 function createServer(options = {}) {
   const databasePath = options.databasePath || DATABASE_PATH;
+  const calendarStore = createTeacherCalendarStore({
+    databasePath: options.calendarDatabasePath || `${databasePath}.calendar.sqlite`,
+    fetchImpl: options.calendarFetch,
+  });
   const migrationWorkbookPath = options.migrationWorkbookPath || MIGRATION_WORKBOOK_PATH;
   const generatedReportsDirectory = options.generatedReportsDirectory || GENERATED_REPORTS_DIRECTORY;
   const appearancePreferencesPath = options.appearancePreferencesPath || null;
@@ -6521,7 +7101,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
               if (cellText(attendanceRow.getCell(attendanceColumns.studentId).value) !== studentId
                 || isAttendanceDateLocked(studentStatusEvents, date)) continue;
               const status = normalizeAttendanceStatus(attendanceRow.getCell(attendanceColumns.status).value);
-              if (status === "Absent") {
+              if (isAbsentAttendanceStatus(status)) {
                 month.present -= 1;
                 month.absent += 1;
               }
@@ -8756,11 +9336,13 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         : remarksWithoutStatusDate.slice(0, markerIndex)).trim();
       const fallbackAbsenceReason = normalizeMonthlyAttendanceRemark(remarks) ? "" : remarks;
       for (const entry of attendance) {
-        if (entry.status !== "Absent" && entry.status !== "Excused") continue;
+        if (!isAbsentAttendanceStatus(entry.status) && entry.status !== "Excused") continue;
         entry.reason = absenceReasons.get(entry.date) || fallbackAbsenceReason;
       }
       if ([...absenceReasons.keys()].some((date) =>
-        !attendance.some((entry) => entry.date === date && (entry.status === "Absent" || entry.status === "Excused")))) {
+        !attendance.some((entry) =>
+          entry.date === date
+            && (isAbsentAttendanceStatus(entry.status) || entry.status === "Excused")))) {
         throw new HttpError(400, `Reasons in row ${rowNumber} do not match an Absent or Excused mark.`);
       }
       records.push({
@@ -8783,7 +9365,14 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
     const status = cellText(value);
     if (status === "-") return "Present";
     if (status === "Late") return "Tardy";
-    return status === "Half-day" ? "Absent" : status;
+    if (status === "Half-day" || status.toLowerCase() === "cc" || status.toLowerCase() === "h") {
+      return "Absent";
+    }
+    return status.toLowerCase() === "x" ? "AbsentX" : status;
+  }
+
+  function isAbsentAttendanceStatus(status) {
+    return status === "Absent" || status === "AbsentX";
   }
 
   function normalizeMonthlyAttendanceRemark(value) {
@@ -9014,12 +9603,13 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         if (record.status === "Present" || record.status === "Tardy") {
           student.present += 1;
           monthSummary.present += 1;
-        } else if (record.status === "Absent") {
+        } else if (isAbsentAttendanceStatus(record.status)) {
           student.absent += 1;
           monthSummary.absent += 1;
         }
         student.months[month] = monthSummary;
-        if (record.status === "Present" || record.status === "Tardy" || record.status === "Absent") {
+        if (record.status === "Present" || record.status === "Tardy"
+          || isAbsentAttendanceStatus(record.status)) {
           if (!firstDate || record.date < firstDate) firstDate = record.date;
           if (!lastDate || record.date > lastDate) lastDate = record.date;
         }
@@ -9100,7 +9690,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           ? "Tardy"
           : status === "Half-day" ? "Absent" : status;
         if (typeof normalized !== "string" || (normalized !== "" && !ATTENDANCE_STATUSES.includes(normalized))) {
-          throw new HttpError(400, "Choose Present, Absent, Tardy, or Excused for each attendance day.");
+          throw new HttpError(400, "Choose Present, Absent (CC or X), Tardy, or Excused for each attendance day.");
         }
         return normalized;
       });
@@ -9110,7 +9700,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           throw new HttpError(400, "Each absence reason must be text no longer than 500 characters.");
         }
         const normalized = reason.trim();
-        return statuses[index] === "Absent" || statuses[index] === "Excused" ? normalized : "";
+        return isAbsentAttendanceStatus(statuses[index]) || statuses[index] === "Excused" ? normalized : "";
       });
       recordsByStudentId.set(studentId, {
         attendance: statuses,
@@ -9722,7 +10312,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       const absenceReasonLines = weekdayDates.flatMap((date) => {
         const dayIndex = weekdayIndices.get(date);
         const status = normalizeAttendanceStatus(student.attendance[dayIndex]);
-        if (status !== "Absent" && status !== "Excused") return [];
+        if (!isAbsentAttendanceStatus(status) && status !== "Excused") return [];
         const reason = cellText(student.reasons[dayIndex]).trim();
         if (!reason) return [];
         return [`${date}: ${reason}`];
@@ -9767,7 +10357,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
             countedDays += 1;
             const dayIndex = weekdayIndices.get(date);
             const status = normalizeAttendanceStatus(student.attendance[dayIndex]);
-            if (status === "Absent") absences += 1;
+            if (isAbsentAttendanceStatus(status)) absences += 1;
           }
         }
         formulaValue(
@@ -9790,7 +10380,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         return total + weekdayDates.reduce((studentTotal, date) => {
           if (attendance.noClassDates.includes(date) || student.lockedDates.includes(date)) return studentTotal;
           const status = normalizeAttendanceStatus(student.attendance[weekdayIndices.get(date)]);
-          return studentTotal + (status === "Absent" ? 1 : 0);
+          return studentTotal + (isAbsentAttendanceStatus(status) ? 1 : 0);
         }, 0);
       }, 0);
       formulaValue(
@@ -9805,7 +10395,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           const studentAbsences = weekdayDates.reduce((count, date) => {
             if (attendance.noClassDates.includes(date) || student.lockedDates.includes(date)) return count;
             const status = normalizeAttendanceStatus(student.attendance[weekdayIndices.get(date)]);
-            return count + (status === "Absent" ? 1 : 0);
+            return count + (isAbsentAttendanceStatus(status) ? 1 : 0);
           }, 0);
           const studentClassDays = weekdayDates.filter((date) =>
             !attendance.noClassDates.includes(date) && !student.lockedDates.includes(date)).length;
@@ -9819,7 +10409,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           ? registeredStudents.reduce((count, student) => {
             if (student.lockedDates.includes(date)) return count;
             const status = normalizeAttendanceStatus(student.attendance[weekdayIndices.get(date)]);
-            return count + (status === "Absent" ? 0 : 1);
+            return count + (isAbsentAttendanceStatus(status) ? 0 : 1);
           }, 0)
           : 0;
         const dailyFormula = date && !attendance.noClassDates.includes(date)
@@ -9979,14 +10569,14 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         throw new HttpError(400, "Each student must appear exactly once in the attendance list.");
       }
       if (!ATTENDANCE_STATUSES.includes(status)) {
-        throw new HttpError(400, "Choose Present, Absent, Tardy, or Excused for each student.");
+        throw new HttpError(400, "Choose Present, Absent (CC or X), Tardy, or Excused for each student.");
       }
       if (record?.reason !== undefined && (typeof record.reason !== "string" || record.reason.length > 500)) {
         throw new HttpError(400, "Each absence reason must be text no longer than 500 characters.");
       }
       recordsByStudentId.set(studentId, {
         status,
-        reason: status === "Absent" || status === "Excused" ? reason : "",
+        reason: isAbsentAttendanceStatus(status) || status === "Excused" ? reason : "",
       });
     }
 
@@ -10655,6 +11245,18 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/favicon.png") {
+        const favicon = await fs.readFile(path.join(__dirname, "favicon.png"));
+        response.writeHead(200, {
+          "Content-Type": "image/png",
+          "Content-Length": favicon.length,
+          "Cache-Control": "public, max-age=86400",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(favicon);
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/assets/jspdf.umd.min.js") {
         const pdfLibrary = await fs.readFile(
           path.join(__dirname, "node_modules", "jspdf", "dist", "jspdf.umd.min.js"),
@@ -10866,6 +11468,165 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         const session = requireTeacherSession(request);
         sendJson(response, 200, await getTeacherProfile(session));
         return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/lesson-plan/daily-log-template") {
+        requireTeacherSession(request);
+        const language = url.searchParams.get("language") || "filipino";
+        sendJson(response, 200, await getDailyLessonLogTemplate(language));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/lesson-plan/daily-log-export") {
+        requireTeacherSession(request);
+        const { buffer, filename } = await createDailyLessonLogExcelExport(
+          await readJson(request, 2 * 1024 * 1024),
+        );
+        response.writeHead(200, {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(buffer);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/lesson-plan/source-preview") {
+        requireTeacherSession(request);
+        const uploads = await readLessonPlanSourceUploads(request);
+        const previewParts = [];
+        const lessonPlan = {
+          global_info: {
+            pamagat: "",
+            larangan: "",
+            teacher: "",
+            gradeSection: "",
+            sessionCount: "",
+            sanggunian: "",
+            aiDeclaration: "",
+            contentStandard: "",
+            performanceStandard: "",
+            learningCompetency: "",
+          },
+          sessions: {},
+        };
+        let previewLength = 0;
+        let truncated = false;
+
+        for (const upload of uploads) {
+          const remaining = MAX_LESSON_PLAN_SOURCE_PREVIEW_CHARS - previewLength;
+          const heading = `Source: ${upload.fileName}\n`;
+          if (remaining <= heading.length) {
+            truncated = true;
+            break;
+          }
+          const extracted = await extractLessonPlanSourceText(upload, remaining - heading.length);
+          const section = `${heading}${extracted.text}\n\n`;
+          previewParts.push(section.slice(0, remaining));
+          previewLength += Math.min(section.length, remaining);
+          truncated = truncated || extracted.truncated || section.length > remaining;
+
+          const parsed = parseLessonPlanSourceText(extracted.text);
+          for (const [field, value] of Object.entries(parsed.global_info)) {
+            if (!lessonPlan.global_info[field] && value) lessonPlan.global_info[field] = value;
+          }
+          for (const [sessionKey, fields] of Object.entries(parsed.sessions)) {
+            if (!lessonPlan.sessions[sessionKey]) lessonPlan.sessions[sessionKey] = fields;
+            else {
+              for (const [field, value] of Object.entries(fields)) {
+                if (!lessonPlan.sessions[sessionKey][field] && value) {
+                  lessonPlan.sessions[sessionKey][field] = value;
+                }
+              }
+            }
+          }
+        }
+
+        sendJson(response, 200, {
+          preview: previewParts.join(""),
+          sourceCount: uploads.length,
+          truncated,
+          lessonPlan,
+        });
+        return;
+      }
+
+      if (url.pathname === "/api/teacher-calendar/holidays" && request.method === "GET") {
+        requireTeacherSession(request);
+        const year = Number(url.searchParams.get("year"));
+        try {
+          sendJson(response, 200, await calendarStore.getHolidays(year));
+        } catch (error) {
+          if (error instanceof CalendarValidationError) throw new HttpError(400, error.message);
+          throw error;
+        }
+        return;
+      }
+
+      if (url.pathname === "/api/teacher-calendar/events") {
+        const session = requireTeacherSession(request);
+        try {
+          if (request.method === "GET") {
+            sendJson(response, 200, await calendarStore.listTasks(
+              session.userId,
+              url.searchParams.get("from") || "",
+              url.searchParams.get("to") || "",
+            ));
+            return;
+          }
+          if (request.method === "POST") {
+            sendJson(response, 201, await calendarStore.createTask(
+              session.userId,
+              await readJson(request),
+            ));
+            return;
+          }
+        } catch (error) {
+          if (error instanceof CalendarValidationError) throw new HttpError(400, error.message);
+          throw error;
+        }
+        throw new HttpError(405, "Method not allowed.");
+      }
+
+      const teacherCalendarTaskMatch = url.pathname.match(/^\/api\/teacher-calendar\/events\/([^/]+)$/);
+      if (teacherCalendarTaskMatch) {
+        const session = requireTeacherSession(request);
+        const taskId = decodeURIComponent(teacherCalendarTaskMatch[1]);
+        if (taskId.length > 100) throw new HttpError(400, "Invalid calendar task.");
+        try {
+          if (request.method === "PUT") {
+            const task = await calendarStore.updateTask(
+              session.userId,
+              taskId,
+              await readJson(request),
+            );
+            if (!task) throw new HttpError(404, "Calendar task not found.");
+            sendJson(response, 200, task);
+            return;
+          }
+          if (request.method === "PATCH") {
+            const data = await readJson(request);
+            const task = await calendarStore.setTaskDone(
+              session.userId,
+              taskId,
+              data && data.isDone,
+            );
+            if (!task) throw new HttpError(404, "Calendar task not found.");
+            sendJson(response, 200, task);
+            return;
+          }
+          if (request.method === "DELETE") {
+            const deleted = await calendarStore.deleteTask(session.userId, taskId);
+            if (!deleted) throw new HttpError(404, "Calendar task not found.");
+            sendJson(response, 200, { deleted: true });
+            return;
+          }
+        } catch (error) {
+          if (error instanceof CalendarValidationError) throw new HttpError(400, error.message);
+          throw error;
+        }
+        throw new HttpError(405, "Method not allowed.");
       }
 
       if (request.method === "PUT" && url.pathname === "/api/teacher/profile") {
@@ -11508,6 +12269,10 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
     } catch (error) {
       if (error instanceof HttpError) {
         sendJson(response, error.status, { error: error.message });
+        return;
+      }
+      if (error instanceof URIError) {
+        sendJson(response, 400, { error: "The request path contains invalid encoding." });
         return;
       }
       const referenceId = crypto.randomUUID();

@@ -17,6 +17,7 @@ const PORTAL_ENTRIES = new Map([
   ["parents", "parents"],
 ]);
 const STATIC_ASSETS = new Map([
+  ["/favicon.png", { filename: "favicon.png", contentType: "image/png" }],
   ["/icon.png", { filename: "icon.png", contentType: "image/png" }],
   ["/sf10-deped-seal.png", { filename: "sf10-deped-seal.png", contentType: "image/png" }],
   ["/sf10-deped-logo.gif", { filename: "sf10-deped-logo.gif", contentType: "image/gif" }],

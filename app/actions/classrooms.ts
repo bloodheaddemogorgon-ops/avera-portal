@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getCurrentUser } from "@/lib/current-user";
 import { portalRequest } from "@/lib/portal-api";
 
 export type Classroom = {
@@ -24,8 +24,8 @@ export type ClassroomInput = {
 // 3) let the API filter by Teacher User ID. Ownership is never taken from the arguments.
 
 export async function createClassroom(input: ClassroomInput): Promise<Classroom> {
-  const userId = await getCurrentUserId();
-  const { classroom } = await portalRequest<{ classroom: Classroom }>("/api/classrooms", userId, {
+  const identity = await getCurrentUser();
+  const { classroom } = await portalRequest<{ classroom: Classroom }>("/api/classrooms", identity, {
     method: "POST",
     body: input,
   });
@@ -34,16 +34,16 @@ export async function createClassroom(input: ClassroomInput): Promise<Classroom>
 }
 
 export async function listClassrooms(): Promise<Classroom[]> {
-  const userId = await getCurrentUserId();
-  const { classrooms } = await portalRequest<{ classrooms: Classroom[] }>("/api/classrooms", userId);
+  const identity = await getCurrentUser();
+  const { classrooms } = await portalRequest<{ classrooms: Classroom[] }>("/api/classrooms", identity);
   return classrooms;
 }
 
 export async function getClassroom(classId: string): Promise<Classroom> {
-  const userId = await getCurrentUserId();
+  const identity = await getCurrentUser();
   const { classroom } = await portalRequest<{ classroom: Classroom }>(
     `/api/classrooms/${encodeURIComponent(classId)}`,
-    userId,
+    identity,
   );
   return classroom;
 }
@@ -52,10 +52,10 @@ export async function updateClassroom(
   classId: string,
   changes: Partial<ClassroomInput>,
 ): Promise<Classroom> {
-  const userId = await getCurrentUserId();
+  const identity = await getCurrentUser();
   const { classroom } = await portalRequest<{ classroom: Classroom }>(
     `/api/classrooms/${encodeURIComponent(classId)}`,
-    userId,
+    identity,
     { method: "PATCH", body: changes },
   );
   revalidatePath("/dashboard");
@@ -63,7 +63,7 @@ export async function updateClassroom(
 }
 
 export async function deleteClassroom(classId: string): Promise<void> {
-  const userId = await getCurrentUserId();
-  await portalRequest(`/api/classrooms/${encodeURIComponent(classId)}`, userId, { method: "DELETE" });
+  const identity = await getCurrentUser();
+  await portalRequest(`/api/classrooms/${encodeURIComponent(classId)}`, identity, { method: "DELETE" });
   revalidatePath("/dashboard");
 }

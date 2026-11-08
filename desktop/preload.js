@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("gradePortal", {
   getAppVersion: () => ipcRenderer.invoke("app-version"),
   isPackaged: () => ipcRenderer.invoke("app-is-packaged"),
+  chooseTeacherPhoto: () => ipcRenderer.invoke("choose-teacher-photo"),
   saveRememberedLogin: (credentials) => ipcRenderer.invoke("remembered-login-save", credentials),
   updateRememberedPassword: (password) => ipcRenderer.invoke("remembered-login-update-password", password),
   clearRememberedLogin: () => ipcRenderer.invoke("remembered-login-clear"),

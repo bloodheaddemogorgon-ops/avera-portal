@@ -1,0 +1,226 @@
+{
+  "year": 2026,
+  "sourceName": "Philippine Proclamation No. 1006, s. 2025 and Proclamation No. 1189, s. 2026",
+  "holidays": [
+    {
+      "id": "ph-2026-01-01-new-years-day",
+      "date": "2026-01-01",
+      "title": "New Year's Day",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-02-17-chinese-new-year",
+      "date": "2026-02-17",
+      "title": "Chinese New Year",
+      "kind": "official",
+      "holidayType": "Special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-02-25-edsa-anniversary",
+      "date": "2026-02-25",
+      "title": "EDSA People Power Revolution Anniversary",
+      "kind": "official",
+      "holidayType": "Special working day",
+      "isNonWorking": false,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-03-20-eid-al-fitr",
+      "date": "2026-03-20",
+      "title": "Eid'l Fitr (Feast of Ramadhan)",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1189, s. 2026",
+      "sourceUrl": "https://pco.gov.ph/news_releases/proclamation-no-1189-s-2026-declaring-friday-20-march-2026-a-regular-holiday-throughout-the-country-in-observance-of-eidl-fitr-feast-of-ramadhan/"
+    },
+    {
+      "id": "ph-2026-04-02-maundy-thursday",
+      "date": "2026-04-02",
+      "title": "Maundy Thursday",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-04-03-good-friday",
+      "date": "2026-04-03",
+      "title": "Good Friday",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-04-04-black-saturday",
+      "date": "2026-04-04",
+      "title": "Black Saturday",
+      "kind": "official",
+      "holidayType": "Additional special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-04-09-day-of-valor",
+      "date": "2026-04-09",
+      "title": "Araw ng Kagitingan (Day of Valor)",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-05-01-labor-day",
+      "date": "2026-05-01",
+      "title": "Labor Day",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-06-12-independence-day",
+      "date": "2026-06-12",
+      "title": "Independence Day",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-08-21-ninoy-aquino-day",
+      "date": "2026-08-21",
+      "title": "Ninoy Aquino Day",
+      "kind": "official",
+      "holidayType": "Special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-08-31-national-heroes-day",
+      "date": "2026-08-31",
+      "title": "National Heroes Day",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-11-01-all-saints-day",
+      "date": "2026-11-01",
+      "title": "All Saints' Day",
+      "kind": "official",
+      "holidayType": "Special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-11-02-all-souls-day",
+      "date": "2026-11-02",
+      "title": "All Souls' Day",
+      "kind": "official",
+      "holidayType": "Additional special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-11-30-bonifacio-day",
+      "date": "2026-11-30",
+      "title": "Bonifacio Day",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-12-08-immaculate-conception",
+      "date": "2026-12-08",
+      "title": "Feast of the Immaculate Conception of Mary",
+      "kind": "official",
+      "holidayType": "Special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-12-24-christmas-eve",
+      "date": "2026-12-24",
+      "title": "Christmas Eve",
+      "kind": "official",
+      "holidayType": "Additional special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-12-25-christmas-day",
+      "date": "2026-12-25",
+      "title": "Christmas Day",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-12-30-rizal-day",
+      "date": "2026-12-30",
+      "title": "Rizal Day",
+      "kind": "official",
+      "holidayType": "Regular holiday",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    },
+    {
+      "id": "ph-2026-12-31-last-day-of-the-year",
+      "date": "2026-12-31",
+      "title": "Last Day of the Year",
+      "kind": "official",
+      "holidayType": "Special non-working day",
+      "isNonWorking": true,
+      "municipality": null,
+      "sourceName": "Proclamation No. 1006, s. 2025",
+      "sourceUrl": "https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html"
+    }
+  ]
+}

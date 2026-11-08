@@ -99,6 +99,11 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
       assert.match(apiResponse.headers.get("set-cookie"), /portal_session=shared/);
     }
 
+    const faviconResponse = await fetch(`${portalOrigins[0]}/favicon.png`);
+    assert.equal(faviconResponse.status, 200);
+    assert.match(faviconResponse.headers.get("content-type"), /^image\/png/);
+    assert.ok((await faviconResponse.arrayBuffer()).byteLength > 0);
+
     assert.equal(apiRequests.length, 2);
     assert.deepEqual(apiRequests.map(({ url }) => url), [
       "/api/health",

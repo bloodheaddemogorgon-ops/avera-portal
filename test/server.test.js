@@ -129,6 +129,85 @@ test("WHO BMI-for-age and Height-for-Age categories use LMS z-scores and request
   }).bmiCategory, "Not available"  );
 });
 
+test("installed app opens teacher profile pictures with the native file picker", async () => {
+  const [desktopMain, desktopPreload, portalPage] = await Promise.all([
+    fs.readFile(path.join(__dirname, "..", "desktop", "main.js"), "utf8"),
+    fs.readFile(path.join(__dirname, "..", "desktop", "preload.js"), "utf8"),
+    fs.readFile(path.join(__dirname, "..", "index.html"), "utf8"),
+  ]);
+  assert.ok(desktopMain.includes('ipcMain.handle("choose-teacher-photo", async (event) => {'));
+  assert.ok(desktopMain.includes("dialog.showOpenDialog(mainWindow, {"));
+  assert.ok(desktopPreload.includes('chooseTeacherPhoto: () => ipcRenderer.invoke("choose-teacher-photo")'));
+  assert.ok(portalPage.includes("window.gradePortal.chooseTeacherPhoto()"));
+  assert.ok(portalPage.includes("await uploadTeacherPhoto(new Blob([bytes],{type:selection.contentType}));"));
+  assert.ok(portalPage.includes('$("teacherProfilePhotoFile").click();'));
+});
+
+test("dashboard display filter offers specific categories without an Everything option", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(portalPage, /<label for="dashboardDisplayFilter">Show on dashboard<\/label>/);
+  const dropdownMarkup = portalPage.match(/<select id="dashboardDisplayFilter">[\s\S]*?<\/select>/)[0];
+  const optionCategories = [...dropdownMarkup.matchAll(/<option value="([^"]+)">/g)]
+    .map(([, category]) => category)
+  assert.doesNotMatch(dropdownMarkup, /<option value="all">/);
+  assert.equal(optionCategories[0], "overview");
+  const dashboardCategories = new Set(
+    [...portalPage.matchAll(/data-dashboard-category="([^"]+)"/g)].map(([, category]) => category),
+  );
+  assert.ok(optionCategories.every((category) => dashboardCategories.has(category)));
+  const filterSource = portalPage.match(/function applyDashboardDisplayFilter\(\)\{[\s\S]*?\n    \}/);
+  assert.ok(filterSource, "dashboard category filter helper exists");
+
+  const items = [
+    { category: "overview", group: "hero" },
+    { category: "overview", group: "metrics" },
+    { category: "attendance", group: "metrics" },
+    { category: "academic", group: "metrics" },
+    { category: "academic", group: "mps-deadline" },
+    { category: "deadlines", group: "metrics" },
+    { category: "deadlines", group: "mps-deadline" },
+    { category: "wellbeing", group: "cards" },
+  ].map((item) => ({
+    ...item,
+    hidden: false,
+    getAttribute(name) {
+      return name === "data-dashboard-category" ? this.category : null;
+    },
+  }));
+  const group = (name) => ({
+    hidden: false,
+    querySelector() {
+      return items.some((item) => item.group === name && !item.hidden) ? {} : null;
+    },
+  });
+  const elements = {
+    dashboardDisplayFilter: { value: "overview" },
+    dashboardMetricGrid: group("metrics"),
+    dashboardMpsDeadlineRow: group("mps-deadline"),
+  };
+  const applyFilter = vm.runInNewContext(`${filterSource[0]}; applyDashboardDisplayFilter`, {
+    $: (id) => elements[id],
+    document: { querySelectorAll: () => items },
+  });
+
+  applyFilter();
+  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), ["overview", "overview"]);
+  assert.equal(elements.dashboardMetricGrid.hidden, false);
+  assert.equal(elements.dashboardMpsDeadlineRow.hidden, true);
+
+  elements.dashboardDisplayFilter.value = "academic";
+  applyFilter();
+  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), ["academic", "academic"]);
+  assert.equal(elements.dashboardMetricGrid.hidden, false);
+  assert.equal(elements.dashboardMpsDeadlineRow.hidden, false);
+
+  elements.dashboardDisplayFilter.value = "wellbeing";
+  applyFilter();
+  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), ["wellbeing"]);
+  assert.equal(elements.dashboardMetricGrid.hidden, true);
+  assert.equal(elements.dashboardMpsDeadlineRow.hidden, true);
+});
+
 test("login rate limiter enforces account and source-address limits over a rolling window", () => {
   const limiter = createAuthRateLimiter({
     accountFailureLimit: 2,
@@ -348,11 +427,19 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
   const layoutFunction = portalPage.match(
     /function getTarpaulinPrintLayout\(dimensions,paperSize,orientation,requestedGrid\)\{[\s\S]*?\n    \}/,
   );
+  const visibleAreaFunction = portalPage.match(
+    /function getTarpaulinPdfVisibleArea\(layout,offsetX,offsetY\)\{[\s\S]*?\n    \}/,
+  );
+  const rightCutOffsetFunction = portalPage.match(
+    /function getTarpaulinRightCutOffsetMm\(layout,visibleArea,hasNextColumn\)\{[\s\S]*?\n    \}/,
+  );
   const zoomFunction = portalPage.match(
     /function updateTarpaulinZoom\(\)\{[\s\S]*?\n    \}/,
   );
   assert.ok(previewFunction, "Tarpapel paper preview renderer exists");
   assert.ok(layoutFunction, "Tarpapel preview uses the print layout calculator");
+  assert.ok(visibleAreaFunction, "Tarpapel preview uses the visible tile area");
+  assert.ok(rightCutOffsetFunction, "Tarpapel preview calculates a half-inch right-tail cut");
   assert.ok(zoomFunction, "Tarpapel zoom controls resize the paper thumbnails");
   assert.match(
     portalPage,
@@ -371,6 +458,7 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
       value: "",
       src: "",
       textContent: "",
+      setAttribute() {},
       appendChild(child) { this.children.push(child); return child; },
     };
     return element;
@@ -379,7 +467,7 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
   const sheetCount = createElement("span");
   const elements = { tarpaulinSheetGuides: guides, tarpaulinSheetCount: sheetCount };
   const preview = vm.runInNewContext(
-    `${layoutFunction[0]}\n${previewFunction[0]}\nupdateTarpaulinSheetPreview(dimensions)`,
+    `${visibleAreaFunction[0]}\n${rightCutOffsetFunction[0]}\n${layoutFunction[0]}\n${previewFunction[0]}\nupdateTarpaulinSheetPreview(dimensions)`,
     {
       $: (id) => elements[id],
       document: { createElement },
@@ -413,6 +501,23 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
   assert.equal(firstSheet.children[0].children[1].className, "tarpaulin-sheet-printable-boundary");
   assert.equal(firstSheet.children[1].textContent, "1");
   assert.equal(sheetCount.textContent, "4 sheets · 2 × 2");
+  for (const index of [1, 3]) {
+    const rightmostSheet = guides.children[index];
+    const cutMarker = rightmostSheet.children.find((child) =>
+      child.className === "tarpaulin-sheet-tail-cut");
+    assert.ok(cutMarker, `rightmost preview sheet ${index + 1} shows a cut marker`);
+    const expectedLeft = (25.4 + preview.bannerWidthMm - preview.strideWidthMm + 12.7)
+      / preview.paperWidthMm * 100;
+    assert.ok(Math.abs(parseFloat(cutMarker.style.left) - expectedLeft) < 1e-10);
+    assert.ok(cutMarker.innerHTML.includes("<svg"), "preview cut marker includes scissors");
+  }
+  for (const index of [0, 2]) {
+    assert.equal(
+      guides.children[index].children.some((child) => child.className === "tarpaulin-sheet-tail-cut"),
+      false,
+      "interior columns use their existing join marks instead of a tail cut",
+    );
+  }
 
   const zoomPreview = createElement("div");
   const zoomGuides = createElement("div");
@@ -434,6 +539,40 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
     assert.equal(zoomGuides.style.properties["--tarpaulin-sheet-min-width"], expectedMinWidth);
     assert.equal(zoomPreview.style.width, "100%");
   }
+});
+
+test("Tarpapel controls and preview can be resized with pointer or keyboard", async () => {
+  const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(portalPage, /id="tarpaulinResizeHandle" role="separator" tabindex="0"/);
+  assert.match(portalPage, /tarpaulinResizeHandle\.addEventListener\("pointerdown"/);
+  assert.match(portalPage, /if\(event\.key==="ArrowLeft"\)nextWidth-=24/);
+  assert.match(portalPage, /else if\(event\.key==="Home"\)nextWidth=limits\.min/);
+  assert.match(portalPage, /else if\(event\.key==="End"\)nextWidth=limits\.max/);
+  assert.match(portalPage, /@media\(max-width:760px\)\{[\s\S]*?\.tarpaulin-resize-handle\{display:none\}/);
+
+  const resizeLimits = portalPage.match(/function tarpaulinResizeLimits\(\)\{[\s\S]*?\n    \}/);
+  const setControlsWidth = portalPage.match(/function setTarpaulinControlsWidth\(width\)\{[\s\S]*?\n    \}/);
+  assert.ok(resizeLimits && setControlsWidth, "Tarpaulin splitter sizing helpers exist");
+  const editorStyle = { properties: {}, setProperty(name, value) { this.properties[name] = value; } };
+  const handleAttributes = {};
+  const resizeContext = vm.createContext({
+    width: 700,
+    tarpaulinEditor: {
+      getBoundingClientRect: () => ({ width: 800 }),
+      style: editorStyle,
+    },
+    tarpaulinResizeHandle: {
+      getBoundingClientRect: () => ({ width: 18 }),
+      setAttribute(name, value) { handleAttributes[name] = value; },
+    },
+  });
+  vm.runInContext(`${resizeLimits[0]}\n${setControlsWidth[0]}\nsetTarpaulinControlsWidth(width)`, resizeContext);
+  assert.equal(editorStyle.properties["--tarpaulin-controls-width"], "75.25%");
+  assert.equal(handleAttributes["aria-valuenow"], "602");
+  resizeContext.width = 100;
+  vm.runInContext("setTarpaulinControlsWidth(width)", resizeContext);
+  assert.equal(editorStyle.properties["--tarpaulin-controls-width"], "35%");
+  assert.equal(handleAttributes["aria-valuenow"], "280");
 });
 
 test("Spin wheel syncs active roster pupils by first name", async () => {
@@ -512,8 +651,12 @@ test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks
   const bottomCutOffsetFunction = portalPage.match(
     /function getTarpaulinBottomCutOffsetMm\(layout,visibleArea,hasNextRow\)\{[\s\S]*?\n    \}/,
   );
+  const rightCutOffsetFunction = portalPage.match(
+    /function getTarpaulinRightCutOffsetMm\(layout,visibleArea,hasNextColumn\)\{[\s\S]*?\n    \}/,
+  );
   const helpers = [
     portalPage.match(/function getTarpaulinPdfVisibleArea\(layout,offsetX,offsetY\)\{[\s\S]*?\n    \}/),
+    portalPage.match(/function getTarpaulinRightCutOffsetMm\(layout,visibleArea,hasNextColumn\)\{[\s\S]*?\n    \}/),
     bottomCutOffsetFunction,
     portalPage.match(/function appendTarpaulinCutLine\(page,direction,positionMm,startMm,lengthMm,isSeamTrim\)\{[\s\S]*?\n    \}/),
     portalPage.match(/function appendTarpaulinScissor\(page,xMm,yMm,rotation\)\{[\s\S]*?\n    \}/),
@@ -569,15 +712,16 @@ test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks
   });
   assert.deepEqual(pageMarks.map(({ lines, scissors }) => [lines.length, scissors.length]), [
     [6, 2],
-    [4, 1],
     [5, 2],
-    [3, 1],
+    [5, 2],
+    [4, 2],
   ]);
   assert.deepEqual(
     pageMarks[1].lines.filter((line) => line.className.includes("vertical")).map((line) => line.style.left),
-    ["25.4mm"],
+    ["25.4mm", "279.2mm"],
   );
-  const bottomCutLine = pageMarks[3].lines.find((line) => line.className.includes("seam-trim"));
+  const bottomCutLine = pageMarks[3].lines.find((line) =>
+    line.className.includes("horizontal") && line.className.includes("seam-trim"));
   const bottomScissor = pageMarks[3].scissors[0];
   assert.ok(bottomCutLine, "bottom blank space gets a segmented trim line");
   assert.ok(Math.abs(parseFloat(bottomCutLine.style.top) - (25.4 + (300 - 171.9) + 12.7)) < 1e-10);
@@ -587,6 +731,12 @@ test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks
     pageMarks[3].lines.some((line) => line.className.includes("horizontal") && line.style.top === "197.3mm"),
     false,
   );
+  const rightTailCut = pageMarks[3].lines.find((line) =>
+    line.className.includes("vertical") && line.className.includes("seam-trim"));
+  assert.ok(rightTailCut, "rightmost blank space gets a segmented trim line");
+  assert.ok(Math.abs(parseFloat(rightTailCut.style.left) - (25.4 + 241.1 + 12.7)) < 1e-10);
+  assert.equal(pageMarks[3].scissors[1].style.left, rightTailCut.style.left);
+  assert.equal(pageMarks[3].scissors[1].style.transform, "translate(-50%,-50%) rotate(90deg)");
 });
 
 test("Tarpapel PDF download preserves the selected image fit and tiled page layout", async () => {
@@ -620,6 +770,7 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
   assert.match(portalPage, /function drawTarpaulinPdfScissor\(doc,centerX,centerY,rotation\)/);
   assert.match(portalPage, /var markerScale=1\.8/);
   assert.match(portalPage, /\.tarpaulin-print-scissors\{width:5\.5mm;height:5\.5mm/);
+  assert.match(portalPage, /\.tarpaulin-print-page-number\{font:bold 14pt Arial,sans-serif/);
   assert.match(portalPage, /tarpaulinPrintMarginsMm=\{top:25\.4,right:12\.7,bottom:12\.7,left:25\.4\},tarpaulinOverlapMm=0/);
   assert.match(portalPage, /\.className="tarpaulin-print-page-number"/);
   assert.match(portalPage, /\.className="tarpaulin-print-scissors"/);
@@ -629,14 +780,18 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
   const bottomCutOffsetFunction = portalPage.match(
     /function getTarpaulinBottomCutOffsetMm\(layout,visibleArea,hasNextRow\)\{[\s\S]*?\n    \}/,
   );
+  const rightCutOffsetFunction = portalPage.match(
+    /function getTarpaulinRightCutOffsetMm\(layout,visibleArea,hasNextColumn\)\{[\s\S]*?\n    \}/,
+  );
   const pdfScissors = portalPage.match(
     /function drawTarpaulinPdfScissor\(doc,centerX,centerY,rotation\)\{[\s\S]*?\n    \}/,
   );
   assert.ok(pdfMarks, "PDF page margin markings exist");
   assert.ok(bottomCutOffsetFunction, "PDF bottom cut position accounts for blank paper space");
+  assert.ok(rightCutOffsetFunction, "PDF right cut position accounts for blank paper space");
   assert.ok(pdfScissors, "PDF scissors are drawn as vector paths");
   const markingHelpers = vm.runInNewContext(
-    `${bottomCutOffsetFunction[0]}\n${pdfScissors[0]}\n${pdfMarks[0]}\n({ drawTarpaulinPdfPageMarks, drawTarpaulinPdfScissor })`,
+    `${bottomCutOffsetFunction[0]}\n${rightCutOffsetFunction[0]}\n${pdfScissors[0]}\n${pdfMarks[0]}\n({ drawTarpaulinPdfPageMarks, drawTarpaulinPdfScissor })`,
     { tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 } },
   );
   const markedPdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [297, 210] });
@@ -659,8 +814,11 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
 
   const seamLines = [];
   const scissorCalls = [];
+  let pageNumberFont;
+  let pageNumberFontSize;
+  let pageNumberColor;
   const seamMarkingHelpers = vm.runInNewContext(
-    `${bottomCutOffsetFunction[0]}\n${pdfMarks[0]}\n({ drawTarpaulinPdfPageMarks })`,
+    `${bottomCutOffsetFunction[0]}\n${rightCutOffsetFunction[0]}\n${pdfMarks[0]}\n({ drawTarpaulinPdfPageMarks })`,
     {
       tarpaulinPrintMarginsMm: { top: 25.4, right: 12.7, bottom: 12.7, left: 25.4 },
       drawTarpaulinPdfScissor: (...args) => scissorCalls.push(args),
@@ -671,9 +829,9 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
     setLineWidth() {},
     setLineDashPattern() {},
     line(...args) { seamLines.push(args); },
-    setFont() {},
-    setFontSize() {},
-    setTextColor() {},
+    setFont(...args) { pageNumberFont = args; },
+    setFontSize(size) { pageNumberFontSize = size; },
+    setTextColor(...args) { pageNumberColor = args; },
     text() {},
   };
   for (const { hasNextColumn, hasNextRow, visibleArea, lineCount, scissorRotations } of [
@@ -682,6 +840,9 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
     { hasNextColumn: true, hasNextRow: false, visibleArea: sampleArea, lineCount: 4, scissorRotations: [90] },
     { hasNextColumn: false, hasNextRow: false, visibleArea: sampleArea, lineCount: 2, scissorRotations: [] },
     { hasNextColumn: false, hasNextRow: false, visibleArea: { width: sampleArea.width, height: 130 }, lineCount: 3, scissorRotations: [0] },
+    { hasNextColumn: false, hasNextRow: false, visibleArea: { width: 130, height: sampleArea.height }, lineCount: 3, scissorRotations: [90] },
+    { hasNextColumn: false, hasNextRow: false, visibleArea: { width: sampleArea.width - 12.6, height: sampleArea.height }, lineCount: 2, scissorRotations: [] },
+    { hasNextColumn: false, hasNextRow: false, visibleArea: { width: sampleArea.width - 12.7, height: sampleArea.height }, lineCount: 3, scissorRotations: [90] },
   ]) {
     seamLines.length = 0;
     scissorCalls.length = 0;
@@ -700,7 +861,14 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
       assert.equal(scissorCalls[0][1], 12.7);
       assert.equal(scissorCalls[0][2], seamLines[1][1]);
     }
+    if (!hasNextColumn && !hasNextRow && visibleArea.width === 130) {
+      assert.ok(Math.abs(seamLines[2][0] - (25.4 + visibleArea.width) - 12.7) < 1e-10);
+      assert.equal(scissorCalls[0][1], seamLines[2][0]);
+    }
   }
+  assert.deepEqual(pageNumberFont, ["helvetica", "bold"]);
+  assert.ok(pageNumberFontSize >= 12, "PDF page numbers use a readable font size");
+  assert.ok(pageNumberColor.every((channel) => channel <= 51), "PDF page numbers use a dark, high-contrast color");
 
   const imagePlacement = portalPage.match(
     /function getTarpaulinPdfImagePlacement\(imageWidth,imageHeight,bannerWidthMm,bannerHeightMm,fit\)\{[\s\S]*?\n    \}/,
@@ -777,6 +945,218 @@ test("portal frontend serves the local jsPDF browser bundle", async (context) =>
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /^text\/javascript/);
   assert.ok((await response.arrayBuffer()).byteLength > 100_000);
+});
+
+test("lesson-plan source preview extracts PDF, Word, and Excel files without persisting uploads", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "lesson-plan-source-preview-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  const server = createServer({ databasePath, migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const pdf = new jsPDF();
+  pdf.text("PDF source preview text", 10, 10);
+  pdf.text("PDF Column A", 10, 25);
+  pdf.text("PDF Column B", 100, 25);
+  pdf.text("PDF Row 2 A", 10, 35);
+  pdf.text("PDF Row 2 B", 100, 35);
+  const pdfBuffer = Buffer.from(pdf.output("arraybuffer"));
+
+  const wordArchive = new JSZip();
+  wordArchive.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  wordArchive.file("_rels/.rels", `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  const wordParagraphs = [
+    "Word source preview text",
+    "Pamagat ng Aralin: Fractions",
+    "Larangan ng Pagkatuto: Mathematics",
+    "Mga Sanggunian: Teacher's Guide pp. 10-12",
+    "Session 1 Objectives: Identify equivalent fractions",
+    "Session 1 Flow: Use fraction strips in pairs",
+    "Session 1 Assessment: Complete the exit ticket",
+    "Session 2 Objectives: Compare fractions",
+    "Session 2 Flow: Compare fraction models",
+    "Session 2 Assessment: Explain one comparison",
+  ].map((text) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`).join("");
+  const wordTable = [
+    ["Word Column A", "Word Column B", "Word Column C", "Word Column D"],
+    ["Word Row 2 A", "Word Row 2 B", "", "Word Row 2 D"],
+  ].map((row) => `<w:tr>${row.map((text) =>
+    `<w:tc><w:p>${text ? `<w:r><w:t>${text}</w:t></w:r>` : ""}</w:p></w:tc>`,
+  ).join("")}</w:tr>`).join("");
+  wordArchive.file("word/document.xml", `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${wordParagraphs}<w:tbl>${wordTable}</w:tbl><w:sectPr/></w:body></w:document>`);
+  const wordBuffer = await wordArchive.generateAsync({ type: "nodebuffer" });
+
+  const excelWorkbook = new ExcelJS.Workbook();
+  excelWorkbook.addWorksheet("Sources").addRows([
+    ["Excel source preview text"],
+    ["Excel Column A", "Excel Column B", "Excel Column C", "Excel Column D"],
+    ["Excel Row 2 A", "Excel Row 2 B", "", "Excel Row 2 D"],
+  ]);
+  const excelBuffer = Buffer.from(await excelWorkbook.xlsx.writeBuffer());
+
+  const unauthenticatedForm = new FormData();
+  unauthenticatedForm.append("sources", new Blob([pdfBuffer], { type: "application/pdf" }), "source.pdf");
+  const unauthenticatedTemplate = await fetch(`${baseUrl}/api/lesson-plan/daily-log-template`);
+  assert.equal(unauthenticatedTemplate.status, 401);
+  const unauthenticatedExcelExport = await fetch(`${baseUrl}/api/lesson-plan/daily-log-export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language: "filipino", rows: [{ cells: [{ text: "SESSION 1" }] }] }),
+  });
+  assert.equal(unauthenticatedExcelExport.status, 401);
+  const unauthorized = await fetch(`${baseUrl}/api/lesson-plan/source-preview`, {
+    method: "POST",
+    body: unauthenticatedForm,
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const registration = await fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Source Preview Teacher",
+      email: "source.preview@example.com",
+      password: "secure-pass-123",
+      role: "teacher",
+      extra: "Source Preview Room",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+  const templateResponse = await fetch(`${baseUrl}/api/lesson-plan/daily-log-template`, {
+    headers: { Cookie: cookie },
+  });
+  const templateResult = await templateResponse.json();
+  assert.equal(templateResponse.status, 200, templateResult.error);
+  assert.ok(templateResult.html.startsWith("<table>"));
+  assert.doesNotMatch(templateResult.html, /Republic of the Philippines|Department of Education|\(Region\)|\(DIVISION\)|\(NAME OF SCHOOL\)|\(SCHOOL ID\)|\(TERM\)|\(MONTH/);
+  assert.ok(templateResult.html.includes("Pamagat ng Aralin"));
+  assert.ok(templateResult.html.includes("Kasanayang Pampagkatuto at Pamantayan ng Kurikulum"));
+  assert.ok(templateResult.html.includes("<strong>SESYON 5</strong>"));
+  assert.ok(templateResult.html.includes("<strong>(BIYERNES)</strong>"));
+  assert.ok(templateResult.html.endsWith("</table>"));
+  assert.doesNotMatch(templateResult.html, /Inihanda ni:|Sinuri at Nirepaso nina:/);
+  const filipinoSessionRow = templateResult.html.match(/<tr(?:\s[^>]*)?>[\s\S]*?<\/tr>/g)
+    .find((row) => row.includes("<strong>SESYON 1</strong>"));
+  assert.equal((filipinoSessionRow.match(/<td(?:\s[^>]*)?>/g) || []).length, 6);
+  assert.doesNotMatch(filipinoSessionRow, /colspan=/);
+  assert.match(filipinoSessionRow, /class="daily-lesson-log-session-row"/);
+  assert.match(templateResult.html, /<td colspan="5">/);
+
+  const dailyLogExportResponse = await fetch(`${baseUrl}/api/lesson-plan/daily-log-export`, {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      language: "filipino",
+      period: { term: "1", week: "2", dateFrom: "2026-07-06", dateTo: "2026-07-10", year: "2026-2027" },
+      rows: [
+        {
+          cells: [{ text: "Pamagat ng Aralin" }, { text: "Fractions", span: 5 }],
+          sessionHeader: false,
+        },
+        {
+          cells: [
+            { text: "SESSION 1" }, { text: "SESSION 2" }, { text: "SESSION 3" },
+            { text: "SESSION 4" }, { text: "SESSION 5" }, { text: "SESSION 6" },
+          ],
+          sessionHeader: true,
+        },
+      ],
+    }),
+  });
+  assert.equal(dailyLogExportResponse.status, 200);
+  assert.match(dailyLogExportResponse.headers.get("content-type"), /spreadsheetml\.sheet/);
+  assert.match(dailyLogExportResponse.headers.get("content-disposition"), /Daily_Lesson_Log_Term_1_Week_2_2026-2027\.xlsx/);
+  const dailyLogWorkbook = new ExcelJS.Workbook();
+  await dailyLogWorkbook.xlsx.load(Buffer.from(await dailyLogExportResponse.arrayBuffer()));
+  const dailyLogSheet = dailyLogWorkbook.getWorksheet("DLL");
+  assert.equal(dailyLogSheet.getCell("A1").value, "DAILY LESSON LOG");
+  assert.match(dailyLogSheet.getCell("A2").value, /TERM: 1.+WEEK: 2.+YEAR: 2026-2027/);
+  assert.equal(dailyLogSheet.getCell("A3").value, "Pamagat ng Aralin");
+  assert.equal(dailyLogSheet.getCell("B3").value, "Fractions");
+  assert.ok(dailyLogSheet.getCell("B3").isMerged);
+  assert.equal(dailyLogSheet.getCell("A4").value, "SESSION 1");
+  assert.equal(dailyLogSheet.getCell("F4").value, "SESSION 6");
+  const invalidDailyLogExport = await fetch(`${baseUrl}/api/lesson-plan/daily-log-export`, {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      language: "filipino",
+      rows: [{ cells: [{ text: "Not valid", span: 7 }] }],
+    }),
+  });
+  assert.equal(invalidDailyLogExport.status, 400);
+
+  const englishTemplateResponse = await fetch(
+    `${baseUrl}/api/lesson-plan/daily-log-template?language=english`,
+    { headers: { Cookie: cookie } },
+  );
+  const englishTemplateResult = await englishTemplateResponse.json();
+  assert.equal(englishTemplateResponse.status, 200, englishTemplateResult.error);
+  assert.ok(englishTemplateResult.html.startsWith("<table>"));
+  assert.doesNotMatch(englishTemplateResult.html, /Republic of the Philippines|Department of Education|\(Region\)|\(DIVISION\)|\(SCHOOL\)|\(School ID\)|\(TERM\)|\(MONTH/);
+  assert.ok(englishTemplateResult.html.includes("Learning Competency and Curriculum Standards"));
+  assert.ok(englishTemplateResult.html.includes("<strong>SESSION 5</strong>"));
+  assert.ok(englishTemplateResult.html.includes("<strong>(FRIDAY)</strong>"));
+  assert.ok(englishTemplateResult.html.endsWith("</table>"));
+  assert.doesNotMatch(englishTemplateResult.html, /Prepared by:|Checked and Reviewed by:/);
+  const englishSessionRow = englishTemplateResult.html.match(/<tr(?:\s[^>]*)?>[\s\S]*?<\/tr>/g)
+    .find((row) => row.includes("<strong>SESSION 1</strong>"));
+  assert.equal((englishSessionRow.match(/<td(?:\s[^>]*)?>/g) || []).length, 6);
+  assert.doesNotMatch(englishSessionRow, /colspan=/);
+  const invalidTemplateResponse = await fetch(
+    `${baseUrl}/api/lesson-plan/daily-log-template?language=spanish`,
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal(invalidTemplateResponse.status, 400);
+  const formData = new FormData();
+  formData.append("sources", new Blob([pdfBuffer], { type: "application/pdf" }), "source.pdf");
+  formData.append("sources", new Blob([wordBuffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), "source.docx");
+  formData.append("sources", new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "source.xlsx");
+  const previewResponse = await fetch(`${baseUrl}/api/lesson-plan/source-preview`, {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: formData,
+  });
+  const previewResult = await previewResponse.json();
+  assert.equal(previewResponse.status, 200, previewResult.error);
+  assert.equal(previewResult.sourceCount, 3);
+  assert.match(previewResult.preview, /PDF source preview text/);
+  assert.match(previewResult.preview, /PDF Column A\tPDF Column B/);
+  assert.match(previewResult.preview, /PDF Row 2 A\tPDF Row 2 B/);
+  assert.match(previewResult.preview, /Word source preview text/);
+  assert.match(previewResult.preview, /Word Column A\tWord Column B\tWord Column C\tWord Column D/);
+  assert.match(previewResult.preview, /Word Row 2 A\tWord Row 2 B\t\tWord Row 2 D/);
+  assert.match(previewResult.preview, /Excel source preview text/);
+  assert.match(previewResult.preview, /Excel Column A\tExcel Column B\tExcel Column C\tExcel Column D/);
+  assert.match(previewResult.preview, /Excel Row 2 A\tExcel Row 2 B\t\tExcel Row 2 D/);
+  assert.equal(previewResult.lessonPlan.global_info.pamagat, "Fractions");
+  assert.equal(previewResult.lessonPlan.global_info.larangan, "Mathematics");
+  assert.equal(previewResult.lessonPlan.global_info.sanggunian, "Teacher's Guide pp. 10-12");
+  assert.equal(previewResult.lessonPlan.global_info.sessionCount, "2");
+  assert.equal(previewResult.lessonPlan.sessions.session_1.objectives, "Identify equivalent fractions");
+  assert.equal(previewResult.lessonPlan.sessions.session_1.flow, "Use fraction strips in pairs");
+  assert.equal(previewResult.lessonPlan.sessions.session_1.assessment, "Complete the exit ticket");
+  assert.equal(previewResult.lessonPlan.sessions.session_2.objectives, "Compare fractions");
+  assert.equal(previewResult.truncated, false);
+
+  const invalidForm = new FormData();
+  invalidForm.append("sources", new Blob(["unsupported"], { type: "text/plain" }), "source.txt");
+  const invalidResponse = await fetch(`${baseUrl}/api/lesson-plan/source-preview`, {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: invalidForm,
+  });
+  assert.equal(invalidResponse.status, 400);
 });
 
 test("SF 10 is available to teachers in the Term Grade menu", async () => {
@@ -930,6 +1310,7 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
+      "Teacher profile information is organized into Basic Info, School Info, Background Information, and SALN Records tabs.",
       "SF 10 now synchronizes the selected learner's three term grades from SF 9, including Music and Arts and Physical Education and Health.",
       "School and classroom details are filled from the teacher profile for the matching classified grade.",
       "SF 10 final ratings, General Average, and Passed/Failed remarks are generated from SF 9 grades and locked against manual edits.",
@@ -956,7 +1337,16 @@ test("E-Class score validation enforces each highest-possible-score limit", asyn
   assert.match(validateScore("1", ""), /positive highest possible score/);
   assert.equal(validateScore("", "10"), "", "an empty score remains allowed");
   assert.match(portalPage, /scoreInput\.value=scoreInput\.dataset\.lastValidScore\|\|""/);
-  assert.match(portalPage, /input\.value="";\s*input\.dataset\.lastValidScore=""/);
+  const maximumEditHandler = portalPage.match(
+    /var maximumCell=event\.target\.closest\("th\[data-highest-possible-score\]"\);([\s\S]*?)\n      var scoreInput=/,
+  );
+  assert.ok(maximumEditHandler, "highest-score edits have a dedicated input handler");
+  assert.doesNotMatch(
+    maximumEditHandler[1],
+    /input\.value\s*=\s*["']["']/,
+    "editing a maximum must not clear learner scores that exceed it",
+  );
+  assert.match(maximumEditHandler[1], /were kept unchanged/);
 });
 
 test("E-Class term grades follow the DO 015 s. 2026 worked examples and transition rules", () => {
@@ -1643,6 +2033,17 @@ test("teacher profile marks the assigned advisory grade and section as read-only
   const portalPage = await fs.readFile(path.join(__dirname, "..", "index.html"), "utf8");
   const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
 
+  assert.match(portalPage, /id="teacherProfileTabs" role="tablist"/);
+  assert.match(portalPage, /id="teacherProfileBasicTab"[^>]*>BASIC INFO<\/button>/);
+  assert.match(portalPage, /id="teacherProfileSchoolTab"[^>]*>SCHOOL INFO<\/button>/);
+  assert.match(portalPage, /id="teacherProfileBackgroundTab"[^>]*>BACKGROUND INFORMATION<\/button>/);
+  assert.match(portalPage, /id="teacherProfileSalnTab"[^>]*>SALN RECORDS<\/button>/);
+  assert.match(portalPage, /id="teacherProfileBasicPanel" role="tabpanel"[\s\S]*?id="teacherProfileName"/);
+  assert.match(portalPage, /id="teacherProfileSchoolPanel" role="tabpanel"[\s\S]*?id="teacherProfileSchoolName"/);
+  assert.match(portalPage, /id="teacherProfileBackgroundPanel" role="tabpanel"[^>]*hidden><\/div>/);
+  assert.match(portalPage, /id="teacherProfileSalnPanel" role="tabpanel"[^>]*hidden><\/div>/);
+  assert.match(portalPage, /function selectTeacherProfileTab\(tab\)/);
+  assert.match(portalPage, /firstInvalidField\.reportValidity\(\)/);
   assert.match(portalPage, /<label for="teacherProfileGrade">Grade <span class="advisory-field-badge">View only<\/span><\/label><input id="teacherProfileGrade"[^>]*readonly/);
   assert.match(portalPage, /<label for="teacherProfileSection">Advisory section <span class="advisory-field-badge">Locked<\/span><\/label><input id="teacherProfileSection"[^>]*readonly/);
   assert.match(portalPage, /id="teacherProfileSectionHint">This is the advisory section assigned to your classroom\./);
@@ -2546,10 +2947,15 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /\.topbar\{display:flex;position:sticky;top:0;z-index:10/);
   assert.match(portalPage, /\.menu-toggle\{display:grid;flex:0 0 44px;width:44px;height:44px;place-items:center;position:relative;z-index:11/);
   assert.ok(portalPage.indexOf('data-logout>Sign out</button>') < portalPage.indexOf('class="sidebar-footer-icon"'));
+  assert.match(portalPage, /<link rel="icon" type="image\/png" href="\/favicon\.png">/);
   const sidebarIconResponse = await fetch(`${baseUrl}/icon.png`);
   assert.equal(sidebarIconResponse.status, 200);
   assert.match(sidebarIconResponse.headers.get("content-type"), /^image\/png/);
   assert.ok((await sidebarIconResponse.arrayBuffer()).byteLength > 0);
+  const faviconResponse = await fetch(`${baseUrl}/favicon.png`);
+  assert.equal(faviconResponse.status, 200);
+  assert.match(faviconResponse.headers.get("content-type"), /^image\/png/);
+  assert.ok((await faviconResponse.arrayBuffer()).byteLength > 0);
   const sf10SealResponse = await fetch(`${baseUrl}/sf10-deped-seal.png`);
   assert.equal(sf10SealResponse.status, 200);
   assert.match(sf10SealResponse.headers.get("content-type"), /^image\/png/);
@@ -3067,7 +3473,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /class="attendance-guidance" aria-label="Attendance recording guidance"[\s\S]*?Daily attendance marks[\s\S]*?Blank means Present[\s\S]*?CC\/X for Absent/);
   assert.doesNotMatch(portalPage, /Use Quick check to select a school day/);
   assert.match(portalPage, /select\.add\(new Option\("X","AbsentX"\)\)/);
-  assert.match(portalPage, /select\.value==="AbsentX"\?"Absent":select\.value/);
+  assert.match(portalPage, /var selectedStatus=select\.value/);
+  assert.match(portalPage, /var selectedTotalStatus=selectedStatus==="AbsentX"\?"Absent":selectedStatus/);
   assert.match(portalPage, /attendance-reason-input/);
   assert.match(portalPage, /noClassMark\.textContent="NC"/);
   assert.match(portalPage, /\.attendance-table td\.attendance-no-class-cell\{background:#e6e6e6/);
@@ -3079,8 +3486,309 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.ok(portalPage.indexOf('id="navTools"') > portalPage.indexOf('id="navSettings"'));
   assert.match(portalPage, /id="navTools"[^>]*>[\s\S]*?Tools/);
   assert.match(portalPage, /id="settingsPage"/);
-  assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?id="tarpaulinTab"[\s\S]*?Tarpapel Maker[\s\S]*?id="spinWheelTab"[\s\S]*?Spin the Wheel[\s\S]*?id="moreToolsTab"/);
+  assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?label for="toolsSelector">Choose a tool[\s\S]*?id="toolsSelector"[^>]*aria-controls="tarpaulinPanel"[\s\S]*?value="tarpaulinPanel" selected>Tarpapel Maker[\s\S]*?value="calendarPanel">Calendar[\s\S]*?value="moreToolsPanel">More tools/);
+  assert.doesNotMatch(portalPage, /<option value="lessonPlanPanel">Lesson Plan Generator<\/option>/);
+  assert.doesNotMatch(portalPage, /id="spinWheelTab"/);
+  assert.match(portalPage, /var panelIds=\["tarpaulinPanel","lessonPlanPanel","calendarPanel","moreToolsPanel"\]/);
+  assert.match(portalPage, /id="lessonPlanPanel" aria-labelledby="lessonPlanPanelTitle" hidden>[\s\S]*?id="lessonPlanFilipinoTab"[\s\S]*?id="lessonPlanEnglishTab"/);
+  assert.match(portalPage, /<label for="lessonPlanModeSelect">Lesson plan type<\/label>/);
+  assert.match(portalPage, /<select id="lessonPlanModeSelect">[\s\S]*?<option value="lesson-plan">Lesson Plan \(1 Session Only\)<\/option>[\s\S]*?<option value="daily-lesson-log">Daily Lesson Log - \(Multiple Sessions\)<\/option>[\s\S]*?<\/select>/);
+  assert.match(portalPage, /\$\("lessonPlanModeSelect"\)\.addEventListener\("change",function\(\)\{selectLessonPlanMode\(this\.value\)\}\)/);
+  assert.ok(portalPage.includes('id="dailyLessonLogDocumentPanel" aria-label="Daily Lesson Log" hidden>'));
+  assert.ok(portalPage.includes('id="dailyLessonLogDocument" contenteditable="false"'));
+  assert.ok(portalPage.includes('id="dailyLessonLogFilipinoTab" type="button" aria-pressed="true">Filipino template</button>'));
+  assert.ok(portalPage.includes('id="dailyLessonLogEnglishTab" type="button" aria-pressed="false">English template</button>'));
+  assert.ok(portalPage.includes('id="dailyLessonLogExcel" type="button" disabled>Download Excel</button>'));
+  assert.ok(portalPage.includes('id="dailyLessonLogPrint" type="button" disabled>Print Preview</button>'));
+  assert.match(portalPage, /async function downloadDailyLessonLogExcel\(\)[\s\S]*?\/api\/lesson-plan\/daily-log-export/);
+  assert.match(portalPage, /\$\("dailyLessonLogExcel"\)\.addEventListener\("click",downloadDailyLessonLogExcel\)/);
+  assert.match(portalPage, /Table rows keep their cells in tab-separated columns, including blank cells/);
+  assert.match(portalPage, /\.lesson-plan-source-preview textarea\{[^}]*font-family:ui-monospace[^}]*tab-size:4;white-space:pre/);
+  assert.ok(portalPage.includes('id="dailyLessonLogPreviewDialog" aria-labelledby="dailyLessonLogPreviewTitle"'));
+  assert.match(portalPage, /function openDailyLessonLogPrintPreview\(\)[\s\S]*?replaceDailyLessonLogSourceDropdownsWithText\(preview\)[\s\S]*?showModal\(\)/);
+  assert.match(portalPage, /\$\("dailyLessonLogPrint"\)\.addEventListener\("click",openDailyLessonLogPrintPreview\)/);
+  assert.match(portalPage, /\$\("dailyLessonLogPreviewPrint"\)\.addEventListener\("click",printDailyLessonLogFromPreview\)/);
+  assert.match(portalPage, /enableDailyLessonLogDragToScroll\(\$\("dailyLessonLogPreviewContent"\)\)/);
+  const dragScrollSource = portalPage.match(
+    /function enableDailyLessonLogDragToScroll\(container\)\{[\s\S]*?\n    \}/,
+  );
+  assert.ok(dragScrollSource, "DLL print preview supports drag-to-scroll");
+  const enableDailyLessonLogDragToScroll = new Function(`return (${dragScrollSource[0]})`)();
+  const dragHandlers = {};
+  const capturedPointers = new Set();
+  const dragClasses = new Set();
+  const dragContainer = {
+    scrollWidth: 1200,
+    clientWidth: 800,
+    scrollHeight: 1000,
+    clientHeight: 600,
+    scrollLeft: 40,
+    scrollTop: 30,
+    addEventListener: (type, handler) => { dragHandlers[type] = handler; },
+    setPointerCapture: (pointerId) => capturedPointers.add(pointerId),
+    hasPointerCapture: (pointerId) => capturedPointers.has(pointerId),
+    releasePointerCapture: (pointerId) => capturedPointers.delete(pointerId),
+    classList: {
+      add: (name) => dragClasses.add(name),
+      remove: (name) => dragClasses.delete(name),
+    },
+  };
+  enableDailyLessonLogDragToScroll(dragContainer);
+  let dragPreventedDefault = false;
+  dragHandlers.pointerdown({
+    pointerType: "mouse",
+    button: 0,
+    isPrimary: true,
+    pointerId: 7,
+    clientX: 200,
+    clientY: 200,
+    target: { closest: () => null },
+    preventDefault: () => { dragPreventedDefault = true; },
+  });
+  dragHandlers.pointermove({ pointerId: 7, clientX: 170, clientY: 180 });
+  assert.equal(dragContainer.scrollLeft, 70);
+  assert.equal(dragContainer.scrollTop, 50);
+  assert.equal(dragPreventedDefault, true);
+  assert.ok(dragClasses.has("is-dragging"));
+  dragHandlers.pointerup({ pointerId: 7 });
+  assert.equal(capturedPointers.has(7), false);
+  assert.equal(dragClasses.has("is-dragging"), false);
+  const captureCount = capturedPointers.size;
+  dragHandlers.pointerdown({
+    pointerType: "mouse",
+    button: 0,
+    isPrimary: true,
+    pointerId: 8,
+    clientX: 200,
+    clientY: 200,
+    target: { closest: () => "button" },
+    preventDefault: () => {},
+  });
+  assert.equal(capturedPointers.size, captureCount, "dragging should not capture interactions on controls");
+  assert.match(portalPage, /id="dailyLessonLogSourceHint">Choose a source session from the dropdown inside each SESSION column/);
+  assert.match(portalPage, /function renderDailyLessonLogSessionOptions\(lessonPlan,content\)[\s\S]*?daily-lesson-log-session-source-select[\s\S]*?Choose source session/);
+  assert.match(portalPage, /id="dailyLessonLogTerm">[\s\S]*?<option value="1">Term 1<\/option>[\s\S]*?<option value="3">Term 3<\/option>/);
+  assert.match(portalPage, /label for="dailyLessonLogWeek">WEEK<\/label>[\s\S]*?id="dailyLessonLogWeek"/);
+  assert.match(portalPage, /id="dailyLessonLogDateFrom" type="date"/);
+  assert.match(portalPage, /id="dailyLessonLogDateTo" type="date"/);
+  assert.match(portalPage, /id="dailyLessonLogYear"/);
+  assert.match(portalPage, /\.lesson-plan-workspace\.daily-lesson-log-active\{width:min\(100%,1280px\);padding:clamp\(16px,3vw,32px\)\}/);
+  assert.match(portalPage, /\.lesson-plan-workspace\.daily-lesson-log-active>\.lesson-plan-sources\{display:grid;min-width:0\}/);
+  assert.match(portalPage, /\.lesson-plan-workspace\.daily-lesson-log-active \.lesson-plan-sources-header\{align-items:flex-start;flex-wrap:wrap\}/);
+  assert.match(portalPage, /\.daily-lesson-log-document-panel\{display:grid;min-width:0;gap:14px\}/);
+  assert.match(portalPage, /\.daily-lesson-log-action-row\{display:grid;min-width:0;grid-template-columns:minmax\(0,1fr\) auto/);
+  assert.match(portalPage, /@media\(max-width:720px\)\{\.daily-lesson-log-action-row,\.daily-lesson-log-source-controls\{grid-template-columns:minmax\(0,1fr\)\}\}/);
+  assert.match(portalPage, /for\(var week=1;week<=12;week\+\+\)/);
+  assert.match(portalPage, /function dailyLessonLogPeriodStorageKey\(language\)[\s\S]*?daily-log-period-/);
+  assert.match(portalPage, /DATE FROM: "\+\(values\.dateFrom\|\|"Not selected"\)[\s\S]*?YEAR: "\+values\.year/);
+  assert.match(portalPage, /initializeDailyLessonLogPeriod\(\);[\s\S]*?updateLessonPlanModeView\(\)/);
+  const sourceValueExtractorSource = portalPage.match(/function extractDailyLessonLogSourceValues\(preview,fieldLabels\)\{[\s\S]*?\n    \}/);
+  assert.ok(sourceValueExtractorSource, "DLL source-field extraction is present");
+  const extractDailyLessonLogSourceValues = new Function(`return (${sourceValueExtractorSource[0]})`)();
+  assert.deepEqual(
+    extractDailyLessonLogSourceValues([
+      "Source: science.xlsx",
+      "Lesson Title\tLIFE CYCLES OF MAMMALS, BIRDS, AND PLANTS",
+      "Topic\tThe Water Cycle",
+      "Photosynthesis",
+      "Learning Objectives\tIdentify the stages of water movement",
+      "Source: science.pdf",
+      "Lesson Title LIFE CYCLES OF MAMMALS, BIRDS, AND PLANTS Learning Area Science",
+      "Source: empty.docx",
+      "Lesson Title",
+      "Topic: The Water Cycle",
+    ].join("\n"),"Lesson\\s+Title"),
+    ["LIFE CYCLES OF MAMMALS, BIRDS, AND PLANTS"],
+  );
+  assert.deepEqual(
+    extractDailyLessonLogSourceValues([
+      "Source: science.xlsx",
+      "Lesson Title\tLIFE CYCLES OF MAMMALS, BIRDS, AND PLANTS",
+      "Learning Area\tSCIENCE",
+      "Topic\tThe Water Cycle",
+      "Source: filipino.docx",
+      "Larangan ng Pagkatuto\tAgham",
+      "Learning Objectives\tTukuyin ang mga yugto ng siklo ng tubig",
+    ].join("\n"),"Learning\\s+Area|Subject|Larangan\\s+ng\\s+Pagkatuto|Asignatura"),
+    ["SCIENCE", "Agham"],
+  );
+  assert.match(portalPage, /function extractDailyLessonLogTopicCandidates\(preview\)[\s\S]*?extractDailyLessonLogSourceValues\(preview,"Lesson\\\\s\+Title"\)/);
+  assert.match(portalPage, /function extractDailyLessonLogLearningAreaCandidates\(preview\)[\s\S]*?extractDailyLessonLogSourceValues\(preview,"Learning\\\\s\+Area\|Subject/);
+  assert.match(portalPage, /function initializeDailyLessonLogSourceDropdowns\(content\)[\s\S]*?table tr:first-child td:nth-child\(2\)[\s\S]*?table tr:nth-child\(2\) td:nth-child\(2\)/);
+  assert.match(portalPage, /function replaceDailyLessonLogSourceDropdownsWithText\(content\)[\s\S]*?sourceSelect\.value[\s\S]*?\(SUBJECT\)/);
+  assert.match(portalPage, /updateDailyLessonLogSourceDropdowns\(result\.preview,dailyLessonLogParsedSources\)/);
+  const intentionsSyncSource = portalPage.match(
+    /function syncDailyLessonLogIntentions\(content\)\{[\s\S]*?\n    \}/,
+  );
+  assert.ok(intentionsSyncSource, "DLL Intentions row sync is present");
+  const intentionsCell = {
+    guidance: "Meaningful learning experiences are learner-centered.",
+    children: [],
+    querySelector: function(){return this.children.find((child)=>child.className==="daily-lesson-log-intentions-context")||null},
+    appendChild: function(child){child.parentNode=this;this.children.push(child);return child},
+  };
+  const intentionTitleSelect = { value: "Fractions" };
+  const intentionSubjectSelect = { value: "Mathematics" };
+  const intentionsContent = {
+    rows: [{cells:[{textContent:"Intensyon. (Intention)"},intentionsCell]}],
+    querySelector: function(selector){
+      if(selector==="select.daily-lesson-log-topic-select")return intentionTitleSelect;
+      if(selector==="select.daily-lesson-log-learning-area-select")return intentionSubjectSelect;
+      return null;
+    },
+  };
+  const findIntentionsRow = (content,pattern)=>content.rows.find((row)=>pattern.test(row.cells[0].textContent))||null;
+  const syncDailyLessonLogIntentions = new Function(
+    "findDailyLessonLogRow","dailyLessonLogLanguage","document",
+    `return (${intentionsSyncSource[0]})`,
+  )(
+    findIntentionsRow,
+    "english",
+    {createElement:()=>({
+      className:"",
+      contentEditable:"true",
+      textContent:"",
+      remove:function(){this.parentNode.children=this.parentNode.children.filter((child)=>child!==this)},
+    })},
+  );
+  assert.equal(syncDailyLessonLogIntentions(intentionsContent), true);
+  const intentionsContext = intentionsCell.children[0];
+  assert.equal(intentionsContext.textContent, "Selected lesson: Fractions  |  Subject: Mathematics");
+  assert.equal(intentionsCell.guidance, "Meaningful learning experiences are learner-centered.");
+  assert.equal(syncDailyLessonLogIntentions(intentionsContent), false, "unchanged source selections do not duplicate context");
+  intentionSubjectSelect.value = "Science";
+  assert.equal(syncDailyLessonLogIntentions(intentionsContent), true);
+  assert.equal(intentionsContext.textContent, "Selected lesson: Fractions  |  Subject: Science");
+  intentionTitleSelect.value = "";
+  intentionSubjectSelect.value = "";
+  assert.equal(syncDailyLessonLogIntentions(intentionsContent), true);
+  assert.equal(intentionsCell.children.length, 0, "clearing selections removes only generated context");
+  assert.equal(intentionsCell.guidance, "Meaningful learning experiences are learner-centered.");
+  assert.match(portalPage, /function populateDailyLessonLogSession\(sessionKey,targetSessionNumber\)[\s\S]*?session\.objectives[\s\S]*?session\.flow[\s\S]*?session\.assessment[\s\S]*?row\.cells\[sessionNumber\]/);
+  assert.match(portalPage, /setDailyLessonLogSourceSelect\(learningAreaSelect,globalInfo\.larangan\)[\s\S]*?syncDailyLessonLogIntentions\(content\)/);
+  assert.match(portalPage, /event\.target\.matches\("\.daily-lesson-log-source-select"\)\)\{[\s\S]*?syncDailyLessonLogIntentions\(\$\("dailyLessonLogDocument"\)\)/);
+  assert.match(portalPage, /populateDailyLessonLogSession\(event\.target\.value,targetCell\.cellIndex\)/);
+  assert.match(portalPage, /\.daily-lesson-log-document \.daily-lesson-log-source-select,\.daily-lesson-log-document \.daily-lesson-log-session-source-select\{display:block;width:100%;min-width:0/);
+  assert.match(portalPage, /function syncDailyLessonLogProfileValues\(content\)[\s\S]*?var teacherName=\$\("teacherProfileName"\)\.value\.trim\(\);[\s\S]*?var sectionSelect=\$\("teacherSubjectSection"\);[\s\S]*?activeSection=sectionOption\?sectionOption\.textContent\.trim\(\)/);
+  assert.match(portalPage, /lessonPlanProfileFieldsSynced/);
+  assert.match(portalPage, /syncDailyLessonLogProfileValues\(safeContent\)/);
+  assert.match(portalPage, /function loadDailyLessonLogTemplate\(language\)[\s\S]*?api\("\/api\/lesson-plan\/daily-log-template\?language="\+encodeURIComponent\(language\)\)[\s\S]*?sanitizeDailyLessonLogHtml\(html\)/);
+  assert.match(portalPage, /function removeDailyLessonLogSchoolHeader\(content\)[\s\S]*?Republic of the Philippines\|Department of Education[\s\S]*?paragraph\.remove\(\)/);
+  assert.match(portalPage, /function removeDailyLessonLogSignatures\(content\)[\s\S]*?Prepared by:[\s\S]*?paragraph\.remove\(\)/);
+  assert.match(portalPage, /removeDailyLessonLogSchoolHeader\(safeContent\);[\s\S]*?documentPanel\.replaceChildren\(safeContent\)/);
+  assert.match(portalPage, /removeDailyLessonLogSignatures\(safeContent\);[\s\S]*?documentPanel\.replaceChildren\(safeContent\)/);
+  assert.match(portalPage, /function lockDailyLessonLogFirstColumn\(content\)[\s\S]*?row\.cells\[0\]\.contentEditable="false"/);
+  assert.match(portalPage, /lockDailyLessonLogFirstColumn\(safeContent\);[\s\S]*?documentPanel\.replaceChildren\(safeContent\)/);
+  assert.match(portalPage, /function dailyLessonLogDraftKey\(language\)[\s\S]*?lessonPlanStorageKey\("daily-log-document-"\+language,"daily-lesson-log"\)/);
+  const dailyLessonLogSanitizer = portalPage.match(/function sanitizeDailyLessonLogHtml\(html\)\{[\s\S]*?\n    \}/)[0];
+  assert.doesNotMatch(dailyLessonLogSanitizer, /"DIV"/);
+  assert.match(dailyLessonLogSanitizer, /daily-lesson-log-session-row/);
+  assert.match(dailyLessonLogSanitizer, /daily-lesson-log-period-summary/);
+  assert.match(dailyLessonLogSanitizer, /daily-lesson-log-intentions-context/);
+  assert.match(dailyLessonLogSanitizer, /data:image\\\/\(\?:png\|jpeg\|gif\|webp\);base64/);
+  assert.match(portalPage, /\.daily-lesson-log-document td:first-child\{width:27%;background:#f7f8fa/);
+  assert.match(portalPage, /\.daily-lesson-log-document td:empty\{height:74px\}/);
+  assert.match(portalPage, /function saveDailyLessonLogDraft\(\)[\s\S]*?dailyLessonLogDraftKey\(dailyLessonLogLanguage\)/);
+  assert.match(portalPage, /function updateLessonPlanModeView\(\)[\s\S]*?daily-lesson-log-active[\s\S]*?loadDailyLessonLogTemplate\(\)/);
+  assert.match(portalPage, /function lessonPlanStorageKey\(language,mode\)[\s\S]*?mode==="daily-lesson-log"\?":daily-lesson-log":""/);
+  assert.match(portalPage, /function configureLessonPlanSessionCounts\(\)[\s\S]*?count\.min=isDailyLessonLog\?"2":"1"[\s\S]*?count\.max=isDailyLessonLog\?"60":"1"[\s\S]*?count\.disabled=!isDailyLessonLog/);
+  assert.match(portalPage, /function selectLessonPlanMode\(mode\)[\s\S]*?lessonPlanForms\(\)\.forEach\(saveLessonPlanForm\)[\s\S]*?form\.reset\(\)[\s\S]*?restoreLessonPlanForm\(form\)/);
+  assert.match(portalPage, /class="lesson-plan-mode-field"/);
+  assert.match(portalPage, /body\.lesson-plan-printing[^}]*\.lesson-plan-mode-field/);
+  assert.match(portalPage, /<select id="filipinoLearningArea" name="learningArea"><option value="">Pumili ng asignatura<\/option><\/select>/);
+  assert.match(portalPage, /<select id="englishLearningArea" name="learningArea"><option value="">Select a learning area<\/option><\/select>/);
+  assert.doesNotMatch(portalPage, /<input id="(?:filipino|english)LearningArea"/);
+  assert.match(portalPage, /function syncLessonPlanLearningAreaOptions\(selectId,placeholder\)[\s\S]*?getTeacherSubjectsForSection\(teacherSubjectSection\)[\s\S]*?subjects\.forEach\(function\(subject\)\{select\.add\(new Option\(subject,subject\)\)\}\)[\s\S]*?select\.disabled=subjects\.length===0/);
+  assert.match(portalPage, /function syncLessonPlanLearningAreas\(\)[\s\S]*?"filipinoLearningArea","Pumili ng asignatura"[\s\S]*?"englishLearningArea","Select a learning area"/);
+  assert.match(portalPage, /function getTeacherSubjectsForSection\(section\)[\s\S]*?return key\?sectionSubjects\[key\]:\[\]/);
+  assert.match(portalPage, /teacherSubjectSection=this\.value;[\s\S]*?syncLessonPlanLearningAreas\(\)/);
+  assert.match(portalPage, /sectionSubjects=result\.sectionSubjects;[\s\S]*?syncLessonPlanLearningAreas\(\)/);
+  assert.match(portalPage, /id="lessonPlanAddSource" type="button" aria-controls="lessonPlanSourceFiles">Upload source<\/button>/);
+  assert.match(portalPage, /id="lessonPlanSourceFiles" type="file" accept="[^"]*\.pdf[^"]*\.doc[^"]*\.docx[^"]*\.xls[^"]*\.xlsx[^"]*" multiple hidden/);
+  assert.match(portalPage, /id="lessonPlanGenerateSources" type="button" disabled>Generate text preview<\/button>/);
+  assert.match(portalPage, /id="lessonPlanRemoveAllSources" type="button" hidden>Remove all<\/button>/);
+  assert.match(portalPage, /Up to 100 files and 100 MB combined[\s\S]*?cleared when you reload or sign out/);
+  assert.match(portalPage, /function addLessonPlanSources\(files\)[\s\S]*?maxTotalSourceSize=100\*1024\*1024/);
+  assert.match(portalPage, /function generateLessonPlanSourcePreview\(\)[\s\S]*?\/api\/lesson-plan\/source-preview/);
+  assert.match(portalPage, /lessonPlanSourcesClear/);
+  assert.doesNotMatch(portalPage, /gracedesk-lesson-plan-sources|openLessonPlanSourcesDatabase/);
+  assert.match(portalPage, /lessonPlanSourcesList/);
+  assert.match(portalPage, /id="lessonPlanFilipinoForm" data-language="filipino"[\s\S]*?name="learningObjectives"[\s\S]*?name="formativeAssessment"/);
+  assert.match(portalPage, /id="lessonPlanEnglishForm" data-language="english"[\s\S]*?name="learningObjectives"[\s\S]*?name="formativeAssessment"/);
+  assert.match(portalPage, /\.lesson-plan-field textarea\{min-height:84px;max-height:420px;overflow-y:auto;resize:none;line-height:1\.5\}/);
+  assert.match(portalPage, /function resizeLessonPlanTextarea\(textarea\)[\s\S]*?textarea\.style\.height=Math\.min\(textarea\.scrollHeight\+borderHeight,420\)\+"px"/);
+  assert.match(portalPage, /if\(event\.target\.matches\("textarea"\)\)resizeLessonPlanTextarea\(event\.target\)/);
+  assert.match(portalPage, /id="filipinoTeacherName" name="teacherName" maxlength="160" readonly/);
+  assert.match(portalPage, /id="filipinoGradeSection" name="gradeSection" maxlength="100" readonly/);
+  assert.match(portalPage, /id="filipinoPreparedBy" name="preparedBy" readonly/);
+  assert.match(portalPage, /id="filipinoPreparedPosition" name="preparedPosition" readonly/);
+  assert.match(portalPage, /id="filipinoReviewedBy" name="reviewedBy" readonly/);
+  assert.match(portalPage, /id="filipinoNotedBy" name="notedBy" readonly/);
+  assert.match(portalPage, /id="englishTeacherName" name="teacherName" maxlength="160" readonly/);
+  assert.match(portalPage, /id="englishGradeSection" name="gradeSection" maxlength="100" readonly/);
+  assert.match(portalPage, /id="englishPreparedBy" name="preparedBy" readonly/);
+  assert.match(portalPage, /id="englishPreparedPosition" name="preparedPosition" readonly/);
+  assert.match(portalPage, /id="englishReviewedBy" name="reviewedBy" readonly/);
+  assert.match(portalPage, /id="englishNotedBy" name="notedBy" readonly/);
+  assert.match(portalPage, /<label for="englishNotedBy">School Head's Position<\/label>/);
+  assert.match(portalPage, /function syncEnglishLessonPlanProfileFields\(\)/);
+  assert.match(portalPage, /lessonPlanTeacherName\.value=teacherName\.value\.trim\(\)/);
+  assert.match(portalPage, /filipinoTeacherName\.value=teacherName\.value\.trim\(\)/);
+  assert.match(portalPage, /filipinoGradeSection\.value=lessonPlanGradeSection\.value/);
+  assert.match(portalPage, /lessonPlanPreparedBy\.value=teacherName\.value\.trim\(\)/);
+  assert.match(portalPage, /filipinoPreparedBy\.value=teacherName\.value\.trim\(\)/);
+  assert.match(portalPage, /lessonPlanPreparedPosition\.value=teacherPosition\.value\.trim\(\)/);
+  assert.match(portalPage, /filipinoPreparedPosition\.value=teacherPosition\.value\.trim\(\)/);
+  assert.match(portalPage, /lessonPlanReviewedBy\.value=schoolHead\.value\.trim\(\)/);
+  assert.match(portalPage, /filipinoReviewedBy\.value=schoolHead\.value\.trim\(\)/);
+  assert.match(portalPage, /lessonPlanNotedBy\.value=schoolHeadPosition\.value\.trim\(\)/);
+  assert.match(portalPage, /filipinoNotedBy\.value=schoolHeadPosition\.value\.trim\(\)/);
+  assert.match(portalPage, /"GRADE "\+gradeValue\.toUpperCase\(\)\+\(sectionValue\?"-"\+sectionValue\.toUpperCase\(\):""\)/);
+  assert.match(portalPage, /select\.value=teacherSubjectSection;[\s\S]*?syncEnglishLessonPlanProfileFields\(\)/);
+  assert.match(portalPage, /function lessonPlanStorageKey\(language,mode\)[\s\S]*?gracedesk-ilaw-v1:/);
+  assert.match(portalPage, /function restoreLessonPlanForm\(form\)[\s\S]*?function saveLessonPlanForm\(form\)/);
+  assert.match(portalPage, /if\(panelId==="calendarPanel"\)loadTeacherCalendar\(\)/);
+  assert.match(portalPage, /selectToolPanel\("calendarPanel",true\)/);
+  assert.match(portalPage, /id="calendarPanel" aria-labelledby="teacherCalendarHeading" hidden>[\s\S]*?id="teacherCalendarGrid"/);
+  assert.match(portalPage, /id="teacherCalendarMunicipality"/);
+  assert.match(portalPage, /id="teacherCalendarMonthView"[\s\S]*?id="teacherCalendarWeekView"/);
+  assert.match(portalPage, /id="spinWheelPanel" hidden/);
+  assert.match(portalPage, /id="topbarCalendarToggle"[^>]*aria-controls="topbarCalendarPopover"[^>]*aria-expanded="false"/);
+  assert.match(portalPage, /id="topbarCalendarPopover" role="dialog"[^>]*hidden>[\s\S]*?id="topbarMiniCalendarGrid"[\s\S]*?id="topbarMiniCalendarClose"[^>]*>Close calendar[\s\S]*?id="topbarMiniCalendarOpen"[^>]*>Open calendar/);
+  assert.match(portalPage, /id="topbarCalendarHolidayHeading">Holidays this month[\s\S]*?id="topbarCalendarHolidayList"/);
+  assert.match(portalPage, /id="topbarCalendarTaskHeading">Tasks on selected date[\s\S]*?id="topbarMiniCalendarTaskList"/);
+  assert.match(portalPage, /\.topbar-calendar-day\.has-task::after\{left:calc\(50% \+ 3px\);background:#2563eb\}/);
+  assert.match(portalPage, /function topbarMiniCalendarVisibleRange\(\)[\s\S]*?lastVisibleDate\.setDate\(lastVisibleDate\.getDate\(\)\+41\)/);
+  assert.match(portalPage, /function syncTopbarMiniCalendarTasks\(forceRefresh\)[\s\S]*?api\("\/api\/teacher-calendar\/events\?from="/);
+  assert.match(portalPage, /var visibleTasks=miniCalendarTaskRangeKey===visibleRange\.key\?miniCalendarTasks:\[\]/);
+  assert.match(portalPage, /\.topbar-calendar-day\.has-deadline:not\(\.has-holiday\)\{background:color-mix\(in srgb,var\(--topbar-calendar-deadline-color\) 13%,var\(--card\)\)\}/);
+  assert.match(portalPage, /\.topbar-calendar-day\.has-holiday\.is-local-holiday:not\(\.is-official-holiday\):not\(\.has-deadline\)\{background:color-mix\(in srgb,#7c3aed 13%,var\(--card\)\)\}/);
+  assert.match(portalPage, /function syncTopbarCalendarHolidays\(year\)[\s\S]*?api\("\/api\/teacher-calendar\/holidays\?year="\+year\)/);
+  assert.match(portalPage, /holiday\.kind==="official"[\s\S]*?holiday\.kind==="local"/);
+  assert.match(portalPage, /id="topbarCalendarBadge"[^>]*hidden/);
+  assert.match(portalPage, /id="topbarCalendarDeadlineHeading">Pending deadlines[\s\S]*?id="topbarDeadlineList"/);
+  assert.match(portalPage, /completeButton\.textContent="Mark done"[\s\S]*?rescheduleButton\.textContent="Reschedule"/);
+  assert.match(portalPage, /task\.date\)\s*<=3/);
+  assert.match(portalPage, /for\(var dayOffset=0;dayOffset<42;dayOffset\+\+\)[\s\S]*?miniCalendarGrid\.appendChild\(dayButton\)/);
+  assert.match(portalPage, /\$\("topbarMiniCalendarOpen"\)\.onclick=function\(\)\{[\s\S]*?showDashboardPage\("tools"\)[\s\S]*?selectToolPanel\("calendarPanel",true\)/);
   assert.match(portalPage, /\$\("navTools"\)\.onclick=function\(\)\{showDashboardPage\("tools"\)\}/);
+  assert.ok(portalPage.indexOf('id="navDashboard"') < portalPage.indexOf('id="navStudents"'));
+  assert.match(portalPage, /<title>GraceDesk · Teach, Track, Thrive\.<\/title>/);
+  assert.match(portalPage, /document\.title=portalName\+" · "\+\(isParentsEntry\?"GraceDesk":"Teach, Track, Thrive\."\)/);
+  assert.match(portalPage, /id="navInventory" type="button" disabled aria-label="Inventory, temporarily unavailable" title="Inventory is temporarily unavailable"/);
+  assert.match(portalPage, /id="dashboardPage" aria-labelledby="dashboardTitle" hidden>[\s\S]*?id="dashboardActiveCount"[\s\S]*?id="dashboardOpenCalendar"/);
+  assert.match(portalPage, /async function enter\(user\)\{[\s\S]*?if\(user\.role==="teacher"\)\{[\s\S]*?showDashboardPage\("dashboard"\);[\s\S]*?\}else\{/);
+  assert.match(portalPage, /function loadDashboardOverview\(\)\{\s*initializeDashboard\(\);\s*\}/);
+  assert.match(portalPage, /var initializeDashboard=\(function\(\)\{[\s\S]*?function dashboardSvgEl\(name,attrs,text\)/);
+  assert.match(portalPage, /function refreshDashboardData\(\)[\s\S]*?\/api\/attendance\/summary[\s\S]*?\/api\/grades\/summary[\s\S]*?\/api\/math-assessments/);
+  assert.match(portalPage, /dashboardErrors\[key\]=error&&error\.message/);
+  assert.match(portalPage, /id="dashboardReadingLevels"[\s\S]*?id="dashboardRmaTrend"[\s\S]*?id="dashboardLowStockList"/);
+  assert.match(portalPage, /id="dashboardMpsYearHeading">Whole-year MPS by subject[\s\S]*?id="dashboardMpsYearChart"[\s\S]*?id="dashboardDeadlinesHeading">Upcoming deadlines/);
+  assert.match(portalPage, /async function dashboardLoadYearMps\(version\)[\s\S]*?getTeacherSubjectsForSection\(reportSection\)[\s\S]*?\/api\/e-class\/record"\+query/);
+  assert.match(portalPage, /Term 1–3 · "\+typeLabel\+" · Mean Percentage Score/);
+  assert.match(portalPage, /svg\.setAttribute\("role","img"\)[\s\S]*?svg\.setAttribute\("aria-label",label\)/);
+  assert.match(portalPage, /\/\* ==== DASHBOARD v2 ==== \*\//);
+  assert.match(portalPage, /\$\("dashboardOpenCalendar"\)\.onclick=function\(\)\{[\s\S]*?showDashboardPage\("tools"\)[\s\S]*?setActiveToolPanel\("calendarPanel"\)/);
   assert.match(portalPage, /id="uploadTarpaulinImage"[^>]*>[\s\S]*?Upload a picture/);
   assert.match(portalPage, /id="tarpaulinImageInput"[^>]*type="file"[^>]*accept="image\/\*"/);
   assert.match(portalPage, /id="tarpaulinUnit"[\s\S]*?<option value="cm">cm<\/option><option value="in">in<\/option>/);
@@ -6236,6 +6944,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
     remarks: "",
   }));
   monthlyRecords[0].attendance[0] = "Present";
+  monthlyRecords[0].attendance[1] = "AbsentX";
   monthlyRecords[0].attendance[attendanceDates.length - 1] = "Absent";
   monthlyRecords[0].reasons[attendanceDates.length - 1] = "Medical appointment";
   monthlyRecords[0].remarks = "Transfer information";
@@ -6261,16 +6970,27 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(updatedMonth.status, 200);
   const updatedMonthResult = await updatedMonth.json();
   assert.equal(updatedMonthResult.students[0].attendance[0], "Tardy");
+  assert.equal(updatedMonthResult.students[0].attendance[1], "AbsentX");
   assert.equal(updatedMonthResult.students[0].attendance[attendanceDates.length - 1], "Absent");
   assert.equal(updatedMonthResult.students[0].reasons[attendanceDates.length - 1], "Flu");
   assert.equal(updatedMonthResult.students[1].attendance.every((status) => status === ""), true);
   assert.equal(updatedMonthResult.students[0].remarks, "Follow-up required");
   assert.equal(updatedMonthResult.students[0].gender, "Female");
+  const savedMarksSummaryResponse = await fetch(`${baseUrl}/api/attendance/summary`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(savedMarksSummaryResponse.status, 200);
+  const savedMarksSummary = await savedMarksSummaryResponse.json();
+  assert.equal(
+    savedMarksSummary.students.find(({ id }) => id === addedStudent.student.id).months[attendanceMonth].absent,
+    2,
+    "X and CC are both counted as absent",
+  );
   const sf2WorkbookBuffer = await createSF2Upload(attendanceMonth, [
     {
       name: addedStudent.student.name,
       gender: addedStudent.student.gender,
-      marks: { 1: "CC", 2: "h" },
+      marks: { 1: "x", 2: "CC" },
       remarks: "Medical appointment",
     },
     {
@@ -6301,7 +7021,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
     { headers: { Cookie: teacherCookie } },
   );
   const importedSF2Month = await importedSF2MonthResponse.json();
-  assert.deepEqual(importedSF2Month.students[0].attendance.slice(0, 3), ["Absent", "Absent", "Present"]);
+  assert.deepEqual(importedSF2Month.students[0].attendance.slice(0, 3), ["AbsentX", "Absent", "Present"]);
   assert.equal(importedSF2Month.students[0].reasons[0], "Medical appointment");
   assert.equal(importedSF2Month.students[0].remarks, "Medical appointment");
   assert.deepEqual(importedSF2Month.students[1].attendance.slice(0, 2), ["Tardy", "Excused"]);
@@ -6326,7 +7046,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
     const monthStudent = importedSF2Month.students[index];
     const monthPresent = monthStudent.attendance.reduce((total, status) =>
       total + (status === "Present" || status === "Tardy" ? 1 : 0), 0);
-    const monthAbsent = monthStudent.attendance.filter((status) => status === "Absent").length;
+    const monthAbsent = monthStudent.attendance.filter((status) =>
+      status === "Absent" || status === "AbsentX").length;
     const dailyStatus = summaryDailyStatuses.get(student.id);
     const dailyPresent = dailyStatus === "Present" || dailyStatus === "Tardy" ? 1 : 0;
     const dailyAbsent = dailyStatus === "Absent" ? 1 : 0;
@@ -6495,7 +7216,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
     .find((column) => exportedSF2Sheet.getCell(10, column).value === importedSchoolDays[0]);
   const exportedSecondDayColumn = Array.from({ length: 25 }, (_, index) => index + 7)
     .find((column) => exportedSF2Sheet.getCell(10, column).value === importedSchoolDays[1]);
-  assert.equal(exportedSF2Sheet.getCell(addedStudentExportRow, exportedFirstDayColumn).value, "CC");
+  assert.equal(exportedSF2Sheet.getCell(addedStudentExportRow, exportedFirstDayColumn).value, "X");
   assert.equal(exportedSF2Sheet.getCell(addedStudentExportRow, exportedSecondDayColumn).value, "CC");
   assert.equal(exportedSF2Sheet.getCell(importedStudentExportRow, exportedFirstDayColumn).value, "T");
   assert.equal(exportedSF2Sheet.getCell(importedStudentExportRow, exportedSecondDayColumn).value, "E");
@@ -6522,6 +7243,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
     { headers: { Cookie: teacherCookie } },
   );
   const roundTripAttendanceResult = await roundTripAttendance.json();
+  assert.equal(roundTripAttendanceResult.students[0].attendance[0], "AbsentX");
   assert.equal(roundTripAttendanceResult.students[0].reasons[0], "Medical appointment");
   assert.equal(roundTripAttendanceResult.students[0].remarks, "Monthly follow-up");
   const unknownLearnerSF2 = await createSF2Upload(attendanceMonth, [
@@ -6542,7 +7264,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   const reasonlessAbsenceMarks = {};
   roundTripAttendanceResult.dates.forEach((date, index) => {
     const status = roundTripAttendanceResult.students[0].attendance[index];
-    const mark = { Absent: "CC", Tardy: "T", Excused: "e" }[status];
+    const mark = { Absent: "CC", AbsentX: "x", Tardy: "T", Excused: "e" }[status];
     if (mark) reasonlessAbsenceMarks[Number(date.slice(-2))] = mark;
   });
   const absentWithoutSF2Remark = await createSF2Upload(attendanceMonth, [
@@ -6567,7 +7289,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
     { headers: { Cookie: teacherCookie } },
   );
   const importedAbsenceWithoutReasonResult = await importedAbsenceWithoutReason.json();
-  assert.equal(importedAbsenceWithoutReasonResult.students[0].attendance[0], "Absent");
+  assert.equal(importedAbsenceWithoutReasonResult.students[0].attendance[0], "AbsentX");
   assert.equal(importedAbsenceWithoutReasonResult.students[0].reasons[0], "");
   const unsupportedSF2Mark = await createSF2Upload(attendanceMonth, [
     { name: addedStudent.student.name, gender: addedStudent.student.gender, marks: { 1: "?" }, remarks: "" },
@@ -6637,7 +7359,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
     ({ id, present, absent })), savedNoClassData.students.map((student) => {
     const present = student.attendance.reduce((total, status) =>
       total + (status === "Present" || status === "Tardy" ? 1 : 0), 0);
-    const absent = student.attendance.filter((status) => status === "Absent").length;
+    const absent = student.attendance.filter((status) =>
+      status === "Absent" || status === "AbsentX").length;
     const dailyStatus = summaryDailyStatuses.get(student.id);
     return {
       id: student.id,
@@ -8343,4 +9066,122 @@ test("classroom API scopes every operation to the calling owner", async (context
 
   assert.equal((await call(`/api/classrooms/${classroom.id}`, "dev-user-123", "DELETE")).status, 200);
   assert.equal((await call(`/api/classrooms/${classroom.id}`, "dev-user-123")).status, 403);
+});
+
+test("teacher calendar API serves holidays and teacher-owned task CRUD independently", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "teacher-calendar-api-"));
+  const databasePath = path.join(directory, "portal.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  const calendarDatabasePath = path.join(directory, "calendar.sqlite");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  const server = createServer({
+    databasePath,
+    migrationWorkbookPath,
+    calendarDatabasePath,
+    calendarFetch: async () => ({ ok: true, json: async () => [] }),
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const registration = await fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Calendar Teacher",
+      email: "calendar.teacher@example.com",
+      password: "calendar-test-password",
+      role: "teacher",
+      extra: "Room 1",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+  const createdResponse = await fetch(`${baseUrl}/api/teacher-calendar/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      title: "Prepare lesson",
+      date: "2026-11-09",
+      startTime: "08:00",
+      endTime: "09:00",
+      notes: "Print the worksheets.",
+    }),
+  });
+  assert.equal(createdResponse.status, 201);
+  const createdTask = await createdResponse.json();
+
+  const listedResponse = await fetch(
+    `${baseUrl}/api/teacher-calendar/events?from=2026-11-01&to=2026-11-30`,
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal(listedResponse.status, 200);
+  const listedTasks = await listedResponse.json();
+  assert.equal(listedTasks[0].id, createdTask.id);
+  assert.equal(listedTasks[0].isDone, false);
+
+  const updatedResponse = await fetch(
+    `${baseUrl}/api/teacher-calendar/events/${encodeURIComponent(createdTask.id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ ...createdTask, title: "Prepare revised lesson" }),
+    },
+  );
+  assert.equal(updatedResponse.status, 200);
+  assert.equal((await updatedResponse.json()).title, "Prepare revised lesson");
+
+  const completedResponse = await fetch(
+    `${baseUrl}/api/teacher-calendar/events/${encodeURIComponent(createdTask.id)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({ isDone: true }),
+    },
+  );
+  assert.equal(completedResponse.status, 200);
+  assert.equal((await completedResponse.json()).isDone, true);
+  const listedCompletedResponse = await fetch(
+    `${baseUrl}/api/teacher-calendar/events?from=2026-11-01&to=2026-11-30`,
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal((await listedCompletedResponse.json())[0].isDone, true);
+
+  const holidaysResponse = await fetch(`${baseUrl}/api/teacher-calendar/holidays?year=2026`, {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(holidaysResponse.status, 200);
+  const holidays = await holidaysResponse.json();
+  assert.ok(holidays.holidays.some((holiday) => holiday.kind === "official"));
+  assert.ok(holidays.holidays.some((holiday) => holiday.kind === "local"));
+  assert.equal(
+    holidays.holidays.find((holiday) => holiday.title === "EDSA People Power Revolution Anniversary")
+      .isNonWorking,
+    false,
+  );
+
+  const deletedResponse = await fetch(
+    `${baseUrl}/api/teacher-calendar/events/${encodeURIComponent(createdTask.id)}`,
+    { method: "DELETE", headers: { Cookie: cookie } },
+  );
+  assert.equal(deletedResponse.status, 200);
+  const unauthorizedResponse = await fetch(
+    `${baseUrl}/api/teacher-calendar/events?from=2026-11-01&to=2026-11-30`,
+  );
+  assert.equal(unauthorizedResponse.status, 401);
+
+  await fs.rm(calendarDatabasePath, { force: true });
+  await fs.mkdir(calendarDatabasePath);
+  const failedCalendarRequest = await fetch(
+    `${baseUrl}/api/teacher-calendar/events?from=2026-11-01&to=2026-11-30`,
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal(failedCalendarRequest.status, 500);
+  assert.equal((await fetch(`${baseUrl}/api/health`)).status, 200);
 });

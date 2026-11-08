@@ -12,13 +12,20 @@ const {
   restoreBestDatabase,
   listDatabaseBackups,
 } = require("./data-protection");
-const { focusOrCreateWindow } = require("./window-lifecycle");
+const { focusOrCreateWindow, loadAndShowWindow } = require("./window-lifecycle");
 
 // Use one stable data folder for accounts and academic records. It is never under
 // the installed application directory, so package replacement cannot erase data.
 const canonicalDataDirectory = path.join(app.getPath("appData"), "grade5-class-portal");
 const databasePath = path.join(canonicalDataDirectory, "grade5-portal-database.sqlite");
 const backupDirectory = path.join(canonicalDataDirectory, "backups");
+const MAX_TEACHER_PHOTO_BYTES = 2 * 1024 * 1024;
+const TEACHER_PHOTO_CONTENT_TYPES = new Map([
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".png", "image/png"],
+  [".webp", "image/webp"],
+]);
 const legacyDatabasePaths = [
   path.join(app.getPath("appData"), "AVeRA", "grade5-portal-database.sqlite"),
   path.join(app.getPath("userData"), "grade5-portal-database.sqlite"),
@@ -64,13 +71,7 @@ async function createPortalWindow() {
     }
     return { action: "deny" };
   });
-  await mainWindow.loadURL(portalUrl);
-  mainWindow.once("ready-to-show", () => {
-    if (!mainWindow.isDestroyed()) mainWindow.show();
-  });
-  // Some older graphics/Windows combinations miss ready-to-show. Displaying
-  // after load is safe and keeps startup from showing a partially loaded UI.
-  if (!mainWindow.isVisible()) mainWindow.show();
+  await loadAndShowWindow(mainWindow, portalUrl);
 }
 
 function restorePortalWindow() {
@@ -248,6 +249,29 @@ ipcMain.handle("app-version", (event) => {
 ipcMain.handle("app-is-packaged", (event) => {
   assertTrustedSender(event);
   return app.isPackaged;
+});
+
+ipcMain.handle("choose-teacher-photo", async (event) => {
+  assertTrustedSender(event);
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: "Choose a teacher profile picture",
+    properties: ["openFile"],
+    filters: [{ name: "Image files", extensions: ["jpg", "jpeg", "png", "webp"] }],
+  });
+  if (canceled || !filePaths[0]) return { canceled: true };
+
+  const filePath = filePaths[0];
+  const contentType = TEACHER_PHOTO_CONTENT_TYPES.get(path.extname(filePath).toLowerCase());
+  if (!contentType) throw new Error("Choose a JPEG, PNG, or WebP image no larger than 2 MB.");
+  const fileStat = await fs.stat(filePath);
+  if (!fileStat.isFile() || fileStat.size > MAX_TEACHER_PHOTO_BYTES) {
+    throw new Error("Choose a JPEG, PNG, or WebP image no larger than 2 MB.");
+  }
+  const photo = await fs.readFile(filePath);
+  if (photo.length > MAX_TEACHER_PHOTO_BYTES) {
+    throw new Error("Choose a JPEG, PNG, or WebP image no larger than 2 MB.");
+  }
+  return { canceled: false, contentType, base64: photo.toString("base64") };
 });
 
 function getRememberedLoginStore() {

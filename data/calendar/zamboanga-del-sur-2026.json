@@ -1,0 +1,17 @@
+{
+  "year": 2026,
+  "sourceName": "Bundled Zamboanga del Sur local observances",
+  "holidays": [
+    {
+      "id": "zds-2026-09-17-province-founding-anniversary",
+      "date": "2026-09-17",
+      "title": "Araw ng Zamboanga del Sur / Megayon Festival",
+      "kind": "local",
+      "holidayType": "Province founding anniversary",
+      "isNonWorking": false,
+      "municipality": null,
+      "sourceName": "Zamboanga del Sur local observance reference",
+      "sourceUrl": "https://www.festivalscape.com/philippines/zamboanga-del-sur/megayon-festival/"
+    }
+  ]
+}
