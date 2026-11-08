@@ -2036,14 +2036,41 @@ test("teacher profile marks the assigned advisory grade and section as read-only
   assert.match(portalPage, /id="teacherProfileTabs" role="tablist"/);
   assert.match(portalPage, /id="teacherProfileBasicTab"[^>]*>BASIC INFO<\/button>/);
   assert.match(portalPage, /id="teacherProfileSchoolTab"[^>]*>SCHOOL INFO<\/button>/);
-  assert.match(portalPage, /id="teacherProfileBackgroundTab"[^>]*>BACKGROUND INFORMATION<\/button>/);
+  assert.match(portalPage, /id="teacherProfileBackgroundTab"[^>]*>PERSONAL DATA SHEET<\/button>/);
   assert.match(portalPage, /id="teacherProfileSalnTab"[^>]*>SALN RECORDS<\/button>/);
   assert.match(portalPage, /id="teacherProfileBasicPanel" role="tabpanel"[\s\S]*?id="teacherProfileName"/);
   assert.match(portalPage, /id="teacherProfileSchoolPanel" role="tabpanel"[\s\S]*?id="teacherProfileSchoolName"/);
-  assert.match(portalPage, /id="teacherProfileBackgroundPanel" role="tabpanel"[^>]*hidden><\/div>/);
+  assert.match(portalPage, /id="teacherProfileBackgroundPanel" role="tabpanel"[^>]*hidden>[\s\S]*?id="pdsSheetTabs"/);
   assert.match(portalPage, /id="teacherProfileSalnPanel" role="tabpanel"[^>]*hidden><\/div>/);
+  assert.match(portalPage, /id="pdsSheetTabs"[^>]*role="tablist"/);
+  for (const sheet of ["C1", "C2", "C3", "C4"]) {
+    assert.match(portalPage, new RegExp(`data-pds-sheet="${sheet}"`));
+  }
+  assert.match(portalPage, /\.pds-sheet-table td\{[^}]*white-space:nowrap;overflow-wrap:normal/);
+  assert.match(portalPage, /cell\.style\.whiteSpace=style\.wrap\?"pre-wrap":"nowrap"/);
+  assert.match(portalPage, /table\.style\.width=sheet\.widths\.reduce/);
+  assert.match(portalPage, /function renderTeacherPdsSheet\(\)/);
+  assert.match(portalPage, /async function loadTeacherPds\(\)/);
+  assert.match(portalPage, /async function saveTeacherPds\(\)/);
+  assert.match(portalPage, /api\("\/api\/teacher\/profile\/pds"/);
+  assert.match(serverSource, /CREATE TABLE IF NOT EXISTS teacher_pds_records/);
+  assert.match(serverSource, /function validateTeacherPdsData\(data, template\)/);
   assert.match(portalPage, /function selectTeacherProfileTab\(tab\)/);
-  assert.match(portalPage, /firstInvalidField\.reportValidity\(\)/);
+  assert.match(portalPage, /id="saveTeacherBasicProfile" type="button">Save Basic Info<\/button>/);
+  assert.match(portalPage, /id="saveTeacherSchoolProfile" type="button">Save School Info<\/button>/);
+  assert.match(portalPage, /async function saveTeacherBasicProfile\(\)/);
+  assert.match(portalPage, /async function saveTeacherSchoolProfile\(\)/);
+  assert.match(portalPage, /teacherProfileBasicNotice"\)\.textContent="Basic Info saved successfully\."/);
+  assert.match(portalPage, /teacherProfileSchoolNotice"\)\.textContent="School Info saved successfully\."/);
+  assert.match(portalPage, /invalidField\.reportValidity\(\)/);
+  const basicProfileSave = portalPage.match(/async function saveTeacherBasicProfile\(\)\{([\s\S]*?)\n  \}\n  async function saveTeacherSchoolProfile/);
+  const schoolProfileSave = portalPage.match(/async function saveTeacherSchoolProfile\(\)\{([\s\S]*?)\n  \}\n  \$\("saveTeacherBasicProfile"\)/);
+  assert.ok(basicProfileSave);
+  assert.ok(schoolProfileSave);
+  assert.doesNotMatch(basicProfileSave[1], /schoolYear:|schoolName:|schoolId:/);
+  assert.match(schoolProfileSave[1], /name:teacherProfileSavedIdentity\.name,[\s\S]*?schoolYear:\$\("teacherProfileSchoolYear"\)\.value/);
+  assert.doesNotMatch(schoolProfileSave[1], /name:\$\("teacherProfileName"\)\.value/);
+  assert.doesNotMatch(portalPage, /id="saveTeacherProfile"/);
   assert.match(portalPage, /<label for="teacherProfileGrade">Grade <span class="advisory-field-badge">View only<\/span><\/label><input id="teacherProfileGrade"[^>]*readonly/);
   assert.match(portalPage, /<label for="teacherProfileSection">Advisory section <span class="advisory-field-badge">Locked<\/span><\/label><input id="teacherProfileSection"[^>]*readonly/);
   assert.match(portalPage, /id="teacherProfileSectionHint">This is the advisory section assigned to your classroom\./);
@@ -2078,6 +2105,96 @@ test("teacher profile marks the assigned advisory grade and section as read-only
   assert.match(portalPage, /<option value="Arts and Design">Arts and Design<\/option>/);
   assert.match(portalPage, /strand:strand/);
   assert.match(portalPage, /function ensureGradeSubjectInput\(subject\)/);
+});
+
+test("teacher PDS exposes the C1-C4 workbook sheets and saves entries per teacher", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "teacher-pds-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  const server = createServer({ databasePath, migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const unauthorized = await fetch(`${baseUrl}/api/teacher/profile/pds`);
+  assert.equal(unauthorized.status, 401);
+
+  async function registerTeacher(name, email, classroom) {
+    const response = await fetch(`${baseUrl}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        email,
+        password: "secure-pass-123",
+        role: "teacher",
+        extra: classroom,
+        grade: "Grade 5",
+      }),
+    });
+    assert.equal(response.status, 201);
+    return response.headers.get("set-cookie").split(";")[0];
+  }
+
+  const firstTeacherCookie = await registerTeacher("PDS Teacher One", "pds.one@example.com", "12");
+  const workbookResponse = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
+    headers: { Cookie: firstTeacherCookie },
+  });
+  assert.equal(workbookResponse.status, 200);
+  const workbook = await workbookResponse.json();
+  assert.deepEqual(workbook.sheets.map((sheet) => sheet.name), ["C1", "C2", "C3", "C4"]);
+  assert.deepEqual(workbook.sheets.map((sheet) => sheet.startRow), [1, 2, 1, 1]);
+  assert.equal(workbook.sheets[0].widths.length, 14);
+  assert.equal(
+    workbook.sheets[0].rows.find((row) => row.number === 9).cells[0].value,
+    "I. PERSONAL INFORMATION",
+  );
+  assert.equal(
+    workbook.sheets[0].rows.find((row) => row.number === 10).cells.find((cell) => cell.address === "D10").editable,
+    true,
+  );
+  const c2WorkExperienceNote = workbook.sheets[1].rows.find((row) => row.number === 14);
+  assert.equal(c2WorkExperienceNote.height, 16);
+  assert.equal(c2WorkExperienceNote.cells.find((cell) => cell.address === "A14").style.wrap, false);
+  assert.equal(workbook.sheets[1].widths[0], 28);
+
+  const saveResponse = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: firstTeacherCookie },
+    body: JSON.stringify({
+      sheets: {
+        C1: { D10: "Teacher One" },
+        C4: { H6: false },
+      },
+    }),
+  });
+  assert.equal(saveResponse.status, 200);
+  assert.equal((await saveResponse.json()).saved, true);
+
+  const invalidSave = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: firstTeacherCookie },
+    body: JSON.stringify({ sheets: { C1: { A9: "Not editable" } } }),
+  });
+  assert.equal(invalidSave.status, 400);
+  const savedWorkbook = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
+    headers: { Cookie: firstTeacherCookie },
+  });
+  const savedEntries = await savedWorkbook.json();
+  assert.equal(savedEntries.entries.C1.D10, "Teacher One");
+  assert.equal(savedEntries.entries.C4.H6, false);
+
+  const secondTeacherCookie = await registerTeacher("PDS Teacher Two", "pds.two@example.com", "13");
+  const secondTeacherWorkbook = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
+    headers: { Cookie: secondTeacherCookie },
+  });
+  assert.deepEqual((await secondTeacherWorkbook.json()).entries, {});
 });
 
 test("registered grade and strand determine all subject lists", async (context) => {
@@ -2936,8 +3053,16 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.ok(portalPage.includes(`class="sidebar-footer-version">GraceDesk · Version ${require("../package.json").version}</span>`));
   assert.ok(portalPage.includes(`class="brand-version">${require("../package.json").version}</span>`));
   assert.match(portalPage, /class="brand-contact" aria-label="Contact information"/);
-  assert.match(portalPage, /mailto:demogorgon37846@gmail\.com/);
+  assert.match(portalPage, /mailto:lugatimanbonn@gmail\.com/);
   assert.match(portalPage, /09561209923/);
+  assert.match(portalPage, /<option value="checklistPanel">Checklist<\/option>/);
+  assert.match(portalPage, /id="checklistPanel"[\s\S]*?id="checklistRefreshRoster"[\s\S]*?id="checklistAddColumn"[\s\S]*?id="checklistHeaderRow"[\s\S]*?id="checklistRows"/);
+  assert.match(portalPage, /<th scope="col">No\.<\/th><th scope="col">Student<\/th>/);
+  assert.match(portalPage, /function migratedChecklistColumns\(data\)[\s\S]*?data\.forEach\(function\(item\)\{addLabel\(item\.text\)\}/);
+  assert.match(portalPage, /function checklistRosterStudents\(\)[\s\S]*?!student\.enrollmentStatus/);
+  assert.match(portalPage, /version:3,[\s\S]*?students:checklistStudentRecords/);
+  assert.match(portalPage, /checkbox\.checked=checklistCellIsChecked\(record,column\.id\)/);
+  assert.match(portalPage, /var studentName=\[student\.lastName,student\.firstName,student\.middleName\]/);
   assert.match(portalPage, /\.teacher-profile-card\{display:flex;max-width:920px;align-items:center/);
   assert.match(portalPage, /\.teacher-profile-form\{max-width:920px;padding:0 22px 22px\}/);
   assert.match(portalPage, /\.teacher-profile-form \.form-field\.full\{grid-column:1\/-1\}/);
@@ -3486,10 +3611,10 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.ok(portalPage.indexOf('id="navTools"') > portalPage.indexOf('id="navSettings"'));
   assert.match(portalPage, /id="navTools"[^>]*>[\s\S]*?Tools/);
   assert.match(portalPage, /id="settingsPage"/);
-  assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?label for="toolsSelector">Choose a tool[\s\S]*?id="toolsSelector"[^>]*aria-controls="tarpaulinPanel"[\s\S]*?value="tarpaulinPanel" selected>Tarpapel Maker[\s\S]*?value="calendarPanel">Calendar[\s\S]*?value="moreToolsPanel">More tools/);
+  assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?label for="toolsSelector">Choose a tool[\s\S]*?id="toolsSelector"[^>]*aria-controls="tarpaulinPanel"[\s\S]*?value="tarpaulinPanel" selected>Tarpapel Maker[\s\S]*?value="calendarPanel">Calendar[\s\S]*?value="checklistPanel">Checklist[\s\S]*?value="moreToolsPanel">More tools/);
   assert.doesNotMatch(portalPage, /<option value="lessonPlanPanel">Lesson Plan Generator<\/option>/);
   assert.doesNotMatch(portalPage, /id="spinWheelTab"/);
-  assert.match(portalPage, /var panelIds=\["tarpaulinPanel","lessonPlanPanel","calendarPanel","moreToolsPanel"\]/);
+  assert.match(portalPage, /var panelIds=\["tarpaulinPanel","lessonPlanPanel","calendarPanel","checklistPanel","moreToolsPanel"\]/);
   assert.match(portalPage, /id="lessonPlanPanel" aria-labelledby="lessonPlanPanelTitle" hidden>[\s\S]*?id="lessonPlanFilipinoTab"[\s\S]*?id="lessonPlanEnglishTab"/);
   assert.match(portalPage, /<label for="lessonPlanModeSelect">Lesson plan type<\/label>/);
   assert.match(portalPage, /<select id="lessonPlanModeSelect">[\s\S]*?<option value="lesson-plan">Lesson Plan \(1 Session Only\)<\/option>[\s\S]*?<option value="daily-lesson-log">Daily Lesson Log - \(Multiple Sessions\)<\/option>[\s\S]*?<\/select>/);
@@ -3755,6 +3880,10 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /id="spinWheelPanel" hidden/);
   assert.match(portalPage, /id="topbarCalendarToggle"[^>]*aria-controls="topbarCalendarPopover"[^>]*aria-expanded="false"/);
   assert.match(portalPage, /id="topbarCalendarPopover" role="dialog"[^>]*hidden>[\s\S]*?id="topbarMiniCalendarGrid"[\s\S]*?id="topbarMiniCalendarClose"[^>]*>Close calendar[\s\S]*?id="topbarMiniCalendarOpen"[^>]*>Open calendar/);
+  assert.match(portalPage, /id="topbarCalendarResizeHandle" role="separator" aria-orientation="vertical"[^>]*tabindex="0"/);
+  assert.match(portalPage, /function setTopbarMiniCalendarWidth\(width,right\)[\s\S]*?syncTopbarMiniCalendarResizeHandle\(miniCalendarPopover\.getBoundingClientRect\(\)\.width\)/);
+  assert.match(portalPage, /miniCalendarResizeHandle\.addEventListener\("keydown"[\s\S]*?event\.key==="ArrowLeft"/);
+  assert.match(portalPage, /miniCalendarResizeHandle\.addEventListener\("pointerdown"/);
   assert.match(portalPage, /id="topbarCalendarHolidayHeading">Holidays this month[\s\S]*?id="topbarCalendarHolidayList"/);
   assert.match(portalPage, /id="topbarCalendarTaskHeading">Tasks on selected date[\s\S]*?id="topbarMiniCalendarTaskList"/);
   assert.match(portalPage, /\.topbar-calendar-day\.has-task::after\{left:calc\(50% \+ 3px\);background:#2563eb\}/);
@@ -7221,14 +7350,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(exportedSF2Sheet.getCell(importedStudentExportRow, exportedFirstDayColumn).value, "T");
   assert.equal(exportedSF2Sheet.getCell(importedStudentExportRow, exportedSecondDayColumn).value, "E");
   const dateSpecificRemarks = exportedSF2Sheet.getCell(addedStudentExportRow, 34).value;
-  assert.match(dateSpecificRemarks, /Grade Portal absence reasons/);
-  assert.match(dateSpecificRemarks, new RegExp(`${attendanceMonth}-01: Medical appointment`));
-  assert.match(dateSpecificRemarks, new RegExp(`${attendanceMonth}-02: Medical appointment`));
-  assert.match(
-    exportedSF2Sheet.getCell(importedStudentExportRow, 34).value,
-    new RegExp(`${attendanceMonth}-02: Early dismissal`),
-    "optional reasons for Excused marks are exported to Remarks",
-  );
+  assert.equal(dateSpecificRemarks, "Monthly follow-up");
+  assert.equal(exportedSF2Sheet.getCell(importedStudentExportRow, 34).value, null);
   const roundTripSF2Import = await fetch(
     `${baseUrl}/api/attendance/month/import?month=${attendanceMonth}`,
     {
@@ -7244,7 +7367,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   );
   const roundTripAttendanceResult = await roundTripAttendance.json();
   assert.equal(roundTripAttendanceResult.students[0].attendance[0], "AbsentX");
-  assert.equal(roundTripAttendanceResult.students[0].reasons[0], "Medical appointment");
+  assert.equal(roundTripAttendanceResult.students[0].reasons[0], "");
   assert.equal(roundTripAttendanceResult.students[0].remarks, "Monthly follow-up");
   const unknownLearnerSF2 = await createSF2Upload(attendanceMonth, [
     { name: addedStudent.student.name, gender: addedStudent.student.gender, marks: { 1: "x" }, remarks: "Medical appointment" },

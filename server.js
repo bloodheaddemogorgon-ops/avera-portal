@@ -77,6 +77,13 @@ const GENERATED_REPORTS_DIRECTORY = path.join(__dirname, "downloads", "generated
 const SF9_TEMPLATE_PATH = path.join(__dirname, "SF9.xlsx");
 const GRADE_SHEET_TEMPLATE_PATH = path.join(__dirname, "Grading Sheet.xlsx");
 const ECLASS_TEMPLATE_PATH = path.join(__dirname, "E-CLASS.xlsx");
+const PDS_TEMPLATE_PATH = path.join(__dirname, "PDS 2026.xlsx");
+const PDS_TEMPLATE_SHEETS = [
+  { name: "C1", description: "Personal information, family background, and education" },
+  { name: "C2", description: "Civil service eligibility and work experience" },
+  { name: "C3", description: "Learning and development, voluntary work, and other information" },
+  { name: "C4", description: "Additional information, references, and oath" },
+];
 const MPS_TEMPLATE_PATH = path.join(__dirname, "MPS TEMPLATE.docx");
 const SF9_LOGO_INCHES = 1.44;
 const SF9_LOGO_PIXELS = SF9_LOGO_INCHES * 96;
@@ -1822,6 +1829,11 @@ function openPortalDatabase(databasePath) {
         workbook_state BLOB NOT NULL,
         updated_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS teacher_pds_records (
+        teacher_id TEXT PRIMARY KEY,
+        sheet_data TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `);
     return database;
   } catch (error) {
@@ -3094,6 +3106,7 @@ function createServer(options = {}) {
   const authRateLimiter = options.authRateLimiter || createAuthRateLimiter();
   let database = null;
   let databaseInitialization = null;
+  let teacherPdsTemplatePromise = null;
   let appearanceTheme = null;
 
   async function getAppearanceTheme() {
@@ -3188,6 +3201,210 @@ function createServer(options = {}) {
       throw error;
     });
     return databaseInitialization;
+  }
+
+  function pdsColumnNumber(letters) {
+    let number = 0;
+    for (const letter of letters) number = number * 26 + letter.charCodeAt(0) - 64;
+    return number;
+  }
+
+  function pdsCellAddress(address) {
+    const match = /^([A-Z]{1,3})(\d{1,3})$/.exec(address);
+    if (!match) return null;
+    return { column: pdsColumnNumber(match[1]), row: Number(match[2]) };
+  }
+
+  function pdsColorToCss(color) {
+    if (typeof color?.argb === "string") return `#${color.argb.slice(-6)}`;
+    if (typeof color?.rgb === "string") return `#${color.rgb.slice(-6)}`;
+    const indexedColors = {
+      8: "#000000",
+      9: "#FFFFFF",
+      10: "#FF0000",
+      22: "#E6E6E6",
+      55: "#D9D9D9",
+      64: "#000000",
+    };
+    return indexedColors[color?.indexed] || null;
+  }
+
+  function pdsCellStyle(cell) {
+    const style = cell.style || {};
+    const border = {};
+    for (const side of ["top", "right", "bottom", "left"]) {
+      const edge = style.border?.[side];
+      if (!edge?.style) continue;
+      const width = edge.style === "thick" ? "3px" : edge.style === "medium" ? "2px" : "1px";
+      const lineStyle = edge.style === "dotted" || edge.style === "dashed" || edge.style === "double"
+        ? edge.style
+        : "solid";
+      border[side] = `${width} ${lineStyle} ${pdsColorToCss(edge.color) || "#40464F"}`;
+    }
+    const fillColor = style.fill?.type === "pattern" && style.fill.pattern === "solid"
+      ? pdsColorToCss(style.fill.fgColor)
+      : null;
+    return {
+      fontFamily: style.font?.name || null,
+      fontSize: style.font?.size || null,
+      fontColor: pdsColorToCss(style.font?.color),
+      bold: Boolean(style.font?.bold),
+      italic: Boolean(style.font?.italic),
+      background: fillColor,
+      horizontal: style.alignment?.horizontal || null,
+      vertical: style.alignment?.vertical || null,
+      wrap: Boolean(style.alignment?.wrapText),
+      border,
+    };
+  }
+
+  async function getTeacherPdsTemplate() {
+    if (!teacherPdsTemplatePromise) {
+      teacherPdsTemplatePromise = (async () => {
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.readFile(PDS_TEMPLATE_PATH);
+        const sheets = PDS_TEMPLATE_SHEETS.map((specification) => {
+          const worksheet = workbook.getWorksheet(specification.name);
+          if (!worksheet) {
+            throw new Error(`The PDS 2026 workbook is missing worksheet ${specification.name}.`);
+          }
+          const printArea = worksheet.pageSetup.printArea || "";
+          const areaMatch = /^\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/.exec(printArea);
+          if (!areaMatch) {
+            throw new Error(`The PDS 2026 worksheet ${specification.name} has no supported print area.`);
+          }
+          const startColumn = pdsColumnNumber(areaMatch[1]);
+          const startRow = Number(areaMatch[2]);
+          const endColumn = pdsColumnNumber(areaMatch[3]);
+          const endRow = Number(areaMatch[4]);
+          const rows = [];
+          for (let rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
+            const row = worksheet.getRow(rowNumber);
+            const cells = [];
+            for (let columnNumber = startColumn; columnNumber <= endColumn; columnNumber += 1) {
+              const cell = row.getCell(columnNumber);
+              const isCheckbox = typeof cell.value === "boolean";
+              cells.push({
+                address: cell.address,
+                value: isCheckbox ? "" : cell.value == null ? "" : cell.text || String(cell.value),
+                checked: isCheckbox ? cell.value : null,
+                editable: isCheckbox || cell.value == null,
+                style: pdsCellStyle(cell),
+              });
+            }
+            rows.push({
+              number: rowNumber,
+              height: Math.max(1, Math.round((row.height || 15) * 4 / 3)),
+              cells,
+            });
+          }
+          const merges = (worksheet.model.merges || []).filter((merge) => {
+            const [start, end] = merge.split(":");
+            const startAddress = pdsCellAddress(start);
+            const endAddress = pdsCellAddress(end);
+            return startAddress && endAddress
+              && startAddress.row >= startRow && endAddress.row <= endRow
+              && startAddress.column >= startColumn && endAddress.column <= endColumn;
+          });
+          const widths = [];
+          for (let columnNumber = startColumn; columnNumber <= endColumn; columnNumber += 1) {
+            widths.push(Math.max(14, Math.floor((worksheet.getColumn(columnNumber).width || 9) * 7 + 5)));
+          }
+          return {
+            name: specification.name,
+            description: specification.description,
+            startRow,
+            startColumn,
+            widths,
+            rows,
+            merges,
+          };
+        });
+        return { workbook, sheets };
+      })();
+    }
+    try {
+      return await teacherPdsTemplatePromise;
+    } catch (error) {
+      teacherPdsTemplatePromise = null;
+      throw error;
+    }
+  }
+
+  function validateTeacherPdsData(data, template) {
+    if (!data || typeof data !== "object" || Array.isArray(data)
+      || Object.keys(data).length !== 1 || !data.sheets
+      || typeof data.sheets !== "object" || Array.isArray(data.sheets)) {
+      throw new HttpError(400, "Provide Personal Data Sheet entries for sheets C1 through C4.");
+    }
+    const templateSheets = new Map(template.sheets.map((sheet) => [sheet.name, sheet]));
+    const normalizedSheets = Object.create(null);
+    let totalCharacters = 0;
+    for (const [sheetName, cells] of Object.entries(data.sheets)) {
+      const templateSheet = templateSheets.get(sheetName);
+      if (!templateSheet || !cells || typeof cells !== "object" || Array.isArray(cells)) {
+        throw new HttpError(400, "Only PDS sheets C1 through C4 can be saved.");
+      }
+      if (Object.keys(cells).length > 1500) {
+        throw new HttpError(400, "A PDS sheet contains too many cell values.");
+      }
+      const worksheet = template.workbook.getWorksheet(sheetName);
+      const normalizedCells = Object.create(null);
+      for (const [address, value] of Object.entries(cells)) {
+        const coordinates = pdsCellAddress(address);
+        if (!coordinates || coordinates.row < templateSheet.startRow
+          || coordinates.row > templateSheet.rows[templateSheet.rows.length - 1].number
+          || coordinates.column < templateSheet.startColumn
+          || coordinates.column >= templateSheet.startColumn + templateSheet.widths.length) {
+          throw new HttpError(400, `The PDS cell ${address} is outside sheet ${sheetName}.`);
+        }
+        const templateCell = worksheet.getCell(address);
+        if (typeof templateCell.value === "boolean") {
+          if (typeof value !== "boolean") {
+            throw new HttpError(400, `The PDS cell ${address} must be a checkbox value.`);
+          }
+          normalizedCells[address] = value;
+          continue;
+        }
+        if (templateCell.value != null || typeof value !== "string" || value.length > 2000) {
+          throw new HttpError(400, `The PDS cell ${address} is not an editable text field.`);
+        }
+        if (!value.trim()) continue;
+        totalCharacters += value.length;
+        if (totalCharacters > 500000) {
+          throw new HttpError(413, "PDS entries exceed the maximum saved size.");
+        }
+        normalizedCells[address] = value;
+      }
+      normalizedSheets[sheetName] = normalizedCells;
+    }
+    return normalizedSheets;
+  }
+
+  async function getTeacherPdsRecord(session) {
+    await initializeDatabase();
+    const record = database.prepare(
+      "SELECT sheet_data, updated_at FROM teacher_pds_records WHERE teacher_id = ?",
+    ).get(session.userId);
+    return {
+      sheets: record ? JSON.parse(record.sheet_data) : {},
+      updatedAt: record?.updated_at || null,
+    };
+  }
+
+  async function saveTeacherPdsRecord(session, data) {
+    const template = await getTeacherPdsTemplate();
+    const sheets = validateTeacherPdsData(data, template);
+    await initializeDatabase();
+    const updatedAt = new Date().toISOString();
+    database.prepare(`
+      INSERT INTO teacher_pds_records (teacher_id, sheet_data, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(teacher_id) DO UPDATE SET
+        sheet_data = excluded.sheet_data,
+        updated_at = excluded.updated_at
+    `).run(session.userId, JSON.stringify(sheets), updatedAt);
+    return { saved: true, updatedAt };
   }
 
   async function readDatabaseWorkbook() {
@@ -10309,17 +10526,6 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (monthlyRemark && student.statusDate) {
         remarks += `${SF2_STATUS_DATE_MARKER}${student.statusDate}]`;
       }
-      const absenceReasonLines = weekdayDates.flatMap((date) => {
-        const dayIndex = weekdayIndices.get(date);
-        const status = normalizeAttendanceStatus(student.attendance[dayIndex]);
-        if (!isAbsentAttendanceStatus(status) && status !== "Excused") return [];
-        const reason = cellText(student.reasons[dayIndex]).trim();
-        if (!reason) return [];
-        return [`${date}: ${reason}`];
-      });
-      if (absenceReasonLines.length) {
-        remarks += `${remarks ? "\n" : ""}${SF2_ABSENCE_REASONS_MARKER}${absenceReasonLines.join("\n")}`;
-      }
       row.getCell(SF2_REMARKS_COLUMN).value = remarks || null;
     }
 
@@ -11461,6 +11667,29 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         const session = requireAdminSession(request);
         const result = await setAdminActiveClass(session, (await readJson(request)).classId);
         sendJson(response, 200, result);
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/teacher/profile/pds") {
+        const session = requireTeacherSession(request);
+        const [template, record] = await Promise.all([
+          getTeacherPdsTemplate(),
+          getTeacherPdsRecord(session),
+        ]);
+        sendJson(response, 200, {
+          sheets: template.sheets,
+          entries: record.sheets,
+          updatedAt: record.updatedAt,
+        });
+        return;
+      }
+
+      if (request.method === "PUT" && url.pathname === "/api/teacher/profile/pds") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await saveTeacherPdsRecord(
+          session,
+          await readJson(request, 1024 * 1024),
+        ));
         return;
       }
 

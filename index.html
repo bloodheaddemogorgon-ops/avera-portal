@@ -151,11 +151,15 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .topbar-calendar-toggle svg{width:20px;height:20px}
 .topbar-calendar-badge{display:grid;position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;place-items:center;padding:0 4px;border:2px solid var(--card);border-radius:999px;background:#b42318;color:#fff;font-size:.65rem;font-weight:800;line-height:1}
 .topbar-calendar-badge[hidden]{display:none}
-.topbar-calendar-popover{position:absolute;top:calc(100% + 10px);right:0;z-index:30;width:min(340px,calc(100vw - 28px));max-height:calc(100vh - 100px);overflow-y:auto;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.topbar-calendar-popover{position:absolute;top:calc(100% + 10px);right:0;z-index:30;width:min(340px,calc(100vw - 28px));min-width:min(280px,calc(100vw - 16px));min-height:min(320px,calc(100vh - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;resize:both;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
 .topbar-calendar-popover[hidden]{display:none}
+.topbar-calendar-resize-handle{display:grid;position:absolute;top:50%;left:0;z-index:2;width:12px;height:64px;place-items:center;transform:translateY(-50%);border:0;border-radius:0 8px 8px 0;background:color-mix(in srgb,var(--accent) 10%,var(--card));color:var(--muted);cursor:ew-resize;touch-action:none;user-select:none}
+.topbar-calendar-resize-handle span{width:3px;height:26px;border-right:1px solid currentColor;border-left:1px solid currentColor}
+.topbar-calendar-resize-handle:hover,.topbar-calendar-resize-handle:focus-visible{background:var(--soft);color:var(--accent);outline:2px solid var(--accent);outline-offset:2px}
 .topbar-calendar-month-heading,.topbar-calendar-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .topbar-calendar-month-heading{margin-bottom:10px}
-.topbar-calendar-month-heading h3{margin:0;font-size:.95rem}
+.topbar-calendar-month-heading h3{margin:0;font-size:.95rem;cursor:grab;touch-action:none;user-select:none}
+.topbar-calendar-month-heading h3:active{cursor:grabbing}
 .topbar-calendar-nav,.topbar-calendar-day{display:grid;place-items:center;padding:0;border:0;border-radius:9px;background:transparent;color:var(--ink);font:inherit;cursor:pointer}
 .topbar-calendar-nav{width:34px;height:34px;color:var(--muted);font-size:1.35rem}
 .topbar-calendar-nav:hover,.topbar-calendar-day:hover{background:var(--soft);color:var(--accent)}
@@ -502,6 +506,87 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .teacher-profile-form .teacher-subject-fieldset{margin-top:2px}
 .teacher-profile-form .school-logo-field{align-items:flex-start}
 .teacher-profile-form .school-logo-field .field-hint{flex-basis:100%;margin:0}
+.pds-workbook{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--field)}
+.pds-workbook-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.pds-workbook-header h2{margin:0;color:var(--ink);font-size:1.15rem}
+.pds-workbook-header p{margin:4px 0 0;color:var(--muted);font-size:.84rem}
+.pds-workbook-header .pds-eyebrow{margin:0 0 4px;color:var(--accent);font-size:.7rem;font-weight:800;letter-spacing:.1em}
+.pds-workbook-actions{display:flex;flex:none;gap:8px}
+.pds-workbook-actions .btn{width:auto;margin:0;padding:9px 13px}
+.pds-sheet-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.pds-sheet-tab{display:flex;min-width:155px;flex-direction:column;gap:3px;padding:9px 12px;border:1px solid transparent;border-bottom:0;border-radius:9px 9px 0 0;background:transparent;color:var(--muted);text-align:left;cursor:pointer}
+.pds-sheet-tab span{font-size:.9rem;font-weight:800}
+.pds-sheet-tab small{font-size:.68rem;white-space:nowrap}
+.pds-sheet-tab[aria-selected="true"]{border-color:var(--line);background:var(--card);color:var(--accent)}
+.pds-sheet-description{margin:12px 0 8px;color:var(--muted);font-size:.8rem}
+.pds-sheet-scroll{max-height:68vh;overflow:auto;border:1px solid #c9ced8;border-radius:10px;background:#fff;overscroll-behavior:contain}
+.pds-sheet-table{width:max-content;min-width:0;border-collapse:collapse;table-layout:fixed;background:#fff;color:#202633;font-family:Arial,sans-serif;font-size:8pt}
+.pds-sheet-table td{min-width:14px;padding:2px 3px;border:1px solid #7d8490;line-height:1.15;vertical-align:middle;white-space:nowrap;overflow-wrap:normal}
+.pds-sheet-table td.pds-editable-cell{background:#fff;cursor:text}
+.pds-sheet-table td.pds-editable-cell:focus{outline:2px solid var(--accent);outline-offset:-2px;background:#fff!important}
+.pds-sheet-table td.pds-checkbox-cell{text-align:center}
+.pds-checkbox-cell input{width:16px;height:16px;accent-color:var(--accent);vertical-align:middle}
+.pds-continuation-note{margin-top:12px}
+#teacherProfilePage>.page-heading,
+#teacherProfilePage>.teacher-profile-card,
+#teacherProfilePage>#teacherProfileForm,
+#teacherProfilePage>#teacherPasswordForm{width:100%;max-width:1280px}
+#teacherProfilePage>.teacher-profile-card{min-width:0;margin-bottom:18px}
+#teacherProfileForm{padding:0 18px 20px}
+#teacherProfileForm .teacher-profile-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));max-width:none;gap:8px;margin:0 0 18px;padding:10px 0 14px;border-bottom:1px solid var(--line)}
+#teacherProfileForm .teacher-profile-tab{display:flex;min-width:0;min-height:44px;align-items:center;justify-content:center;padding:9px 10px;text-align:center;line-height:1.3}
+#teacherProfileForm .teacher-profile-tab:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));color:var(--accent)}
+#teacherProfileForm .teacher-profile-tab:focus-visible,
+.pds-sheet-tab:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:2px}
+#teacherProfileForm .teacher-profile-tab-panel{min-width:0}
+.pds-workbook{padding:22px;border-color:color-mix(in srgb,var(--accent) 16%,var(--line));background:var(--card)}
+.pds-workbook-header{align-items:center;padding-bottom:16px;border-bottom:1px solid var(--line)}
+.pds-workbook-actions .btn{min-height:42px}
+.pds-sheet-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:16px;border-bottom:1px solid var(--line)}
+.pds-sheet-tab{min-width:0;min-height:58px;justify-content:center;padding:9px 12px;border-color:var(--line);border-bottom:0;background:var(--field)}
+.pds-sheet-tab small{white-space:normal;line-height:1.3}
+.pds-sheet-tab[aria-selected="true"]{border-color:var(--accent);background:var(--soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.pds-sheet-description{min-height:1.4em;margin:14px 0 10px}
+.pds-sheet-scroll{max-height:none;overflow-x:auto;overflow-y:visible;border-color:var(--line);border-radius:12px}
+.pds-workbook .notice:empty{display:none}
+.pds-workbook .notice:not(:empty){padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field)}
+.pds-workbook .notice.error:not(:empty){border-color:color-mix(in srgb,var(--err) 35%,var(--line))}
+.pds-continuation-note{margin:12px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field);line-height:1.45}
+@media(max-width:760px){
+  #teacherProfileForm .teacher-profile-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pds-workbook{padding:16px}
+  .pds-workbook-header{align-items:flex-start}
+  .pds-sheet-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){
+  #teacherProfileForm{padding:0 12px 16px}
+  #teacherProfileForm .teacher-profile-tabs{gap:6px;padding:8px 0 12px}
+  #teacherProfileForm .teacher-profile-tab{padding:8px 6px;font-size:.78rem}
+  .pds-workbook{padding:12px}
+  .pds-workbook-header{flex-direction:column;gap:12px}
+  .pds-workbook-actions{width:100%}
+  .pds-workbook-actions .btn{flex:1;min-width:0;padding:9px 8px;font-size:.82rem}
+  .pds-sheet-tabs{gap:6px}
+  .pds-sheet-tab{min-height:54px;padding:8px}
+  .pds-sheet-tab small{font-size:.64rem}
+}
+@media print{
+  body.pds-printing *{visibility:hidden!important}
+  body.pds-printing #teacherProfileBackgroundPanel,
+  body.pds-printing #teacherProfileBackgroundPanel *{visibility:visible!important}
+  body.pds-printing #teacherProfilePage{position:static!important;max-height:none!important;overflow:visible!important;padding:0!important}
+  body.pds-printing #teacherProfileBackgroundPanel{position:absolute!important;inset:0!important;width:100%!important;padding:0!important}
+  body.pds-printing .pds-workbook{padding:0!important;border:0!important;background:#fff!important}
+  body.pds-printing .pds-workbook-header,
+  body.pds-printing #pdsSaveError,
+  body.pds-printing #pdsSaveNotice,
+  body.pds-printing .pds-sheet-tabs,
+  body.pds-printing .pds-sheet-description,
+  body.pds-printing .pds-continuation-note{display:none!important}
+  body.pds-printing .pds-sheet-scroll{max-height:none!important;overflow:visible!important;border:0!important}
+  body.pds-printing .pds-sheet-table{width:100%!important;min-width:0!important;font-size:7pt!important}
+  body.pds-printing .pds-sheet-table td{padding:1px!important;font-size:7pt!important}
+}
 #teacherPasswordForm{max-width:920px}
 #teacherProfilePage:not([hidden]){position:relative;z-index:1;min-height:0;max-height:calc(100vh - 76px);overflow-y:auto;overflow-x:hidden;padding:0 8px 32px 0;scrollbar-width:thin;scrollbar-color:var(--accent) var(--field);overscroll-behavior-y:contain}
 #teacherProfilePage:not([hidden])::-webkit-scrollbar{width:10px}
@@ -523,6 +608,26 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .tools-selector label{color:var(--muted);font-size:.82rem;font-weight:700}
 .tools-selector select{width:100%;min-height:40px;padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;font-size:.82rem;font-weight:700}
 .tools-panel{min-width:0}
+.checklist-toolbar .btn,.checklist-column-remove{width:auto;margin:0}
+.checklist-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}
+.checklist-table-wrap{width:100%;margin-top:14px;overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.checklist-table{width:100%;min-width:680px;border-collapse:separate;border-spacing:0;color:var(--ink);font-size:.84rem}
+.checklist-table th,.checklist-table td{padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.checklist-table th{background:var(--soft);color:var(--muted);font-size:.74rem;font-weight:800;white-space:nowrap}
+.checklist-table tr:last-child td{border-bottom:0}
+.checklist-table th:last-child,.checklist-table td:last-child{border-right:0}
+.checklist-table .checklist-number-cell,.checklist-table .checklist-check-cell{text-align:center}
+.checklist-table .checklist-number-cell{width:52px;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:700}
+.checklist-table .checklist-student-cell{min-width:210px;font-weight:700}
+.checklist-table .checklist-check-cell{width:120px}
+.checklist-table .checklist-check-cell input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.checklist-table .checklist-column-heading{display:flex;min-width:140px;align-items:center;gap:7px}
+.checklist-table .checklist-column-heading input{width:100%;min-width:0;min-height:36px;margin:0;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);font:inherit}
+.checklist-table .checklist-column-remove{flex:none;padding:5px 7px;font-size:.68rem}
+.checklist-table .checklist-empty-cell{padding:20px;color:var(--muted);text-align:center}
+.checklist-toolbar .btn:disabled{cursor:not-allowed;opacity:.5}
+.checklist-status{margin:12px 0 0;color:var(--muted);font-size:.82rem}
+.checklist-status.error{color:var(--err)}
 .lesson-plan-workspace{--ink:#202a38;--muted:#667085;--line:#d8dee8;--field:#fff;--card:#fff;display:grid;min-width:0;width:min(100%,960px);gap:18px;margin:0 auto;padding:clamp(20px,4vw,44px);border:1px solid #d6dce5;border-radius:8px;background:#fff;color:#202a38;box-shadow:0 12px 34px rgba(15,23,42,.14)}
 .lesson-plan-heading{padding:0 0 16px;border-bottom:2px solid #273444;text-align:center}
 .lesson-plan-heading h2{margin:0;color:#202a38;font-size:1.35rem;letter-spacing:.07em;text-transform:uppercase}
@@ -1661,7 +1766,7 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
 .menu-toggle:hover,.topbar-settings:hover{transform:translateY(-1px)}
 .topbar-profile{border-radius:999px;padding:5px 12px 5px 6px}
 .topbar-profile-avatar{width:34px;height:34px}
-.page-content{max-width:1480px;padding:clamp(24px,3vw,42px)}
+.page-content{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;row-gap:clamp(18px,2vw,24px);min-width:0;max-width:1480px;padding:clamp(24px,3vw,42px) clamp(20px,3vw,42px) clamp(36px,4vw,56px)}
 .page-heading{gap:14px;margin-bottom:22px}
 .page-heading h1{letter-spacing:-.045em}
 .data-card{border-radius:18px;box-shadow:0 8px 28px color-mix(in srgb,var(--ink) 5%,transparent)}
@@ -2362,7 +2467,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
     </div>
     <span class="brand-version">1.0.52</span>
     <p class="brand-contact" aria-label="Contact information">
-      <a href="mailto:demogorgon37846@gmail.com">Email: demogorgon37846@gmail.com</a>
+      <a href="mailto:lugatimanbonn@gmail.com">Email: lugatimanbonn@gmail.com</a>
       <a href="https://www.facebook.com/bonnervin.lugatiman.1" target="_blank" rel="noopener noreferrer">Facebook</a>
       <a href="tel:09561209923">Mobile No.: 09561209923</a>
     </p>
@@ -2567,9 +2672,10 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
                 <span class="topbar-calendar-badge" id="topbarCalendarBadge" aria-hidden="true" hidden></span>
               </button>
               <section class="topbar-calendar-popover" id="topbarCalendarPopover" role="dialog" aria-labelledby="topbarMiniCalendarMonth" hidden>
+                <div class="topbar-calendar-resize-handle" id="topbarCalendarResizeHandle" role="separator" aria-orientation="vertical" aria-label="Resize calendar width" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="340" tabindex="0" title="Drag the left edge or use the arrow keys to resize"><span aria-hidden="true"></span></div>
                 <div class="topbar-calendar-month-heading">
                   <button class="topbar-calendar-nav" id="topbarMiniCalendarPrevious" type="button" aria-label="Previous month">‹</button>
-                  <h3 id="topbarMiniCalendarMonth"></h3>
+                  <h3 id="topbarMiniCalendarMonth" title="Drag to move the calendar. Resize the left edge or bottom-right corner."></h3>
                   <button class="topbar-calendar-nav" id="topbarMiniCalendarNext" type="button" aria-label="Next month">›</button>
                 </div>
                 <div class="topbar-calendar-weekdays" role="row">
@@ -3851,7 +3957,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
               <div class="teacher-profile-tabs" id="teacherProfileTabs" role="tablist" aria-label="Teacher profile information">
                 <button class="teacher-profile-tab" id="teacherProfileBasicTab" type="button" role="tab" aria-selected="true" aria-controls="teacherProfileBasicPanel" tabindex="0">BASIC INFO</button>
                 <button class="teacher-profile-tab" id="teacherProfileSchoolTab" type="button" role="tab" aria-selected="false" aria-controls="teacherProfileSchoolPanel" tabindex="-1">SCHOOL INFO</button>
-                <button class="teacher-profile-tab" id="teacherProfileBackgroundTab" type="button" role="tab" aria-selected="false" aria-controls="teacherProfileBackgroundPanel" tabindex="-1">BACKGROUND INFORMATION</button>
+                <button class="teacher-profile-tab" id="teacherProfileBackgroundTab" type="button" role="tab" aria-selected="false" aria-controls="teacherProfileBackgroundPanel" tabindex="-1">PERSONAL DATA SHEET</button>
                 <button class="teacher-profile-tab" id="teacherProfileSalnTab" type="button" role="tab" aria-selected="false" aria-controls="teacherProfileSalnPanel" tabindex="-1">SALN RECORDS</button>
               </div>
               <div class="teacher-profile-tab-panel" id="teacherProfileBasicPanel" role="tabpanel" aria-labelledby="teacherProfileBasicTab" tabindex="0">
@@ -3866,6 +3972,9 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
                   <fieldset class="form-field full teacher-subject-fieldset" aria-labelledby="teacherProfileSubjectsHandledLabel"><div class="teacher-subject-header"><div class="teacher-subject-heading"><h3 id="teacherProfileSubjectsHandledLabel">Subjects handled</h3><p class="teacher-subject-description">Choose the subjects taught in each section.</p></div><div class="teacher-subject-section-control"><label class="teacher-subject-section-label" for="teacherSubjectSection">Section</label><select class="teacher-subject-section" id="teacherSubjectSection" aria-label="Choose section for subject selections"></select></div><button class="btn ghost" id="toggleTeacherSubjects" type="button" aria-pressed="true">Add Subjects</button></div><div class="teacher-subject-options" id="teacherProfileSubjectsHandled" role="group" aria-labelledby="teacherProfileSubjectsHandledLabel"></div><p class="field-hint" id="teacherSubjectsHint">Subjects are locked. Choose Add Subjects to edit your selections.</p><p class="notice" id="teacherSubjectsNotice" role="status" aria-live="polite"></p></fieldset>
                   <div class="form-field"><label>Parent class code</label><span class="teacher-class-code" id="teacherProfileClassCode">—</span><p class="field-hint">Share this code with parents to join your class.</p></div>
                 </div>
+                <p class="notice error" id="teacherProfileBasicError" role="alert"></p>
+                <p class="notice" id="teacherProfileBasicNotice" role="status" aria-live="polite"></p>
+                <div class="form-actions"><button class="btn" id="saveTeacherBasicProfile" type="button">Save Basic Info</button></div>
               </div>
               <div class="teacher-profile-tab-panel" id="teacherProfileSchoolPanel" role="tabpanel" aria-labelledby="teacherProfileSchoolTab" tabindex="0" hidden>
                 <div class="form-grid">
@@ -3887,12 +3996,37 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
                     </div>
                   </div></div>
                 </div>
+                <p class="notice error" id="teacherProfileSchoolError" role="alert"></p>
+                <p class="notice" id="teacherProfileSchoolNotice" role="status" aria-live="polite"></p>
+                <div class="form-actions"><button class="btn" id="saveTeacherSchoolProfile" type="button">Save School Info</button></div>
               </div>
-              <div class="teacher-profile-tab-panel" id="teacherProfileBackgroundPanel" role="tabpanel" aria-labelledby="teacherProfileBackgroundTab" tabindex="0" hidden></div>
+              <div class="teacher-profile-tab-panel" id="teacherProfileBackgroundPanel" role="tabpanel" aria-labelledby="teacherProfileBackgroundTab" tabindex="0" hidden>
+                <section class="pds-workbook" id="pdsWorkbook" aria-label="Personal Data Sheet workbook">
+                  <div class="pds-workbook-header">
+                    <div><p class="pds-eyebrow">PERSONAL DATA SHEET · REVISED 2026</p><h2>CS Form No. 212</h2><p>Complete the editable cells, then save them to your teacher profile.</p></div>
+                    <div class="pds-workbook-actions">
+                      <button class="btn ghost" id="printPdsSheet" type="button">Print sheet</button>
+                      <button class="btn" id="savePdsSheet" type="button">Save PDS</button>
+                    </div>
+                  </div>
+                  <p class="notice error" id="pdsSaveError" role="alert"></p>
+                  <p class="notice" id="pdsSaveNotice" role="status" aria-live="polite"></p>
+                  <div class="pds-sheet-tabs" id="pdsSheetTabs" role="tablist" aria-label="PDS workbook sheets">
+                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC1" aria-controls="pdsSheetTable" aria-selected="true" tabindex="0" data-pds-sheet="C1"><span>C1</span><small>Personal · Family · Education</small></button>
+                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC2" aria-controls="pdsSheetTable" aria-selected="false" tabindex="-1" data-pds-sheet="C2"><span>C2</span><small>Eligibility · Work Experience</small></button>
+                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC3" aria-controls="pdsSheetTable" aria-selected="false" tabindex="-1" data-pds-sheet="C3"><span>C3</span><small>Training · Voluntary · Other Info</small></button>
+                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC4" aria-controls="pdsSheetTable" aria-selected="false" tabindex="-1" data-pds-sheet="C4"><span>C4</span><small>Additional Info · References · Oath</small></button>
+                  </div>
+                  <p class="pds-sheet-description" id="pdsSheetDescription">Loading PDS 2026 workbook…</p>
+                  <div class="pds-sheet-scroll" id="pdsSheetScroll" role="tabpanel" aria-labelledby="pdsSheetTabC1" aria-busy="true">
+                    <table class="pds-sheet-table" id="pdsSheetTable" aria-label="PDS sheet C1"><tbody></tbody></table>
+                  </div>
+                  <p class="field-hint pds-continuation-note">The source workbook also contains continuation sheets C5–C11; this page includes the requested C1–C4 sheets.</p>
+                </section>
+              </div>
               <div class="teacher-profile-tab-panel" id="teacherProfileSalnPanel" role="tabpanel" aria-labelledby="teacherProfileSalnTab" tabindex="0" hidden></div>
               <p class="notice error" id="teacherProfileError" role="alert"></p>
               <p class="notice" id="teacherProfileNotice" role="status" aria-live="polite"></p>
-              <div class="form-actions"><button class="btn" id="saveTeacherProfile" type="submit">Save Profile</button></div>
             </form>
             <form class="data-card teacher-profile-form" id="teacherPasswordForm">
               <div class="data-card-header"><h2>Change password</h2></div>
@@ -4019,6 +4153,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
               <select id="toolsSelector" aria-controls="tarpaulinPanel">
                 <option value="tarpaulinPanel" selected>Tarpapel Maker</option>
                 <option value="calendarPanel">Calendar</option>
+                <option value="checklistPanel">Checklist</option>
                 <option value="moreToolsPanel">More tools</option>
               </select>
             </div>
@@ -4436,6 +4571,23 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
                 </form>
               </dialog>
             </section>
+            <section class="tools-panel" id="checklistPanel" aria-labelledby="checklistHeading" hidden>
+              <section class="data-card" aria-labelledby="checklistHeading">
+                <h2 id="checklistHeading">Checklist</h2>
+                <p class="field-hint">The table lists currently enrolled students across your active class. Edit column headers to customize checklist items; use Refresh student list after roster changes.</p>
+                <div class="checklist-toolbar" aria-label="Checklist table actions">
+                  <button class="btn ghost" id="checklistRefreshRoster" type="button">Refresh student list</button>
+                  <button class="btn ghost" id="checklistAddColumn" type="button">Add checklist item</button>
+                </div>
+                <div class="checklist-table-wrap" role="region" aria-label="Checklist table; scroll horizontally to view all columns" tabindex="0">
+                  <table class="checklist-table" id="checklistTable">
+                    <thead><tr id="checklistHeaderRow"><th scope="col">No.</th><th scope="col">Student</th></tr></thead>
+                    <tbody id="checklistRows"></tbody>
+                  </table>
+                </div>
+                <p class="checklist-status" id="checklistStatus" role="status" aria-live="polite"></p>
+              </section>
+            </section>
             <section class="tools-panel" id="moreToolsPanel" aria-labelledby="moreToolsHeading" hidden>
               <div class="data-card empty-state"><h2 id="moreToolsHeading">More tools are on the way</h2><p>Additional classroom tools can be added here.</p></div>
             </section>
@@ -4517,7 +4669,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
           <p>This application was independently developed to assist classroom advisers in managing learner records and administrative tasks more efficiently. Development was supported by artificial intelligence (AI) tools; however, all design, functionality, content, and implementation decisions remain the responsibility of the developer.</p>
           <p>This application is not affiliated with, endorsed by, or officially approved by the Department of Education (DepEd).</p>
           <p class="portal-footer-contact" aria-label="Contact information">
-            <a href="mailto:demogorgon37846@gmail.com">Email: demogorgon37846@gmail.com</a>
+            <a href="mailto:lugatimanbonn@gmail.com">Email: lugatimanbonn@gmail.com</a>
             <a href="https://www.facebook.com/bonnervin.lugatiman.1" target="_blank" rel="noopener noreferrer">Facebook</a>
             <a href="tel:09561209923">Mobile No.: 09561209923</a>
           </p>
@@ -4769,6 +4921,16 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
   var rmaRequestId=0;
   var teacherProfileDirty=false;
   var teacherProfileDetailsDirty=false;
+  var teacherProfileBasicDirty=false;
+  var teacherProfileSchoolDirty=false;
+  var teacherProfileSavedIdentity={name:"",email:"",classroomNumber:""};
+  var teacherPdsTemplate=[];
+  var teacherPdsEntries={};
+  var teacherPdsLoaded=false;
+  var teacherPdsLoading=null;
+  var teacherPdsDirty=false;
+  var teacherPdsRequestId=0;
+  var activeTeacherPdsSheet="C1";
   var teacherSubjectsDirty=false;
   var teacherSubjectsLocked=true;
   var teacherPasswordDirty=false;
@@ -5673,6 +5835,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
   }
 
   async function loadStudents(){
+    rosterStudentsLoaded=false;
     $("studentNotice").textContent="";
     $("studentNotice").classList.remove("error");
     $("studentCount").textContent="Loading students...";
@@ -5689,6 +5852,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
         throw new Error("The roster response is outdated. Restart the portal server to load parent account links.");
       }
       rosterParents=result.parents;
+      rosterStudentsLoaded=true;
       if(Array.isArray(result.sectionsHandled)){
         handledSections=result.sectionsHandled;
         populateSectionControls(activeStudentSection);
@@ -5708,12 +5872,17 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
         $("studentNotice").textContent="Roster refreshed, but saved E-Class inputs could not be reconciled: "+error.message;
         $("studentNotice").classList.add("error");
       }
+      if(!$("checklistPanel").hidden)renderChecklist();
       return true;
     }catch(error){
       $("studentCount").textContent="Unable to load";
       $("clearStudentRoster").disabled=true;
       $("studentNotice").textContent=error.message;
       $("studentNotice").classList.add("error");
+      if(!$("checklistPanel").hidden){
+        renderChecklist();
+        setChecklistStatus("Student roster could not be loaded. "+error.message,true);
+      }
       return false;
     }
   }
@@ -9979,8 +10148,10 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
     if(!showRma)rmaDirty=false;
     if(!showAttendance)attendanceDirty=false;
     if(page!=="profile"){
-      teacherProfileDirty=false;
+      teacherProfileDirty=teacherPdsDirty;
       teacherProfileDetailsDirty=false;
+      teacherProfileBasicDirty=false;
+      teacherProfileSchoolDirty=false;
       teacherSubjectsDirty=false;
       teacherPasswordDirty=false;
       $("teacherPasswordForm").reset();
@@ -12305,6 +12476,10 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
   async function loadTeacherProfile(){
     $("teacherProfileError").textContent="";
     $("teacherProfileNotice").textContent="";
+    $("teacherProfileBasicError").textContent="";
+    $("teacherProfileBasicNotice").textContent="";
+    $("teacherProfileSchoolError").textContent="";
+    $("teacherProfileSchoolNotice").textContent="";
     try{
       var profileResults=await Promise.all([
         api("/api/teacher/profile"),
@@ -12316,6 +12491,11 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       $("teacherProfilePosition").value=result.position||"";
       $("teacherProfileEmail").value=result.email;
       $("teacherProfileClassroom").value=result.classroomNumber;
+      teacherProfileSavedIdentity={
+        name:result.name,
+        email:result.email,
+        classroomNumber:result.classroomNumber
+      };
       $("teacherProfileGrade").value=result.grade||"";
       $("teacherProfileSection").value=result.section||"";
       defaultStudentSection=result.section||"";
@@ -12357,6 +12537,8 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       $("teacherProfileClassCode").textContent=currentUser.classCode||"Not available";
       teacherProfileDirty=false;
       teacherProfileDetailsDirty=false;
+      teacherProfileBasicDirty=false;
+      teacherProfileSchoolDirty=false;
       setTeacherProfilePhoto(result.hasPhoto);
       setTeacherSchoolLogo(result.hasSchoolLogo);
     }catch(error){
@@ -13473,7 +13655,12 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
     if(!$("toolsPage").hidden)setActiveToolPanel("calendarPanel");
   };
   (function(){
-    var panelIds=["tarpaulinPanel","lessonPlanPanel","calendarPanel","moreToolsPanel"];
+    var panelIds=["tarpaulinPanel","lessonPlanPanel","calendarPanel","checklistPanel","moreToolsPanel"];
+    var checklistColumns=[];
+    var checklistStudentRecords=[];
+    var checklistOwnerKey="";
+    var checklistMigrationMessage="";
+    var rosterStudentsLoaded=false;
     var lessonPlanInitialized=false;
     var lessonPlanMode="lesson-plan";
     var lessonPlanSourceFiles=[];
@@ -14617,6 +14804,10 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
     var miniCalendarSelectedDate=calendarDateIso(new Date());
     var miniCalendarToggle=$("topbarCalendarToggle");
     var miniCalendarPopover=$("topbarCalendarPopover");
+    var miniCalendarResizeHandle=$("topbarCalendarResizeHandle");
+    var miniCalendarDrag=null;
+    var miniCalendarResize=null;
+    var miniCalendarHasCustomPosition=false;
     var miniCalendarGrid=$("topbarMiniCalendarGrid");
     var miniCalendarHolidayCache=new Map();
     var miniCalendarHolidayRequests=new Map();
@@ -14911,6 +15102,49 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       miniCalendarPopover.hidden=true;
       miniCalendarToggle.setAttribute("aria-expanded","false");
       if(restoreFocus)miniCalendarToggle.focus();
+    }
+    function setTopbarMiniCalendarPosition(left,top){
+      var positionParent=miniCalendarPopover.offsetParent;
+      var parentBounds=positionParent?positionParent.getBoundingClientRect():{left:0,top:0};
+      miniCalendarPopover.style.left=(left-parentBounds.left)+"px";
+      miniCalendarPopover.style.top=(top-parentBounds.top)+"px";
+    }
+    function keepTopbarMiniCalendarInViewport(){
+      var bounds=miniCalendarPopover.getBoundingClientRect();
+      var left=Math.max(8,Math.min(bounds.left,window.innerWidth-bounds.width-8));
+      var top=Math.max(8,Math.min(bounds.top,window.innerHeight-bounds.height-8));
+      setTopbarMiniCalendarPosition(left,top);
+    }
+    function syncTopbarMiniCalendarResizeHandle(width){
+      var maxWidth=Math.max(1,window.innerWidth-16);
+      var minWidth=Math.min(280,maxWidth);
+      miniCalendarResizeHandle.setAttribute("aria-valuemin",String(minWidth));
+      miniCalendarResizeHandle.setAttribute("aria-valuemax",String(maxWidth));
+      miniCalendarResizeHandle.setAttribute("aria-valuenow",String(Math.round(width)));
+      miniCalendarResizeHandle.setAttribute("aria-valuetext",Math.round(width)+" pixels wide");
+    }
+    function setTopbarMiniCalendarWidth(width,right){
+      var maxWidth=Math.max(1,window.innerWidth-16);
+      var minWidth=Math.min(280,maxWidth);
+      var nextWidth=Math.min(maxWidth,Math.max(minWidth,width));
+      var rightEdge=Math.min(window.innerWidth-8,Math.max(minWidth+8,right));
+      var bounds=miniCalendarPopover.getBoundingClientRect();
+      miniCalendarPopover.style.width=nextWidth+"px";
+      setTopbarMiniCalendarPosition(rightEdge-nextWidth,bounds.top);
+      keepTopbarMiniCalendarInViewport();
+      syncTopbarMiniCalendarResizeHandle(miniCalendarPopover.getBoundingClientRect().width);
+    }
+    function positionTopbarMiniCalendar(){
+      var bounds=miniCalendarPopover.getBoundingClientRect();
+      if(!miniCalendarHasCustomPosition){
+        miniCalendarPopover.style.position="fixed";
+        miniCalendarPopover.style.right="auto";
+        miniCalendarPopover.style.width=bounds.width+"px";
+        miniCalendarPopover.style.height=bounds.height+"px";
+        miniCalendarHasCustomPosition=true;
+      }
+      keepTopbarMiniCalendarInViewport();
+      syncTopbarMiniCalendarResizeHandle(miniCalendarPopover.getBoundingClientRect().width);
     }
     function calendarDeadlineDaysRemaining(date){
       var todayIso=calendarDateIso(new Date());
@@ -15355,6 +15589,390 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       if($("toolsSelector").value==="calendarPanel")loadTeacherCalendar();
     });
 
+    function checklistStorageKey(){
+      var userKey=currentUser&&(currentUser.id||currentUser.username||currentUser.email);
+      if(!userKey)throw new Error("Sign in to use the checklist.");
+      return "gradePortalStudentChecklist:"+encodeURIComponent(String(userKey));
+    }
+    function checklistLegacyStorageKey(){
+      var userKey=currentUser&&(currentUser.id||currentUser.username||currentUser.email);
+      if(!userKey)throw new Error("Sign in to use the checklist.");
+      return "gradePortalChecklist:"+encodeURIComponent(String(userKey));
+    }
+    function defaultChecklistColumns(){
+      return [{id:"checklist-1",label:"Checklist item"}];
+    }
+    function migratedChecklistColumns(data){
+      var labels=[];
+      var seen=new Set();
+      var skippedLabels=0;
+      function addLabel(value){
+        if(typeof value!=="string")return;
+        var label=value.trim().slice(0,50);
+        if(!label||seen.has(label.toLowerCase()))return;
+        if(labels.length>=12){
+          skippedLabels++;
+          return;
+        }
+        seen.add(label.toLowerCase());
+        labels.push(label);
+      }
+      if(Array.isArray(data)){
+        if(data.length>100||data.some(function(item){
+          return !item||typeof item.id!=="string"||!item.id
+            ||typeof item.text!=="string"||!item.text.trim()||item.text.length>200
+            ||typeof item.done!=="boolean";
+        })){
+          throw new Error("The saved checklist data is invalid.");
+        }
+        data.forEach(function(item){addLabel(item.text)});
+      }else if(data&&data.version===2&&Array.isArray(data.columns)&&Array.isArray(data.rows)){
+        data.rows.forEach(function(row){
+          if(!row||!Array.isArray(row.cells))throw new Error("The saved checklist data is invalid.");
+          var firstCell=row.cells[0];
+          if(firstCell&&typeof firstCell.text==="string")addLabel(firstCell.text);
+        });
+        data.columns.slice(2).forEach(function(column){addLabel(column&&column.label)});
+      }else{
+        throw new Error("The saved checklist data is invalid.");
+      }
+      return {
+        columns:labels.length
+          ?labels.map(function(label,index){return {id:"checklist-"+(index+1),label:label}})
+          :defaultChecklistColumns(),
+        migratedLabels:labels.length,
+        skippedLabels:skippedLabels
+      };
+    }
+    function validateChecklistTable(columns,studentRecords){
+      if(!Array.isArray(columns)||columns.length<1||columns.length>12
+        ||!Array.isArray(studentRecords)||studentRecords.length>10000){
+        throw new Error("The saved checklist table is invalid.");
+      }
+      var columnIds=new Set();
+      var columnLabels=new Set();
+      columns.forEach(function(column){
+        if(!column||typeof column.id!=="string"||!column.id||columnIds.has(column.id)
+          ||typeof column.label!=="string"||!column.label.trim()||column.label.length>50){
+          throw new Error("The saved checklist table has an invalid column.");
+        }
+        columnIds.add(column.id);
+        var normalizedLabel=column.label.trim().toLowerCase();
+        if(columnLabels.has(normalizedLabel))throw new Error("The saved checklist table has duplicate column names.");
+        columnLabels.add(normalizedLabel);
+      });
+      var studentIds=new Set();
+      studentRecords.forEach(function(record){
+        if(!record||typeof record.studentId!=="string"||!record.studentId||studentIds.has(record.studentId)
+          ||!Array.isArray(record.checks)){
+          throw new Error("The saved checklist table has an invalid student record.");
+        }
+        studentIds.add(record.studentId);
+        var checkedColumnIds=new Set();
+        record.checks.forEach(function(check){
+          if(!check||!columnIds.has(check.columnId)||checkedColumnIds.has(check.columnId)
+            ||typeof check.checked!=="boolean"){
+            throw new Error("The saved checklist table has an invalid checkbox value.");
+          }
+          checkedColumnIds.add(check.columnId);
+        });
+      });
+    }
+    function loadChecklistItems(){
+      var key=checklistStorageKey();
+      if(checklistOwnerKey===key)return;
+      var saved=window.localStorage.getItem(key);
+      var columns;
+      var studentRecords=[];
+      checklistMigrationMessage="";
+      if(saved){
+        var data=JSON.parse(saved);
+        if(data&&data.version===3){
+          columns=data.columns;
+          studentRecords=data.students;
+        }else{
+          throw new Error("The saved student checklist data is invalid.");
+        }
+      }else{
+        var legacySaved=window.localStorage.getItem(checklistLegacyStorageKey());
+        if(legacySaved){
+          var legacyResult=migratedChecklistColumns(JSON.parse(legacySaved));
+          columns=legacyResult.columns;
+          checklistMigrationMessage=legacyResult.migratedLabels
+            ?" Earlier checklist item names are now column headers; the previous checklist data remains saved on this device."
+            :"";
+          if(legacyResult.skippedLabels){
+            checklistMigrationMessage+=" Only the first 12 item names fit as headers.";
+          }
+        }else{
+          columns=defaultChecklistColumns();
+        }
+      }
+      validateChecklistTable(columns,studentRecords);
+      checklistColumns=columns;
+      checklistStudentRecords=studentRecords;
+      checklistOwnerKey=key;
+    }
+    function saveChecklistItems(){
+      try{
+        window.localStorage.setItem(checklistStorageKey(),JSON.stringify({
+          version:3,
+          columns:checklistColumns,
+          students:checklistStudentRecords
+        }));
+        return "";
+      }catch(error){
+        return error.message;
+      }
+    }
+    function setChecklistStatus(message,isError){
+      var status=$("checklistStatus");
+      status.textContent=message;
+      status.classList.toggle("error",Boolean(isError));
+    }
+    function checklistRosterStudents(){
+      return rosterStudents.filter(function(student){
+        return student&&student.id!==undefined&&student.id!==null&&String(student.id).trim()&&!student.enrollmentStatus;
+      });
+    }
+    function syncChecklistStudentRecords(students){
+      var previousRecords=checklistStudentRecords;
+      var nextRecords=previousRecords.slice();
+      var knownIds=new Set(nextRecords.map(function(record){return record.studentId}));
+      students.forEach(function(student){
+        var studentId=String(student.id);
+        if(!knownIds.has(studentId)){
+          knownIds.add(studentId);
+          nextRecords.push({studentId:studentId,checks:[]});
+        }
+      });
+      if(nextRecords.length===previousRecords.length)return "";
+      checklistStudentRecords=nextRecords;
+      var saveError=saveChecklistItems();
+      if(saveError){
+        checklistStudentRecords=previousRecords;
+        return saveError;
+      }
+      return "";
+    }
+    function checklistStudentRecord(studentId){
+      return checklistStudentRecords.find(function(record){return record.studentId===String(studentId)})||null;
+    }
+    function checklistCellIsChecked(record,columnId){
+      if(!record)return false;
+      var check=record.checks.find(function(item){return item.columnId===columnId});
+      return Boolean(check&&check.checked);
+    }
+    function checklistSummary(students){
+      var completed=0;
+      students.forEach(function(student){
+        var record=checklistStudentRecord(student.id);
+        checklistColumns.forEach(function(column){
+          if(checklistCellIsChecked(record,column.id))completed++;
+        });
+      });
+      var total=students.length*checklistColumns.length;
+      return students.length+" student"+(students.length===1?"":"s")+"; "+completed+" of "+total+" checklist items complete."
+    }
+    function renderChecklist(errorMessage,isError){
+      var table=$("checklistTable");
+      var headerRow=$("checklistHeaderRow");
+      var body=$("checklistRows");
+      headerRow.replaceChildren();
+      body.replaceChildren();
+      try{
+        loadChecklistItems();
+      }catch(error){
+        table.hidden=true;
+        setChecklistStatus("Checklist could not be loaded. "+error.message,true);
+        return;
+      }
+      if(!rosterStudentsLoaded){
+        table.hidden=true;
+        setChecklistStatus("The student roster is loading. Refresh the student list to try again.",false);
+        return;
+      }
+      table.hidden=false;
+      var students=checklistRosterStudents();
+      var syncError=syncChecklistStudentRecords(students);
+      function addHeader(label,className){
+        var cell=document.createElement("th");
+        cell.scope="col";
+        cell.textContent=label;
+        if(className)cell.className=className;
+        headerRow.appendChild(cell);
+        return cell;
+      }
+      addHeader("No.","checklist-number-cell");
+      addHeader("Student","checklist-student-cell");
+      checklistColumns.forEach(function(column,columnIndex){
+        var header=addHeader("","checklist-column-heading");
+        var labelInput=document.createElement("input");
+        labelInput.type="text";
+        labelInput.maxLength=50;
+        labelInput.value=column.label;
+        labelInput.setAttribute("aria-label","Column name: "+column.label);
+        labelInput.addEventListener("change",function(){
+          var nextLabel=labelInput.value.trim();
+          if(!nextLabel||checklistColumns.some(function(existing,index){
+            return index!==columnIndex&&existing.label.toLowerCase()===nextLabel.toLowerCase();
+          })){
+            labelInput.value=column.label;
+            setChecklistStatus("Column names must be non-empty and unique.",true);
+            return;
+          }
+          var previousLabel=column.label;
+          column.label=nextLabel;
+          var saveError=saveChecklistItems();
+          if(saveError){
+            column.label=previousLabel;
+            labelInput.value=previousLabel;
+            setChecklistStatus("Checklist could not be saved. "+saveError,true);
+            return;
+          }
+          labelInput.setAttribute("aria-label","Checklist item: "+nextLabel);
+          if(removeColumnButton)removeColumnButton.setAttribute("aria-label","Remove "+nextLabel+" checklist column");
+          setChecklistStatus(checklistSummary(students));
+        });
+        header.appendChild(labelInput);
+        var removeColumnButton=null;
+        if(columnIndex>0){
+          removeColumnButton=document.createElement("button");
+          removeColumnButton.className="btn ghost checklist-column-remove";
+          removeColumnButton.type="button";
+          removeColumnButton.textContent="Remove";
+          removeColumnButton.setAttribute("aria-label","Remove "+column.label+" checklist column");
+          removeColumnButton.addEventListener("click",function(){
+            if(!window.confirm("Remove the "+column.label+" checklist item and all of its saved checkmarks?"))return;
+            var previousColumns=checklistColumns;
+            var previousRecords=checklistStudentRecords;
+            checklistColumns=checklistColumns.filter(function(existing){return existing.id!==column.id});
+            checklistStudentRecords=checklistStudentRecords.map(function(record){
+              return {
+                studentId:record.studentId,
+                checks:record.checks.filter(function(check){return check.columnId!==column.id})
+              };
+            });
+            var saveError=saveChecklistItems();
+            if(saveError){
+              checklistColumns=previousColumns;
+              checklistStudentRecords=previousRecords;
+              renderChecklist("Checklist could not be saved. "+saveError,true);
+              return;
+            }
+            renderChecklist();
+          });
+          header.appendChild(removeColumnButton);
+        }
+      });
+      if(!students.length){
+        var emptyRow=document.createElement("tr");
+        var emptyCell=document.createElement("td");
+        emptyCell.className="checklist-empty-cell";
+        emptyCell.colSpan=checklistColumns.length+2;
+        emptyCell.textContent="No currently enrolled students were found in this class.";
+        emptyRow.appendChild(emptyCell);
+        body.appendChild(emptyRow);
+      }
+      students.forEach(function(student,rowIndex){
+        var studentId=String(student.id);
+        var studentName=[student.lastName,student.firstName,student.middleName].filter(Boolean).join(", ")
+          ||String(student.name||"Unnamed student");
+        var record=checklistStudentRecord(studentId);
+        var row=document.createElement("tr");
+        var numberCell=document.createElement("td");
+        numberCell.className="checklist-number-cell";
+        numberCell.textContent=String(rowIndex+1);
+        row.appendChild(numberCell);
+        var nameCell=document.createElement("td");
+        nameCell.className="checklist-student-cell";
+        nameCell.textContent=studentName;
+        row.appendChild(nameCell);
+        checklistColumns.forEach(function(column){
+          var dataCell=document.createElement("td");
+          dataCell.className="checklist-check-cell";
+          var checkbox=document.createElement("input");
+          checkbox.type="checkbox";
+          checkbox.checked=checklistCellIsChecked(record,column.id);
+          checkbox.setAttribute("aria-label","Mark "+column.label+" complete for "+studentName);
+          checkbox.addEventListener("change",function(){
+            var previousRecords=checklistStudentRecords;
+            var nextRecords=previousRecords.slice();
+            var recordIndex=nextRecords.findIndex(function(existing){return existing.studentId===studentId});
+            var previousRecord=recordIndex===-1?{studentId:studentId,checks:[]}:nextRecords[recordIndex];
+            var nextChecks=previousRecord.checks.slice();
+            var checkIndex=nextChecks.findIndex(function(existing){return existing.columnId===column.id});
+            var nextCheck={columnId:column.id,checked:checkbox.checked};
+            if(checkIndex===-1)nextChecks.push(nextCheck);
+            else nextChecks[checkIndex]=nextCheck;
+            var nextRecord={studentId:studentId,checks:nextChecks};
+            if(recordIndex===-1)nextRecords.push(nextRecord);
+            else nextRecords[recordIndex]=nextRecord;
+            checklistStudentRecords=nextRecords;
+            var saveError=saveChecklistItems();
+            if(saveError){
+              checklistStudentRecords=previousRecords;
+              checkbox.checked=!checkbox.checked;
+              setChecklistStatus("Checklist could not be saved. "+saveError,true);
+              return;
+            }
+            setChecklistStatus(checklistSummary(students)+(checklistMigrationMessage||""));
+          });
+          dataCell.appendChild(checkbox);
+          row.appendChild(dataCell);
+        });
+        body.appendChild(row);
+      });
+      $("checklistAddColumn").disabled=checklistColumns.length>=12;
+      $("checklistRefreshRoster").disabled=false;
+      if(typeof errorMessage==="string"){
+        setChecklistStatus(errorMessage,isError);
+      }else if(syncError){
+        setChecklistStatus("Student rows are shown, but their saved checklist data could not be updated: "+syncError,true);
+      }else{
+        setChecklistStatus(checklistSummary(students)+(checklistMigrationMessage||""));
+      }
+    }
+    $("checklistAddColumn").addEventListener("click",function(){
+      try{
+        loadChecklistItems();
+      }catch(error){
+        renderChecklist();
+        return;
+      }
+      if(checklistColumns.length>=12){
+        setChecklistStatus("A checklist can have up to 12 items.",true);
+        return;
+      }
+      var previousColumns=checklistColumns;
+      var labelNumber=checklistColumns.length+1;
+      while(checklistColumns.some(function(existing){return existing.label.toLowerCase()==="checklist item "+labelNumber}))labelNumber++;
+      checklistColumns=checklistColumns.concat({
+        id:"checklist-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,6),
+        label:"Checklist item "+labelNumber
+      });
+      var saveError=saveChecklistItems();
+      if(saveError){
+        checklistColumns=previousColumns;
+        renderChecklist("Checklist could not be saved. "+saveError,true);
+        return;
+      }
+      renderChecklist();
+      var headers=$("checklistHeaderRow").querySelectorAll("input");
+      if(headers.length)headers[headers.length-1].focus();
+    });
+    $("checklistRefreshRoster").addEventListener("click",async function(){
+      var button=$("checklistRefreshRoster");
+      button.disabled=true;
+      button.textContent="Refreshing…";
+      try{
+        var loaded=await loadStudents();
+        if(!loaded)setChecklistStatus("The student roster could not be refreshed. "+$("studentNotice").textContent,true);
+      }finally{
+        button.disabled=false;
+        button.textContent="Refresh student list";
+      }
+    });
     function selectToolPanel(panelId,focus){
       panelIds.forEach(function(id){
         $(id).hidden=id!==panelId;
@@ -15362,6 +15980,16 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       $("toolsSelector").value=panelId;
       $("toolsSelector").setAttribute("aria-controls",panelId);
       if(panelId==="calendarPanel")loadTeacherCalendar();
+      if(panelId==="checklistPanel"){
+        if(rosterStudentsLoaded){
+          renderChecklist();
+        }else{
+          setChecklistStatus("Loading the student roster…",false);
+          loadStudents().then(function(loaded){
+            if(!loaded)setChecklistStatus("The student roster could not be loaded. "+$("studentNotice").textContent,true);
+          });
+        }
+      }
       if(panelId==="lessonPlanPanel")initializeLessonPlan();
       if(focus)$("toolsSelector").focus();
     }
@@ -15375,6 +16003,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       }
       renderTopbarMiniCalendar();
       miniCalendarPopover.hidden=false;
+      positionTopbarMiniCalendar();
       miniCalendarToggle.setAttribute("aria-expanded","true");
       syncTopbarCalendarHolidays(miniCalendarDate.getFullYear());
       refreshTopbarDeadlineTasks();
@@ -15382,6 +16011,51 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       var selectedDay=miniCalendarGrid.querySelector(".is-selected");
       if(selectedDay)selectedDay.focus();
     };
+    var miniCalendarDragHandle=$("topbarMiniCalendarMonth");
+    miniCalendarResizeHandle.addEventListener("pointerdown",function(event){
+      if(event.button!==0)return;
+      positionTopbarMiniCalendar();
+      var bounds=miniCalendarPopover.getBoundingClientRect();
+      miniCalendarResize={pointerId:event.pointerId,startX:event.clientX,startWidth:bounds.width,right:bounds.right};
+      event.preventDefault();
+    });
+    miniCalendarResizeHandle.addEventListener("keydown",function(event){
+      if(miniCalendarPopover.hidden||(event.key!=="ArrowLeft"&&event.key!=="ArrowRight"))return;
+      positionTopbarMiniCalendar();
+      var bounds=miniCalendarPopover.getBoundingClientRect();
+      var step=event.shiftKey?80:16;
+      var direction=event.key==="ArrowLeft"?1:-1;
+      setTopbarMiniCalendarWidth(bounds.width+direction*step,bounds.right);
+      event.preventDefault();
+    });
+    miniCalendarDragHandle.addEventListener("pointerdown",function(event){
+      if(event.button!==0)return;
+      positionTopbarMiniCalendar();
+      var bounds=miniCalendarPopover.getBoundingClientRect();
+      miniCalendarDrag={pointerId:event.pointerId,offsetX:event.clientX-bounds.left,offsetY:event.clientY-bounds.top};
+      event.preventDefault();
+    });
+    document.addEventListener("pointermove",function(event){
+      if(miniCalendarResize&&miniCalendarResize.pointerId===event.pointerId){
+        setTopbarMiniCalendarWidth(miniCalendarResize.startWidth+miniCalendarResize.startX-event.clientX,miniCalendarResize.right);
+        return;
+      }
+      if(!miniCalendarDrag||miniCalendarDrag.pointerId!==event.pointerId)return;
+      setTopbarMiniCalendarPosition(event.clientX-miniCalendarDrag.offsetX,event.clientY-miniCalendarDrag.offsetY);
+      keepTopbarMiniCalendarInViewport();
+    });
+    function stopTopbarMiniCalendarDrag(event){
+      if(miniCalendarDrag&&miniCalendarDrag.pointerId===event.pointerId)miniCalendarDrag=null;
+      if(miniCalendarResize&&miniCalendarResize.pointerId===event.pointerId)miniCalendarResize=null;
+    }
+    document.addEventListener("pointerup",stopTopbarMiniCalendarDrag);
+    document.addEventListener("pointercancel",stopTopbarMiniCalendarDrag);
+    window.addEventListener("resize",function(){
+      if(!miniCalendarPopover.hidden&&miniCalendarHasCustomPosition){
+        keepTopbarMiniCalendarInViewport();
+        syncTopbarMiniCalendarResizeHandle(miniCalendarPopover.getBoundingClientRect().width);
+      }
+    });
     $("topbarMiniCalendarPrevious").onclick=function(){
       miniCalendarDate=new Date(miniCalendarDate.getFullYear(),miniCalendarDate.getMonth()-1,1,12);
       renderTopbarMiniCalendar();
@@ -17851,10 +18525,27 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
     }
   };
   $("readingAddStudent").onclick=function(){showDashboardPage("students")};
+  var teacherProfileSchoolFieldIds=new Set([
+    "teacherProfileSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId","teacherProfileRegion",
+    "teacherProfileDivision","teacherProfileDistrict","teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"
+  ]);
+  function updateTeacherProfileDirtyState(){
+    teacherProfileDetailsDirty=teacherProfileBasicDirty||teacherProfileSchoolDirty;
+    teacherProfileDirty=teacherProfileDetailsDirty||teacherSubjectsDirty||teacherPdsDirty;
+  }
   ["teacherProfileName","teacherProfilePosition","teacherProfileEmail","teacherProfileClassroom","teacherProfileSectionsHandled","teacherProfileSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId","teacherProfileRegion","teacherProfileDivision","teacherProfileDistrict","teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"].forEach(function(id){
     $(id).addEventListener("input",function(){
-      teacherProfileDetailsDirty=true;
-      teacherProfileDirty=true;
+      var isSchoolField=teacherProfileSchoolFieldIds.has(id);
+      if(isSchoolField)teacherProfileSchoolDirty=true;
+      else teacherProfileBasicDirty=true;
+      updateTeacherProfileDirtyState();
+      if(isSchoolField){
+        $("teacherProfileSchoolError").textContent="";
+        $("teacherProfileSchoolNotice").textContent="";
+      }else{
+        $("teacherProfileBasicError").textContent="";
+        $("teacherProfileBasicNotice").textContent="";
+      }
       if(id==="teacherProfileName"||id==="teacherProfilePosition"
         ||id==="teacherProfileSchoolHead"||id==="teacherProfileSchoolHeadPosition"){
         syncEnglishLessonPlanProfileFields();
@@ -17901,7 +18592,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       handledSubjects=result.subjectsHandled;
       teacherSubjectsDirty=false;
       teacherSubjectsLocked=true;
-      teacherProfileDirty=teacherProfileDetailsDirty;
+      updateTeacherProfileDirtyState();
       $("teacherSubjectSection").value=teacherSubjectSection;
       renderTeacherSubjectChoices(availableSubjects,getTeacherSubjectsForSection(teacherSubjectSection));
       updateTeacherSubjectLockState();
@@ -17924,6 +18615,7 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       profileTab.tabIndex=selected?0:-1;
       $(profileTab.getAttribute("aria-controls")).hidden=!selected;
     });
+    if(tab.id==="teacherProfileBackgroundTab")loadTeacherPds();
   }
   teacherProfileTabs.forEach(function(tab){
     tab.addEventListener("click",function(){selectTeacherProfileTab(tab)});
@@ -17941,22 +18633,267 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       nextTab.focus();
     });
   });
-  $("teacherProfileForm").onsubmit=async function(event){
-    event.preventDefault();
-    var firstInvalidField=this.querySelector(":invalid");
-    if(firstInvalidField){
-      var invalidPanel=firstInvalidField.closest(".teacher-profile-tab-panel");
-      if(invalidPanel){
-        var invalidTab=teacherProfileTabs.find(function(tab){return tab.getAttribute("aria-controls")===invalidPanel.id});
-        if(invalidTab)selectTeacherProfileTab(invalidTab);
+  var pdsSheetTabs=Array.prototype.slice.call($("pdsSheetTabs").querySelectorAll('[role="tab"]'));
+  function pdsCoordinates(address){
+    var match=/^([A-Z]+)(\d+)$/.exec(address);
+    if(!match)return null;
+    var column=0;
+    for(var index=0;index<match[1].length;index++)column=column*26+match[1].charCodeAt(index)-64;
+    return {row:Number(match[2]),column:column};
+  }
+  function setPdsCellStyle(cell,style){
+    if(!style)return;
+    if(style.fontFamily)cell.style.fontFamily=style.fontFamily;
+    if(style.fontSize)cell.style.fontSize=style.fontSize+"pt";
+    if(style.fontColor)cell.style.color=style.fontColor;
+    if(style.background)cell.style.backgroundColor=style.background;
+    if(style.bold)cell.style.fontWeight="700";
+    if(style.italic)cell.style.fontStyle="italic";
+    if(style.horizontal)cell.style.textAlign=style.horizontal;
+    if(style.vertical)cell.style.verticalAlign=style.vertical;
+    cell.style.whiteSpace=style.wrap?"pre-wrap":"nowrap";
+    cell.style.overflowWrap=style.wrap?"anywhere":"normal";
+    ["top","right","bottom","left"].forEach(function(side){
+      if(style.border&&style.border[side]){
+        cell.style["border"+side.charAt(0).toUpperCase()+side.slice(1)]=style.border[side];
       }
-      firstInvalidField.reportValidity();
+    });
+  }
+  function captureActiveTeacherPdsSheet(){
+    if(!teacherPdsLoaded)return;
+    var values=Object.create(null);
+    $("pdsSheetTable").querySelectorAll("[data-pds-cell]").forEach(function(field){
+      var address=field.getAttribute("data-pds-cell");
+      if(field.type==="checkbox"){
+        values[address]=field.checked;
+      }else{
+        var value=(field.innerText||field.textContent||"").replace(/\r\n?/g,"\n").trim();
+        if(value)values[address]=value;
+      }
+    });
+    teacherPdsEntries[activeTeacherPdsSheet]=values;
+  }
+  function renderTeacherPdsSheet(){
+    var sheet=teacherPdsTemplate.find(function(candidate){return candidate.name===activeTeacherPdsSheet});
+    if(!sheet)return;
+    $("pdsSheetDescription").textContent=sheet.description;
+    var table=$("pdsSheetTable");
+    table.setAttribute("aria-label","PDS 2026 sheet "+sheet.name);
+    $("pdsSheetScroll").setAttribute("aria-labelledby","pdsSheetTab"+sheet.name);
+    table.style.width=sheet.widths.reduce(function(total,width){return total+width},0)+"px";
+    table.textContent="";
+    var colgroup=document.createElement("colgroup");
+    sheet.widths.forEach(function(width){
+      var column=document.createElement("col");
+      column.style.width=width+"px";
+      colgroup.appendChild(column);
+    });
+    table.appendChild(colgroup);
+    var body=document.createElement("tbody");
+    var mergedCells=Object.create(null);
+    var coveredCells=new Set();
+    sheet.merges.forEach(function(range){
+      var endpoints=range.split(":");
+      var start=pdsCoordinates(endpoints[0]);
+      var end=pdsCoordinates(endpoints[1]);
+      if(!start||!end)return;
+      mergedCells[endpoints[0]]={rowSpan:end.row-start.row+1,colSpan:end.column-start.column+1};
+      for(var rowNumber=start.row;rowNumber<=end.row;rowNumber++){
+        for(var columnNumber=start.column;columnNumber<=end.column;columnNumber++){
+          if(rowNumber!==start.row||columnNumber!==start.column){
+            coveredCells.add(rowNumber+":"+columnNumber);
+          }
+        }
+      }
+    });
+    var savedCells=teacherPdsEntries[activeTeacherPdsSheet]||{};
+    sheet.rows.forEach(function(row){
+      var tableRow=document.createElement("tr");
+      tableRow.style.height=row.height+"px";
+      var rowLabel=(row.cells.find(function(cell){return cell.value&&cell.value.trim()})||{}).value||"entry";
+      row.cells.forEach(function(cell){
+        var coordinates=pdsCoordinates(cell.address);
+        if(!coordinates||coveredCells.has(coordinates.row+":"+coordinates.column))return;
+        var tableCell=document.createElement("td");
+        var span=mergedCells[cell.address];
+        if(span){
+          tableCell.rowSpan=span.rowSpan;
+          tableCell.colSpan=span.colSpan;
+        }
+        setPdsCellStyle(tableCell,cell.style);
+        if(typeof cell.checked==="boolean"){
+          tableCell.classList.add("pds-checkbox-cell");
+          var checkbox=document.createElement("input");
+          checkbox.type="checkbox";
+          checkbox.setAttribute("data-pds-cell",cell.address);
+          checkbox.setAttribute("aria-label",sheet.name+" "+rowLabel+" "+cell.address);
+          checkbox.checked=Object.prototype.hasOwnProperty.call(savedCells,cell.address)
+            ?savedCells[cell.address]===true
+            :cell.checked;
+          tableCell.appendChild(checkbox);
+        }else if(cell.editable){
+          tableCell.classList.add("pds-editable-cell");
+          tableCell.contentEditable="true";
+          tableCell.setAttribute("role","textbox");
+          tableCell.setAttribute("aria-label",sheet.name+" "+rowLabel+" "+cell.address);
+          tableCell.setAttribute("data-pds-cell",cell.address);
+          tableCell.textContent=typeof savedCells[cell.address]==="string"?savedCells[cell.address]:"";
+        }else{
+          tableCell.textContent=cell.value;
+        }
+        tableRow.appendChild(tableCell);
+      });
+      body.appendChild(tableRow);
+    });
+    table.appendChild(body);
+  }
+  function selectTeacherPdsSheet(tab){
+    if(!teacherPdsLoaded)return;
+    captureActiveTeacherPdsSheet();
+    activeTeacherPdsSheet=tab.getAttribute("data-pds-sheet");
+    pdsSheetTabs.forEach(function(sheetTab){
+      var selected=sheetTab===tab;
+      sheetTab.setAttribute("aria-selected",selected?"true":"false");
+      sheetTab.tabIndex=selected?0:-1;
+    });
+    renderTeacherPdsSheet();
+  }
+  pdsSheetTabs.forEach(function(tab){
+    tab.addEventListener("click",function(){selectTeacherPdsSheet(tab)});
+    tab.addEventListener("keydown",function(event){
+      var currentIndex=pdsSheetTabs.indexOf(tab);
+      var nextIndex=currentIndex;
+      if(event.key==="ArrowRight")nextIndex=(currentIndex+1)%pdsSheetTabs.length;
+      else if(event.key==="ArrowLeft")nextIndex=(currentIndex+pdsSheetTabs.length-1)%pdsSheetTabs.length;
+      else if(event.key==="Home")nextIndex=0;
+      else if(event.key==="End")nextIndex=pdsSheetTabs.length-1;
+      else return;
+      event.preventDefault();
+      var nextTab=pdsSheetTabs[nextIndex];
+      selectTeacherPdsSheet(nextTab);
+      nextTab.focus();
+    });
+  });
+  function markTeacherPdsDirty(){
+    teacherPdsDirty=true;
+    updateTeacherProfileDirtyState();
+    $("pdsSaveError").textContent="";
+    $("pdsSaveNotice").textContent="Unsaved changes. Save PDS to keep them in your teacher profile.";
+  }
+  $("pdsSheetTable").addEventListener("input",markTeacherPdsDirty);
+  $("pdsSheetTable").addEventListener("change",markTeacherPdsDirty);
+  async function loadTeacherPds(){
+    if(teacherPdsLoaded)return;
+    if(teacherPdsLoading)return teacherPdsLoading;
+    var requestId=++teacherPdsRequestId;
+    $("pdsSaveError").textContent="";
+    $("pdsSaveNotice").textContent="";
+    $("pdsSheetDescription").textContent="Loading PDS 2026 workbook…";
+    $("pdsSheetScroll").setAttribute("aria-busy","true");
+    var loadPromise=(async function(){
+      var result=await api("/api/teacher/profile/pds");
+      if(requestId!==teacherPdsRequestId)return;
+      if(!Array.isArray(result.sheets)||result.sheets.map(function(sheet){return sheet.name}).join(",")!=="C1,C2,C3,C4"){
+        throw new Error("The PDS 2026 workbook does not contain the expected C1–C4 sheets.");
+      }
+      teacherPdsTemplate=result.sheets;
+      teacherPdsEntries=result.entries||{};
+      activeTeacherPdsSheet="C1";
+      teacherPdsDirty=false;
+      updateTeacherProfileDirtyState();
+      teacherPdsLoaded=true;
+      pdsSheetTabs.forEach(function(tab){
+        var selected=tab.getAttribute("data-pds-sheet")==="C1";
+        tab.setAttribute("aria-selected",selected?"true":"false");
+        tab.tabIndex=selected?0:-1;
+      });
+      renderTeacherPdsSheet();
+      $("pdsSaveNotice").textContent=result.updatedAt
+        ?"Saved PDS entries loaded from your teacher profile."
+        :"Your PDS is ready. Save changes to keep them in your teacher profile.";
+    })();
+    teacherPdsLoading=loadPromise;
+    try{
+      await loadPromise;
+    }catch(error){
+      if(requestId===teacherPdsRequestId){
+        $("pdsSaveError").textContent=error.message;
+        $("pdsSheetDescription").textContent="The PDS workbook could not be loaded.";
+      }
+    }finally{
+      if(teacherPdsLoading===loadPromise)teacherPdsLoading=null;
+      if(requestId===teacherPdsRequestId)$("pdsSheetScroll").setAttribute("aria-busy","false");
+    }
+  }
+  async function saveTeacherPds(){
+    var button=$("savePdsSheet");
+    if(!teacherPdsLoaded){
+      $("pdsSaveError").textContent="Load the PDS workbook before saving.";
       return;
     }
-    $("teacherProfileError").textContent="";
-    $("teacherProfileNotice").textContent="";
-    var button=$("saveTeacherProfile");
-    button.disabled=true;button.textContent="Saving...";
+    captureActiveTeacherPdsSheet();
+    $("pdsSaveError").textContent="";
+    $("pdsSaveNotice").textContent="";
+    button.disabled=true;
+    button.setAttribute("aria-busy","true");
+    button.textContent="Saving...";
+    var requestId=teacherPdsRequestId;
+    try{
+      var result=await api("/api/teacher/profile/pds",{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({sheets:teacherPdsEntries})
+      });
+      if(requestId!==teacherPdsRequestId)return;
+      teacherPdsDirty=false;
+      updateTeacherProfileDirtyState();
+      $("pdsSaveNotice").textContent="PDS C1–C4 saved to your teacher profile.";
+      if(result.updatedAt)$("pdsSaveNotice").textContent+=" Saved "+new Date(result.updatedAt).toLocaleString()+".";
+    }catch(error){
+      if(requestId===teacherPdsRequestId)$("pdsSaveError").textContent=error.message;
+    }finally{
+      button.disabled=false;
+      button.removeAttribute("aria-busy");
+      button.textContent="Save PDS";
+    }
+  }
+  $("savePdsSheet").addEventListener("click",saveTeacherPds);
+  $("printPdsSheet").addEventListener("click",function(){
+    if(!teacherPdsLoaded)return;
+    captureActiveTeacherPdsSheet();
+    document.body.classList.add("pds-printing");
+    window.print();
+  });
+  window.addEventListener("afterprint",function(){document.body.classList.remove("pds-printing")});
+  function firstInvalidTeacherProfileField(fieldIds){
+    for(var index=0;index<fieldIds.length;index++){
+      var field=$(fieldIds[index]);
+      if(!field.checkValidity())return field;
+    }
+    return null;
+  }
+  function updateSavedTeacherProfileIdentity(result){
+    teacherProfileSavedIdentity={
+      name:result.name,
+      email:result.email,
+      classroomNumber:result.classroomNumber
+    };
+  }
+  async function saveTeacherBasicProfile(){
+    var button=$("saveTeacherBasicProfile");
+    $("teacherProfileBasicError").textContent="";
+    $("teacherProfileBasicNotice").textContent="";
+    var invalidField=firstInvalidTeacherProfileField([
+      "teacherProfileName","teacherProfilePosition","teacherProfileEmail",
+      "teacherProfileClassroom","teacherProfileSectionsHandled"
+    ]);
+    if(invalidField){
+      invalidField.reportValidity();
+      return;
+    }
+    button.disabled=true;
+    button.setAttribute("aria-busy","true");
+    button.textContent="Saving...";
     try{
       var result=await api("/api/teacher/profile",{
         method:"PUT",
@@ -17966,25 +18903,23 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
           position:$("teacherProfilePosition").value,
           email:$("teacherProfileEmail").value,
           classroomNumber:$("teacherProfileClassroom").value,
-          sectionsHandled:splitHandledList($("teacherProfileSectionsHandled").value),
-          schoolYear:$("teacherProfileSchoolYear").value,
-          schoolName:$("teacherProfileSchoolName").value,
-          schoolId:$("teacherProfileSchoolId").value,
-          region:$("teacherProfileRegion").value,
-          division:$("teacherProfileDivision").value,
-          district:$("teacherProfileDistrict").value,
-          schoolHead:$("teacherProfileSchoolHead").value,
-          schoolHeadPosition:$("teacherProfileSchoolHeadPosition").value
+          sectionsHandled:splitHandledList($("teacherProfileSectionsHandled").value)
         })
       });
       currentUser.name=result.name;
+      currentUser.email=result.email;
       defaultStudentSection=result.section||"";
       defaultStudentGrade=result.grade||"";
       handledSections=result.sectionsHandled||[];
       sectionGrades=result.sectionGrades||{};
       sectionSubjects=result.sectionSubjects||sectionSubjects;
       handledSubjects=result.subjectsHandled||[];
+      $("teacherProfileName").value=result.name;
+      $("teacherProfilePosition").value=result.position||"";
+      $("teacherProfileEmail").value=result.email;
+      $("teacherProfileClassroom").value=result.classroomNumber;
       $("teacherProfileSectionsHandled").value=handledSections.join(", ");
+      updateSavedTeacherProfileIdentity(result);
       populateTeacherSubjectSections(teacherSubjectSection||result.section);
       populateSectionControls(activeStudentSection);
       renderStudents(rosterStudents);
@@ -17997,15 +18932,80 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
       $("classSummary").textContent=currentUser.classCode
         ?"Class code for parents: "+currentUser.classCode
         :"Manage the student records for your class.";
-      teacherProfileDetailsDirty=false;
-      teacherProfileDirty=teacherSubjectsDirty;
-      $("teacherProfileNotice").textContent="Profile details saved.";
+      syncEnglishLessonPlanProfileFields();
+      teacherProfileBasicDirty=false;
+      updateTeacherProfileDirtyState();
+      $("teacherProfileBasicNotice").textContent="Basic Info saved successfully.";
     }catch(error){
-      $("teacherProfileError").textContent=error.message;
+      $("teacherProfileBasicError").textContent=error.message;
     }finally{
-      button.disabled=false;button.textContent="Save Profile";
+      button.disabled=false;
+      button.removeAttribute("aria-busy");
+      button.textContent="Save Basic Info";
     }
-  };
+  }
+  async function saveTeacherSchoolProfile(){
+    var button=$("saveTeacherSchoolProfile");
+    $("teacherProfileSchoolError").textContent="";
+    $("teacherProfileSchoolNotice").textContent="";
+    var invalidField=firstInvalidTeacherProfileField([
+      "teacherProfileSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId",
+      "teacherProfileRegion","teacherProfileDivision","teacherProfileDistrict",
+      "teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"
+    ]);
+    if(invalidField){
+      invalidField.reportValidity();
+      return;
+    }
+    if(!teacherProfileSavedIdentity.name||!teacherProfileSavedIdentity.email||!teacherProfileSavedIdentity.classroomNumber){
+      $("teacherProfileSchoolError").textContent="Save Basic Info or reload your profile before saving School Info.";
+      return;
+    }
+    button.disabled=true;
+    button.setAttribute("aria-busy","true");
+    button.textContent="Saving...";
+    try{
+      var result=await api("/api/teacher/profile",{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          name:teacherProfileSavedIdentity.name,
+          email:teacherProfileSavedIdentity.email,
+          classroomNumber:teacherProfileSavedIdentity.classroomNumber,
+          schoolYear:$("teacherProfileSchoolYear").value,
+          schoolName:$("teacherProfileSchoolName").value,
+          schoolId:$("teacherProfileSchoolId").value,
+          region:$("teacherProfileRegion").value,
+          division:$("teacherProfileDivision").value,
+          district:$("teacherProfileDistrict").value,
+          schoolHead:$("teacherProfileSchoolHead").value,
+          schoolHeadPosition:$("teacherProfileSchoolHeadPosition").value
+        })
+      });
+      updateSavedTeacherProfileIdentity(result);
+      $("teacherProfileSchoolYear").value=result.schoolYear||"";
+      $("teacherProfileSchoolName").value=result.schoolName||"";
+      $("teacherProfileSchoolId").value=result.schoolId||"";
+      $("teacherProfileRegion").value=result.region||"";
+      $("teacherProfileDivision").value=result.division||"";
+      $("teacherProfileDistrict").value=result.district||"";
+      $("teacherProfileSchoolHead").value=result.schoolHead||"";
+      $("teacherProfileSchoolHeadPosition").value=result.schoolHeadPosition||"";
+      syncEnglishLessonPlanProfileFields();
+      teacherProfileSchoolDirty=false;
+      updateTeacherProfileDirtyState();
+      $("teacherProfileSchoolNotice").textContent="School Info saved successfully.";
+    }catch(error){
+      $("teacherProfileSchoolError").textContent=error.message;
+    }finally{
+      button.disabled=false;
+      button.removeAttribute("aria-busy");
+      button.textContent="Save School Info";
+    }
+  }
+  $("saveTeacherBasicProfile").addEventListener("click",saveTeacherBasicProfile);
+  $("saveTeacherSchoolProfile").addEventListener("click",saveTeacherSchoolProfile);
+  $("teacherProfileForm").addEventListener("submit",function(event){event.preventDefault()});
   async function uploadTeacherPhoto(file){
     if(!file)return;
     $("teacherProfileError").textContent="";
@@ -18723,8 +19723,21 @@ html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;b
     attendanceDirty=false;
     teacherProfileDirty=false;
     teacherProfileDetailsDirty=false;
+    teacherProfileBasicDirty=false;
+    teacherProfileSchoolDirty=false;
+    teacherProfileSavedIdentity={name:"",email:"",classroomNumber:""};
     teacherSubjectsDirty=false;
     teacherPasswordDirty=false;
+    teacherPdsRequestId++;
+    teacherPdsTemplate=[];
+    teacherPdsEntries={};
+    teacherPdsLoaded=false;
+    teacherPdsLoading=null;
+    teacherPdsDirty=false;
+    activeTeacherPdsSheet="C1";
+    $("pdsSheetTable").textContent="";
+    $("pdsSaveError").textContent="";
+    $("pdsSaveNotice").textContent="";
     var logoutError=null;
     try{await api("/api/auth/logout",{method:"POST"})}catch(error){logoutError=error;console.error("Sign out failed:",error)}
     if(desktopBridge&&typeof desktopBridge.clearPortalAuthCookies==="function"){
