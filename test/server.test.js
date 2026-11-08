@@ -1018,6 +1018,44 @@ test("portal frontend compresses text responses and leaves binary assets unchang
   assert.equal(binaryAsset.statusCode, 200);
   assert.equal(binaryAsset.headers["content-encoding"], undefined);
   assert.equal(binaryAsset.headers.vary, undefined);
+
+  const assetPath = path.join(__dirname, "..", "node_modules", "jspdf", "dist", "jspdf.umd.min.js");
+  const originalReadFile = fs.readFile;
+  const originalGzipSync = zlib.gzipSync;
+  let assetVersion = 0;
+  let gzipCalls = 0;
+  fs.readFile = async (filename, ...options) => filename === assetPath
+    ? Buffer.from(`lru-cache-entry-${assetVersion}`)
+    : originalReadFile(filename, ...options);
+  zlib.gzipSync = (...args) => {
+    gzipCalls += 1;
+    return originalGzipSync(...args);
+  };
+  try {
+    for (assetVersion = 0; assetVersion < 32; assetVersion += 1) {
+      await requestRaw("/assets/jspdf.umd.min.js", "gzip");
+    }
+    assert.equal(gzipCalls, 32);
+
+    assetVersion = 0;
+    await requestRaw("/assets/jspdf.umd.min.js", "gzip");
+    assert.equal(gzipCalls, 32);
+
+    assetVersion = 32;
+    await requestRaw("/assets/jspdf.umd.min.js", "gzip");
+    assert.equal(gzipCalls, 33);
+
+    assetVersion = 0;
+    await requestRaw("/assets/jspdf.umd.min.js", "gzip");
+    assert.equal(gzipCalls, 33);
+
+    assetVersion = 1;
+    await requestRaw("/assets/jspdf.umd.min.js", "gzip");
+    assert.equal(gzipCalls, 34);
+  } finally {
+    fs.readFile = originalReadFile;
+    zlib.gzipSync = originalGzipSync;
+  }
 });
 
 test("lesson-plan source preview extracts PDF, Word, and Excel files without persisting uploads", async (context) => {

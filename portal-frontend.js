@@ -15,6 +15,9 @@ const ROOT_DIRECTORY = __dirname;
 const INDEX_PATH = path.join(ROOT_DIRECTORY, "index.html");
 const APP_VERSION = require("./package.json").version;
 const COMPRESSED_CONTENT_CACHE = new Map();
+const COMPRESSED_CONTENT_CACHE_MAX_BYTES = 64 * 1024 * 1024;
+const COMPRESSED_CONTENT_CACHE_MAX_ENTRIES = 32;
+let compressedContentCacheBytes = 0;
 const PORTAL_ENTRIES = new Map([
   ["teacher", "main"],
   ["parents", "parents"],
@@ -86,14 +89,29 @@ function getCompressedContent(content, encoding) {
   const contentHash = crypto.createHash("sha256").update(content).digest("hex");
   const cacheKey = `${encoding}:${contentHash}`;
   const cachedContent = COMPRESSED_CONTENT_CACHE.get(cacheKey);
-  if (cachedContent) return cachedContent;
+  if (cachedContent) {
+    COMPRESSED_CONTENT_CACHE.delete(cacheKey);
+    COMPRESSED_CONTENT_CACHE.set(cacheKey, cachedContent);
+    return cachedContent;
+  }
 
   const compressedContent = encoding === "br"
     ? zlib.brotliCompressSync(content, {
       params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 },
     })
     : zlib.gzipSync(content);
+  if (compressedContent.length > COMPRESSED_CONTENT_CACHE_MAX_BYTES) return compressedContent;
+
+  while (COMPRESSED_CONTENT_CACHE.size >= COMPRESSED_CONTENT_CACHE_MAX_ENTRIES
+    || compressedContentCacheBytes + compressedContent.length > COMPRESSED_CONTENT_CACHE_MAX_BYTES) {
+    const oldestKey = COMPRESSED_CONTENT_CACHE.keys().next().value;
+    const oldestContent = COMPRESSED_CONTENT_CACHE.get(oldestKey);
+    COMPRESSED_CONTENT_CACHE.delete(oldestKey);
+    compressedContentCacheBytes -= oldestContent.length;
+  }
+
   COMPRESSED_CONTENT_CACHE.set(cacheKey, compressedContent);
+  compressedContentCacheBytes += compressedContent.length;
   return compressedContent;
 }
 
