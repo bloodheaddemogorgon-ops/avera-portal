@@ -985,6 +985,13 @@ test("portal frontend serves its extracted assets and the local jsPDF browser bu
     }
   });
 
+  const pageResponse = await fetch(`http://127.0.0.1:${frontend.address().port}/`);
+  assert.equal(pageResponse.status, 200);
+  const renderedPage = await pageResponse.text();
+  const appVersion = require("../package.json").version;
+  assert.ok(renderedPage.includes(`/assets/portal.css?v=${appVersion}`));
+  assert.ok(renderedPage.includes(`/assets/portal.js?v=${appVersion}`));
+
   for (const [pathname, filename, contentType] of [
     ["/assets/portal.css", "portal.css", /^text\/css/],
     ["/assets/portal.js", "portal.js", /^text\/javascript/],
@@ -3219,11 +3226,12 @@ test("registrations persist in the workbook and can sign in after a restart", as
   const portalPageResponse = await fetch(baseUrl);
   assert.equal(portalPageResponse.status, 200);
   const portalPageHtml = await portalPageResponse.text();
-  assert.match(portalPageHtml, /<link rel="stylesheet" href="\/assets\/portal\.css">/);
-  assert.match(portalPageHtml, /<script src="\/assets\/portal\.js"><\/script>/);
+  const appVersion = require("../package.json").version;
+  assert.ok(portalPageHtml.includes(`<link rel="stylesheet" href="/assets/portal.css?v=${appVersion}">`));
+  assert.ok(portalPageHtml.includes(`<script src="/assets/portal.js?v=${appVersion}"></script>`));
   assert.doesNotMatch(portalPageHtml, /<style>/);
   assert.doesNotMatch(portalPageHtml, /<script(?![^>]*\bsrc=)[^>]*>/);
-  assert.ok(portalPageHtml.indexOf('<script src="/assets/portal.js">') < portalPageHtml.lastIndexOf("</body>"));
+  assert.ok(portalPageHtml.indexOf(`<script src="/assets/portal.js?v=${appVersion}">`) < portalPageHtml.lastIndexOf("</body>"));
   const portalPage = await includePortalAssets(portalPageHtml);
   for (const [pathname, filename, contentType] of [
     ["/assets/portal.css", "portal.css", /^text\/css/],

@@ -186,7 +186,7 @@ function renderPortalPage(entry) {
       'data-portal-entry="main"',
       `data-portal-entry="${htmlEntry}"`,
     );
-    return html.replace(
+    return html.replaceAll("__APP_VERSION__", APP_VERSION).replace(
       /(<span class="sidebar-footer-version">GraceDesk · Version )[^<]*(<\/span>)/,
       `$1${APP_VERSION}$2`,
     );

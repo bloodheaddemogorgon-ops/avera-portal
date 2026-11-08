@@ -11439,7 +11439,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         ).replace(
           /(<span class="brand-version">)[^<]*(<\/span>)/,
           `$1${APP_VERSION}$2`,
-        );
+        ).replaceAll("__APP_VERSION__", APP_VERSION);
         response.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
