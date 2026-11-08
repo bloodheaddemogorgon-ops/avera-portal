@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const fs = require("node:fs");
 const fsPromises = require("node:fs/promises");
+const crypto = require("node:crypto");
 const http = require("node:http");
 const https = require("node:https");
 const path = require("node:path");
@@ -13,6 +14,7 @@ const zlib = require("node:zlib");
 const ROOT_DIRECTORY = __dirname;
 const INDEX_PATH = path.join(ROOT_DIRECTORY, "index.html");
 const APP_VERSION = require("./package.json").version;
+const COMPRESSED_CONTENT_CACHE = new Map();
 const PORTAL_ENTRIES = new Map([
   ["teacher", "main"],
   ["parents", "parents"],
@@ -80,16 +82,26 @@ function getAcceptedContentEncoding(request) {
   return "identity";
 }
 
+function getCompressedContent(content, encoding) {
+  const contentHash = crypto.createHash("sha256").update(content).digest("hex");
+  const cacheKey = `${encoding}:${contentHash}`;
+  const cachedContent = COMPRESSED_CONTENT_CACHE.get(cacheKey);
+  if (cachedContent) return cachedContent;
+
+  const compressedContent = encoding === "br"
+    ? zlib.brotliCompressSync(content, {
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 },
+    })
+    : zlib.gzipSync(content);
+  COMPRESSED_CONTENT_CACHE.set(cacheKey, compressedContent);
+  return compressedContent;
+}
+
 function sendTextResponse(request, response, status, contentType, cacheControl, content) {
   const encoding = getAcceptedContentEncoding(request);
-  let responseContent = content;
-  if (encoding === "br") {
-    responseContent = zlib.brotliCompressSync(content, {
-      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 },
-    });
-  } else if (encoding === "gzip") {
-    responseContent = zlib.gzipSync(content);
-  }
+  const responseContent = encoding === "identity"
+    ? content
+    : getCompressedContent(content, encoding);
 
   const headers = {
     "Content-Type": contentType,

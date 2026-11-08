@@ -995,6 +995,12 @@ test("portal frontend compresses text responses and leaves binary assets unchang
   assert.ok(brotli.body.length < identity.body.length);
   assert.deepEqual(zlib.brotliDecompressSync(brotli.body), identity.body);
 
+  const gzipPage = await requestRaw("/", "gzip");
+  assert.equal(gzipPage.headers["content-encoding"], "gzip");
+  assert.deepEqual(zlib.gunzipSync(gzipPage.body), identity.body);
+  const repeatedBrotliPage = await requestRaw("/", "br");
+  assert.deepEqual(repeatedBrotliPage.body, brotli.body);
+
   const gzipAsset = await requestRaw("/assets/jspdf.umd.min.js", "gzip");
   assert.equal(gzipAsset.headers["content-encoding"], "gzip");
   assert.equal(gzipAsset.headers.vary, "Accept-Encoding");
