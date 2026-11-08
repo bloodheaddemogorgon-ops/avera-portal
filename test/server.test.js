@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const http = require("node:http");
@@ -129,6 +130,36 @@ test("WHO BMI-for-age and Height-for-Age categories use LMS z-scores and request
     weightKg: 20,
     heightM: 1.1,
   }).bmiCategory, "Not available"  );
+});
+
+test("WHO reference workbooks load on first calculation and stay cached", () => {
+  const source = `
+    const XLSX = require("@e965/xlsx");
+    const readFile = XLSX.readFile;
+    let readCount = 0;
+    XLSX.readFile = function (...args) {
+      readCount += 1;
+      return readFile.apply(this, args);
+    };
+    const { calculateBmiForAge } = require("./who-growth-reference");
+    if (readCount !== 0) throw new Error("WHO workbooks loaded during module import.");
+    const input = {
+      birthdate: "2015-04-21",
+      gender: "Female",
+      measurementDate: "2025-04-21",
+      weightKg: 42,
+      heightM: 1.4,
+    };
+    const assessment = calculateBmiForAge(input);
+    if (readCount !== 4) throw new Error(\`Expected four workbook reads; got \${readCount}.\`);
+    if (assessment.bmiCategory !== "Overweight") throw new Error("BMI assessment changed.");
+    calculateBmiForAge(input);
+    if (readCount !== 4) throw new Error("WHO workbooks were loaded more than once.");
+  `;
+  execFileSync(process.execPath, ["-e", source], {
+    cwd: path.join(__dirname, ".."),
+    encoding: "utf8",
+  });
 });
 
 test("installed app opens teacher profile pictures with the native file picker", async () => {

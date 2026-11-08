@@ -37,14 +37,23 @@ function loadLmsReference(fileName) {
   return table;
 }
 
-const BMI_REFERENCES = {
-  Male: loadLmsReference("bmi-boys-z-who-2007-exp.xlsx"),
-  Female: loadLmsReference("bmi-girls-z-who-2007-exp.xlsx"),
-};
-const HEIGHT_REFERENCES = {
-  Male: loadLmsReference("hfa-boys-z-who-2007-exp.xlsx"),
-  Female: loadLmsReference("hfa-girls-z-who-2007-exp.xlsx"),
-};
+let referenceTables;
+
+function getReferenceTables() {
+  if (!referenceTables) {
+    referenceTables = {
+      bmi: {
+        Male: loadLmsReference("bmi-boys-z-who-2007-exp.xlsx"),
+        Female: loadLmsReference("bmi-girls-z-who-2007-exp.xlsx"),
+      },
+      height: {
+        Male: loadLmsReference("hfa-boys-z-who-2007-exp.xlsx"),
+        Female: loadLmsReference("hfa-girls-z-who-2007-exp.xlsx"),
+      },
+    };
+  }
+  return referenceTables;
+}
 
 function parseDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -111,17 +120,18 @@ function classifyHeightForAge(haz) {
 }
 
 function calculateBmiForAge({ birthdate, gender, measurementDate, weightKg, heightM }) {
+  const references = getReferenceTables();
   const ageMonths = calculateAgeMonths(birthdate, measurementDate);
   const bmi = Number.isFinite(weightKg) && weightKg > 0
     && Number.isFinite(heightM) && heightM > 0
     ? weightKg / heightM ** 2
     : null;
-  const reference = BMI_REFERENCES[gender];
+  const reference = references.bmi[gender];
   const lms = reference && ageMonths !== null
     ? getInterpolatedLms(reference, ageMonths)
     : null;
   const baz = calculateLmsZScore(bmi, lms);
-  const heightReference = HEIGHT_REFERENCES[gender];
+  const heightReference = references.height[gender];
   const heightLms = heightReference && ageMonths !== null
     ? getInterpolatedLms(heightReference, ageMonths)
     : null;
