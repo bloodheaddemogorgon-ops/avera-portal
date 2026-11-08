@@ -1501,11 +1501,9 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
-      "Teacher profile information is organized into Basic Info, School Info, Background Information, and SALN Records tabs.",
-      "SF 10 now synchronizes the selected learner's three term grades from SF 9, including Music and Arts and Physical Education and Health.",
-      "School and classroom details are filled from the teacher profile for the matching classified grade.",
-      "SF 10 final ratings, General Average, and Passed/Failed remarks are generated from SF 9 grades and locked against manual edits.",
-      "SF 10 follows the three-term curriculum and has a more organized toolbar.",
+      "Portal HTML is smaller, with the stylesheet and application script served as compressed, versioned assets.",
+      "WHO growth-reference workbooks load only when the first BMI-for-age calculation is requested.",
+      "Compressed portal responses are cached with bounded memory usage.",
     ],
   );
 });
