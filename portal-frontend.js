@@ -8,6 +8,7 @@ const http = require("node:http");
 const https = require("node:https");
 const path = require("node:path");
 const { URL } = require("node:url");
+const zlib = require("node:zlib");
 
 const ROOT_DIRECTORY = __dirname;
 const INDEX_PATH = path.join(ROOT_DIRECTORY, "index.html");
@@ -41,15 +42,77 @@ const DEFAULT_PORTS = {
   parents: 3005,
 };
 
-function sendJson(response, status, body) {
-  const content = Buffer.from(JSON.stringify(body));
-  response.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": content.length,
-    "Cache-Control": "no-store",
+function getAcceptedContentEncoding(request) {
+  const header = request.headers["accept-encoding"];
+  if (typeof header !== "string" || !header.trim()) return "identity";
+
+  const qualities = new Map();
+  for (const item of header.toLowerCase().split(",")) {
+    const [encoding, ...parameters] = item.trim().split(";");
+    if (!encoding) continue;
+    let quality = 1;
+    for (const parameter of parameters) {
+      const match = /^q\s*=\s*(.+)$/i.exec(parameter.trim());
+      if (match) {
+        const parsedQuality = Number(match[1]);
+        quality = Number.isFinite(parsedQuality) && parsedQuality >= 0 && parsedQuality <= 1
+          ? parsedQuality
+          : 0;
+      }
+    }
+    qualities.set(encoding, quality);
+  }
+
+  const wildcardQuality = qualities.get("*");
+  const qualityFor = (encoding) => qualities.has(encoding)
+    ? qualities.get(encoding)
+    : wildcardQuality || 0;
+  const identityQuality = qualities.has("identity")
+    ? qualities.get("identity")
+    : wildcardQuality === 0 ? 0 : 1;
+  const brotliQuality = qualityFor("br");
+  const gzipQuality = qualityFor("gzip");
+
+  if (brotliQuality > 0 && brotliQuality >= gzipQuality && brotliQuality >= identityQuality) {
+    return "br";
+  }
+  if (gzipQuality > 0 && gzipQuality >= identityQuality) return "gzip";
+  return "identity";
+}
+
+function sendTextResponse(request, response, status, contentType, cacheControl, content) {
+  const encoding = getAcceptedContentEncoding(request);
+  let responseContent = content;
+  if (encoding === "br") {
+    responseContent = zlib.brotliCompressSync(content, {
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 },
+    });
+  } else if (encoding === "gzip") {
+    responseContent = zlib.gzipSync(content);
+  }
+
+  const headers = {
+    "Content-Type": contentType,
+    "Content-Length": responseContent.length,
+    "Cache-Control": cacheControl,
     "X-Content-Type-Options": "nosniff",
-  });
-  response.end(content);
+    Vary: "Accept-Encoding",
+  };
+  if (encoding !== "identity") headers["Content-Encoding"] = encoding;
+  response.writeHead(status, headers);
+  response.end(responseContent);
+}
+
+function sendJson(request, response, status, body) {
+  const content = Buffer.from(JSON.stringify(body));
+  sendTextResponse(
+    request,
+    response,
+    status,
+    "application/json; charset=utf-8",
+    "no-store",
+    content,
+  );
 }
 
 function getLastHeaderValue(request, headerName) {
@@ -130,7 +193,7 @@ function proxyApiRequest(request, response, backendUrl, entry, trustProxy) {
   upstreamRequest.on("error", (error) => {
     console.error(`The ${entry} portal could not reach the shared API backend:`, error.message);
     if (!response.headersSent) {
-      sendJson(response, 502, { error: "The shared API backend is unavailable." });
+      sendJson(request, response, 502, { error: "The shared API backend is unavailable." });
     } else {
       response.destroy();
     }
@@ -172,19 +235,31 @@ function createPortalFrontendServer(options = {}) {
       if (request.method === "GET" && isPage) {
         const html = await renderPortalPage(pageEntry);
         const content = Buffer.from(html);
-        response.writeHead(200, {
-          "Content-Type": "text/html; charset=utf-8",
-          "Content-Length": content.length,
-          "Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-        });
-        response.end(content);
+        sendTextResponse(
+          request,
+          response,
+          200,
+          "text/html; charset=utf-8",
+          "no-store",
+          content,
+        );
         return;
       }
 
       const asset = request.method === "GET" ? STATIC_ASSETS.get(url.pathname) : null;
       if (asset) {
         const content = await fsPromises.readFile(path.join(ROOT_DIRECTORY, asset.filename));
+        if (asset.contentType.startsWith("text/")) {
+          sendTextResponse(
+            request,
+            response,
+            200,
+            asset.contentType,
+            "public, max-age=86400",
+            content,
+          );
+          return;
+        }
         response.writeHead(200, {
           "Content-Type": asset.contentType,
           "Content-Length": content.length,
@@ -195,10 +270,10 @@ function createPortalFrontendServer(options = {}) {
         return;
       }
 
-      sendJson(response, 404, { error: "Page not found." });
+      sendJson(request, response, 404, { error: "Page not found." });
     } catch (error) {
       console.error(`The ${entry} portal could not serve the request:`, error);
-      sendJson(response, 500, { error: "The portal page could not be served." });
+      sendJson(request, response, 500, { error: "The portal page could not be served." });
     }
   };
 

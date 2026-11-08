@@ -3,9 +3,11 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 const vm = require("node:vm");
+const zlib = require("node:zlib");
 const test = require("node:test");
 const ExcelJS = require("exceljs");
 const JSZip = require("jszip");
@@ -945,6 +947,71 @@ test("portal frontend serves the local jsPDF browser bundle", async (context) =>
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /^text\/javascript/);
   assert.ok((await response.arrayBuffer()).byteLength > 100_000);
+});
+
+test("portal frontend compresses text responses and leaves binary assets unchanged", async (context) => {
+  const frontend = createPortalFrontendServer({
+    entry: "teacher",
+    backendUrl: "http://127.0.0.1:1",
+  });
+  await new Promise((resolve) => frontend.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (frontend.listening) {
+      await new Promise((resolve, reject) => {
+        frontend.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  });
+
+  const baseUrl = `http://127.0.0.1:${frontend.address().port}`;
+  const requestRaw = (pathname, acceptEncoding) => new Promise((resolve, reject) => {
+    const request = http.get(baseUrl + pathname, {
+      headers: { "Accept-Encoding": acceptEncoding },
+    }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => resolve({
+        statusCode: response.statusCode,
+        headers: response.headers,
+        body: Buffer.concat(chunks),
+      }));
+    });
+    request.on("error", reject);
+  });
+
+  const identity = await requestRaw("/", "identity");
+  assert.equal(identity.statusCode, 200);
+  assert.equal(identity.headers["content-encoding"], undefined);
+  assert.equal(identity.headers.vary, "Accept-Encoding");
+  assert.equal(identity.headers["cache-control"], "no-store");
+
+  const unsupported = await requestRaw("/", "br;q=0, gzip;q=0");
+  assert.equal(unsupported.headers["content-encoding"], undefined);
+
+  const brotli = await requestRaw("/", "br, gzip");
+  assert.equal(brotli.headers["content-encoding"], "br");
+  assert.equal(brotli.headers.vary, "Accept-Encoding");
+  assert.equal(Number(brotli.headers["content-length"]), brotli.body.length);
+  assert.ok(brotli.body.length < identity.body.length);
+  assert.deepEqual(zlib.brotliDecompressSync(brotli.body), identity.body);
+
+  const gzipAsset = await requestRaw("/assets/jspdf.umd.min.js", "gzip");
+  assert.equal(gzipAsset.headers["content-encoding"], "gzip");
+  assert.equal(gzipAsset.headers.vary, "Accept-Encoding");
+  const decompressedAsset = zlib.gunzipSync(gzipAsset.body);
+  assert.ok(decompressedAsset.length > 100_000);
+  assert.ok(gzipAsset.body.length < decompressedAsset.length);
+
+  const jsonError = await requestRaw("/not-found", "gzip");
+  assert.equal(jsonError.headers["content-encoding"], "gzip");
+  assert.deepEqual(JSON.parse(zlib.gunzipSync(jsonError.body)), {
+    error: "Page not found.",
+  });
+
+  const binaryAsset = await requestRaw("/favicon.png", "br, gzip");
+  assert.equal(binaryAsset.statusCode, 200);
+  assert.equal(binaryAsset.headers["content-encoding"], undefined);
+  assert.equal(binaryAsset.headers.vary, undefined);
 });
 
 test("lesson-plan source preview extracts PDF, Word, and Excel files without persisting uploads", async (context) => {
