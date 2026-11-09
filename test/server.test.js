@@ -427,6 +427,8 @@ test("Tarpapel print layout uses non-overlapping tiles with joining margins", as
   assert.ok(layoutFunction, "Tarpapel print layout calculator exists");
   const scaleFunction = portalPage.match(/function tarpaulinBannerScaleForGrid\(dimensions,layout\)\{[\s\S]*?\n    \}/);
   assert.ok(scaleFunction, "Tarpapel grid scaling calculator exists");
+  const sizeFunction = portalPage.match(/function tarpaulinBannerSizeForGrid\(dimensions,layout,stretch\)\{[\s\S]*?\n    \}/);
+  assert.ok(sizeFunction, "Tarpapel grid sizing calculator exists");
 
   function getLayout(paperSize, orientation, requestedGrid) {
     return vm.runInNewContext(`(${layoutFunction[0]})(dimensions,paperSize,orientation,requestedGrid)`, {
@@ -463,6 +465,18 @@ test("Tarpapel print layout uses non-overlapping tiles with joining margins", as
     layout: customGrid,
   });
   assert.ok(Math.abs(scale - 0.1778) < 1e-12);
+  const stretchedSize = vm.runInNewContext(
+    `(${sizeFunction[0]})(dimensions,layout,true)`,
+    { dimensions: { widthCm: 300, heightCm: 100 }, layout: customGrid,
+      tarpaulinBannerScaleForGrid: vm.runInNewContext(`(${scaleFunction[0]})`) },
+  );
+  assert.deepEqual({ ...stretchedSize }, { widthCm: 58.42, heightCm: 17.78 });
+  const proportionalSize = vm.runInNewContext(
+    `(${sizeFunction[0]})(dimensions,layout,false)`,
+    { dimensions: { widthCm: 300, heightCm: 100 }, layout: customGrid,
+      tarpaulinBannerScaleForGrid: vm.runInNewContext(`(${scaleFunction[0]})`) },
+  );
+  assert.deepEqual({ ...proportionalSize }, { widthCm: 53.34, heightCm: 17.78 });
 });
 
 test("Tarpapel preview renders full paper sheets with margins and unique banner segments", async () => {
@@ -936,6 +950,12 @@ test("Tarpapel PDF download preserves the selected image fit and tiled page layo
     width: 1777.7777777777778,
     height: 1000,
   });
+  assert.deepEqual({ ...getPlacement("stretch") }, {
+    x: 0,
+    y: 0,
+    width: 3000,
+    height: 1000,
+  });
 
   const layoutFunction = portalPage.match(
     /function getTarpaulinPrintLayout\(dimensions,paperSize,orientation,requestedGrid\)\{[\s\S]*?\n    \}/,
@@ -999,7 +1019,7 @@ test("portal frontend serves its extracted assets and the local jsPDF browser bu
     const response = await fetch(`http://127.0.0.1:${frontend.address().port}${pathname}`);
     assert.equal(response.status, 200);
     assert.match(response.headers.get("content-type"), contentType);
-    assert.equal(response.headers.get("cache-control"), "public, max-age=86400");
+    assert.equal(response.headers.get("cache-control"), "no-cache");
     assert.deepEqual(
       Buffer.from(await response.arrayBuffer()),
       await fs.readFile(path.join(__dirname, "..", "assets", filename)),
@@ -1501,9 +1521,11 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
-      "Portal HTML is smaller, with the stylesheet and application script served as compressed, versioned assets.",
-      "WHO growth-reference workbooks load only when the first BMI-for-age calculation is requested.",
-      "Compressed portal responses are cached with bounded memory usage.",
+      "Sign-in remembers the most recent account using secure credential storage; signing in still requires your click.",
+      "Sign-out reports failures and keeps the session active if logout cannot be confirmed.",
+      "Tarpapel Maker can stretch an image across the selected sheets while retaining print margins.",
+      "Removed the unused Checklist tool and teacher PDS/SALN profile tabs.",
+      "Portal styles and scripts revalidate so browser caches do not block updates.",
     ],
   );
 });
@@ -2225,23 +2247,11 @@ test("teacher profile marks the assigned advisory grade and section as read-only
   assert.match(portalPage, /id="teacherProfileTabs" role="tablist"/);
   assert.match(portalPage, /id="teacherProfileBasicTab"[^>]*>BASIC INFO<\/button>/);
   assert.match(portalPage, /id="teacherProfileSchoolTab"[^>]*>SCHOOL INFO<\/button>/);
-  assert.match(portalPage, /id="teacherProfileBackgroundTab"[^>]*>PERSONAL DATA SHEET<\/button>/);
-  assert.match(portalPage, /id="teacherProfileSalnTab"[^>]*>SALN RECORDS<\/button>/);
+  assert.doesNotMatch(portalPage, /teacherProfileBackgroundTab|teacherProfileSalnTab|pdsWorkbook|pdsSheetTable/);
   assert.match(portalPage, /id="teacherProfileBasicPanel" role="tabpanel"[\s\S]*?id="teacherProfileName"/);
   assert.match(portalPage, /id="teacherProfileSchoolPanel" role="tabpanel"[\s\S]*?id="teacherProfileSchoolName"/);
-  assert.match(portalPage, /id="teacherProfileBackgroundPanel" role="tabpanel"[^>]*hidden>[\s\S]*?id="pdsSheetTabs"/);
-  assert.match(portalPage, /id="teacherProfileSalnPanel" role="tabpanel"[^>]*hidden><\/div>/);
-  assert.match(portalPage, /id="pdsSheetTabs"[^>]*role="tablist"/);
-  for (const sheet of ["C1", "C2", "C3", "C4"]) {
-    assert.match(portalPage, new RegExp(`data-pds-sheet="${sheet}"`));
-  }
-  assert.match(portalPage, /\.pds-sheet-table td\{[^}]*white-space:nowrap;overflow-wrap:normal/);
-  assert.match(portalPage, /cell\.style\.whiteSpace=style\.wrap\?"pre-wrap":"nowrap"/);
-  assert.match(portalPage, /table\.style\.width=sheet\.widths\.reduce/);
-  assert.match(portalPage, /function renderTeacherPdsSheet\(\)/);
-  assert.match(portalPage, /async function loadTeacherPds\(\)/);
-  assert.match(portalPage, /async function saveTeacherPds\(\)/);
-  assert.match(portalPage, /api\("\/api\/teacher\/profile\/pds"/);
+  assert.match(portalPage, /#teacherProfileForm \.teacher-profile-tabs\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)/);
+  assert.doesNotMatch(portalPage, /teacherPds|pds-printing|pds-workbook|pds-sheet/);
   assert.match(serverSource, /CREATE TABLE IF NOT EXISTS teacher_pds_records/);
   assert.match(serverSource, /function validateTeacherPdsData\(data, template\)/);
   assert.match(portalPage, /function selectTeacherProfileTab\(tab\)/);
@@ -3252,6 +3262,14 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal((await fetch(`${baseUrl}/admin.html`)).status, 404);
   assert.doesNotMatch(portalPage, /portal-entry-links|portal-entry-link/);
   assert.doesNotMatch(portalPage, /id="adminEntryToggle"|Sign in as administrator|Administrator sign in|Admin Portal/);
+  assert.match(portalPage, /id="email" name="email" type="email" autocomplete="username"/);
+  assert.match(portalPage, /id="pw" name="password" type="password" autocomplete="current-password"/);
+  assert.match(portalPage, /function prefillRememberedAccount\(\)/);
+  assert.match(portalPage, /loadRememberedLogin/);
+  assert.match(portalPage, /gradePortalRecentSignInEmail/);
+  assert.match(portalPage, /navigator\.credentials\.get\(\{password:true,mediation:"silent"\}\)/);
+  assert.match(portalPage, /new window\.PasswordCredential\(\{id:email,password:password\}\)/);
+  assert.doesNotMatch(portalPage, /restoreRememberedLogin|clearRememberedLogin|remembered-login-restore/);
   assert.match(portalPage, /id="sideBrandLogo" src="\/icon\.png" alt=""/);
   assert.match(portalPage, /class="sidebar-footer-icon" src="\/icon\.png" alt="" aria-hidden="true"/);
   assert.match(portalPage, /#workspace:has\(#eClassPage:not\(\[hidden\]\)\)>\.portal-footer\{display:none\}/);
@@ -3263,14 +3281,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /class="brand-contact" aria-label="Contact information"/);
   assert.match(portalPage, /mailto:lugatimanbonn@gmail\.com/);
   assert.match(portalPage, /09561209923/);
-  assert.match(portalPage, /<option value="checklistPanel">Checklist<\/option>/);
-  assert.match(portalPage, /id="checklistPanel"[\s\S]*?id="checklistRefreshRoster"[\s\S]*?id="checklistAddColumn"[\s\S]*?id="checklistHeaderRow"[\s\S]*?id="checklistRows"/);
-  assert.match(portalPage, /<th scope="col">No\.<\/th><th scope="col">Student<\/th>/);
-  assert.match(portalPage, /function migratedChecklistColumns\(data\)[\s\S]*?data\.forEach\(function\(item\)\{addLabel\(item\.text\)\}/);
-  assert.match(portalPage, /function checklistRosterStudents\(\)[\s\S]*?!student\.enrollmentStatus/);
-  assert.match(portalPage, /version:3,[\s\S]*?students:checklistStudentRecords/);
-  assert.match(portalPage, /checkbox\.checked=checklistCellIsChecked\(record,column\.id\)/);
-  assert.match(portalPage, /var studentName=\[student\.lastName,student\.firstName,student\.middleName\]/);
+  assert.doesNotMatch(portalPage, /checklistPanel|checklistRefreshRoster|checklistAddColumn|checklistTable|renderChecklist/);
   assert.match(portalPage, /\.teacher-profile-card\{display:flex;max-width:920px;align-items:center/);
   assert.match(portalPage, /\.teacher-profile-form\{max-width:920px;padding:0 22px 22px\}/);
   assert.match(portalPage, /\.teacher-profile-form \.form-field\.full\{grid-column:1\/-1\}/);
@@ -3819,10 +3830,11 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.ok(portalPage.indexOf('id="navTools"') > portalPage.indexOf('id="navSettings"'));
   assert.match(portalPage, /id="navTools"[^>]*>[\s\S]*?Tools/);
   assert.match(portalPage, /id="settingsPage"/);
-  assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?label for="toolsSelector">Choose a tool[\s\S]*?id="toolsSelector"[^>]*aria-controls="tarpaulinPanel"[\s\S]*?value="tarpaulinPanel" selected>Tarpapel Maker[\s\S]*?value="calendarPanel">Calendar[\s\S]*?value="checklistPanel">Checklist[\s\S]*?value="moreToolsPanel">More tools/);
+  assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?label for="toolsSelector">Choose a tool[\s\S]*?id="toolsSelector"[^>]*aria-controls="tarpaulinPanel"[\s\S]*?value="tarpaulinPanel" selected>Tarpapel Maker[\s\S]*?value="calendarPanel">Calendar[\s\S]*?value="moreToolsPanel">More tools/);
+  assert.doesNotMatch(portalPage, /<option value="checklistPanel">|id="checklistPanel"/);
   assert.doesNotMatch(portalPage, /<option value="lessonPlanPanel">Lesson Plan Generator<\/option>/);
   assert.doesNotMatch(portalPage, /id="spinWheelTab"/);
-  assert.match(portalPage, /var panelIds=\["tarpaulinPanel","lessonPlanPanel","calendarPanel","checklistPanel","moreToolsPanel"\]/);
+  assert.match(portalPage, /var panelIds=\["tarpaulinPanel","lessonPlanPanel","calendarPanel","moreToolsPanel"\]/);
   assert.match(portalPage, /id="lessonPlanPanel" aria-labelledby="lessonPlanPanelTitle" hidden>[\s\S]*?id="lessonPlanFilipinoTab"[\s\S]*?id="lessonPlanEnglishTab"/);
   assert.match(portalPage, /<label for="lessonPlanModeSelect">Lesson plan type<\/label>/);
   assert.match(portalPage, /<select id="lessonPlanModeSelect">[\s\S]*?<option value="lesson-plan">Lesson Plan \(1 Session Only\)<\/option>[\s\S]*?<option value="daily-lesson-log">Daily Lesson Log - \(Multiple Sessions\)<\/option>[\s\S]*?<\/select>/);
@@ -4135,6 +4147,11 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /id="tarpaulinSheetLayout"[\s\S]*?<option value="auto">Automatic \(based on banner size\)<\/option><option value="custom">Choose a paper grid<\/option>/);
   assert.match(portalPage, /id="tarpaulinSheetsAcross"/);
   assert.match(portalPage, /id="tarpaulinSheetsDown"/);
+  assert.match(portalPage, /id="tarpaulinImageFit"[\s\S]*?<option value="stretch">Auto fit to pages \(stretch\)<\/option>/);
+  assert.match(portalPage, /input===bannerImageFit&&input\.value==="stretch"&&bannerSheetLayout\.value!=="custom"[\s\S]*?bannerSheetLayout\.value="custom"[\s\S]*?bannerSheetLayout\.dispatchEvent\(new Event\("change"\)\)/);
+  assert.match(portalPage, /bannerSheetsAcross,bannerSheetsDown[\s\S]*?fitBannerToSheetGrid\(\)/);
+  assert.match(portalPage, /bannerImageFit\.value==="stretch"\?"fill":bannerImageFit\.value/);
+  assert.match(portalPage, /bannerImageFit\.value==="stretch"\?"none":bannerImageFit\.value==="cover"/);
   assert.match(portalPage, /id="tarpaulinZoomOut"[^>]*aria-label="Zoom out"/);
   assert.match(portalPage, /id="tarpaulinZoomIn"[^>]*aria-label="Zoom in"/);
   assert.match(portalPage, /tarpaulinZoom=Math\.max\(0\.5/);

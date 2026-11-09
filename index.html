@@ -16,7 +16,7 @@
     <div class="brand-acronym" aria-label="Grade Records, Assessment and Classroom Essentials">
       <span><b>G</b>rade</span><span><b>R</b>ecords,</span><span><b>A</b>ssessment</span><span class="amp">&amp;</span><span><b>C</b>lassroom</span><span><b>E</b>ssentials</span>
     </div>
-    <span class="brand-version">1.0.52</span>
+    <span class="brand-version">__APP_VERSION__</span>
     <p class="brand-contact" aria-label="Contact information">
       <a href="mailto:lugatimanbonn@gmail.com">Email: lugatimanbonn@gmail.com</a>
       <a href="https://www.facebook.com/bonnervin.lugatiman.1" target="_blank" rel="noopener noreferrer">Facebook</a>
@@ -36,17 +36,17 @@
         <button class="tab" role="tab" data-mode="in" aria-selected="true">Sign in</button>
         <button class="tab" role="tab" data-mode="up" aria-selected="false">Create account</button>
       </div>
-      <form id="form" novalidate>
+      <form id="form" autocomplete="on" novalidate>
         <div id="nameWrap" hidden>
           <label for="name">Full name</label>
           <input id="name" autocomplete="name">
           <p class="err" data-for="name"></p>
         </div>
         <label for="email">Email</label>
-        <input id="email" type="email" autocomplete="email">
+        <input id="email" name="email" type="email" autocomplete="username">
         <p class="err" data-for="email"></p>
         <label for="pw">Password</label>
-        <div class="pw"><input id="pw" type="password" autocomplete="current-password"><button type="button" id="showPw">Show</button></div>
+        <div class="pw"><input id="pw" name="password" type="password" autocomplete="current-password"><button type="button" id="showPw">Show</button></div>
         <p class="err" data-for="pw"></p>
         <div id="teacherGradeWrap" hidden>
           <label for="teacherGrade">Grade level</label>
@@ -1508,8 +1508,6 @@
               <div class="teacher-profile-tabs" id="teacherProfileTabs" role="tablist" aria-label="Teacher profile information">
                 <button class="teacher-profile-tab" id="teacherProfileBasicTab" type="button" role="tab" aria-selected="true" aria-controls="teacherProfileBasicPanel" tabindex="0">BASIC INFO</button>
                 <button class="teacher-profile-tab" id="teacherProfileSchoolTab" type="button" role="tab" aria-selected="false" aria-controls="teacherProfileSchoolPanel" tabindex="-1">SCHOOL INFO</button>
-                <button class="teacher-profile-tab" id="teacherProfileBackgroundTab" type="button" role="tab" aria-selected="false" aria-controls="teacherProfileBackgroundPanel" tabindex="-1">PERSONAL DATA SHEET</button>
-                <button class="teacher-profile-tab" id="teacherProfileSalnTab" type="button" role="tab" aria-selected="false" aria-controls="teacherProfileSalnPanel" tabindex="-1">SALN RECORDS</button>
               </div>
               <div class="teacher-profile-tab-panel" id="teacherProfileBasicPanel" role="tabpanel" aria-labelledby="teacherProfileBasicTab" tabindex="0">
                 <div class="form-grid">
@@ -1551,31 +1549,6 @@
                 <p class="notice" id="teacherProfileSchoolNotice" role="status" aria-live="polite"></p>
                 <div class="form-actions"><button class="btn" id="saveTeacherSchoolProfile" type="button">Save School Info</button></div>
               </div>
-              <div class="teacher-profile-tab-panel" id="teacherProfileBackgroundPanel" role="tabpanel" aria-labelledby="teacherProfileBackgroundTab" tabindex="0" hidden>
-                <section class="pds-workbook" id="pdsWorkbook" aria-label="Personal Data Sheet workbook">
-                  <div class="pds-workbook-header">
-                    <div><p class="pds-eyebrow">PERSONAL DATA SHEET · REVISED 2026</p><h2>CS Form No. 212</h2><p>Complete the editable cells, then save them to your teacher profile.</p></div>
-                    <div class="pds-workbook-actions">
-                      <button class="btn ghost" id="printPdsSheet" type="button">Print sheet</button>
-                      <button class="btn" id="savePdsSheet" type="button">Save PDS</button>
-                    </div>
-                  </div>
-                  <p class="notice error" id="pdsSaveError" role="alert"></p>
-                  <p class="notice" id="pdsSaveNotice" role="status" aria-live="polite"></p>
-                  <div class="pds-sheet-tabs" id="pdsSheetTabs" role="tablist" aria-label="PDS workbook sheets">
-                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC1" aria-controls="pdsSheetTable" aria-selected="true" tabindex="0" data-pds-sheet="C1"><span>C1</span><small>Personal · Family · Education</small></button>
-                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC2" aria-controls="pdsSheetTable" aria-selected="false" tabindex="-1" data-pds-sheet="C2"><span>C2</span><small>Eligibility · Work Experience</small></button>
-                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC3" aria-controls="pdsSheetTable" aria-selected="false" tabindex="-1" data-pds-sheet="C3"><span>C3</span><small>Training · Voluntary · Other Info</small></button>
-                    <button class="pds-sheet-tab" type="button" role="tab" id="pdsSheetTabC4" aria-controls="pdsSheetTable" aria-selected="false" tabindex="-1" data-pds-sheet="C4"><span>C4</span><small>Additional Info · References · Oath</small></button>
-                  </div>
-                  <p class="pds-sheet-description" id="pdsSheetDescription">Loading PDS 2026 workbook…</p>
-                  <div class="pds-sheet-scroll" id="pdsSheetScroll" role="tabpanel" aria-labelledby="pdsSheetTabC1" aria-busy="true">
-                    <table class="pds-sheet-table" id="pdsSheetTable" aria-label="PDS sheet C1"><tbody></tbody></table>
-                  </div>
-                  <p class="field-hint pds-continuation-note">The source workbook also contains continuation sheets C5–C11; this page includes the requested C1–C4 sheets.</p>
-                </section>
-              </div>
-              <div class="teacher-profile-tab-panel" id="teacherProfileSalnPanel" role="tabpanel" aria-labelledby="teacherProfileSalnTab" tabindex="0" hidden></div>
               <p class="notice error" id="teacherProfileError" role="alert"></p>
               <p class="notice" id="teacherProfileNotice" role="status" aria-live="polite"></p>
             </form>
@@ -1683,11 +1656,13 @@
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.62</p>
+                  <p class="developer-update-meta">Version 1.0.63</p>
                   <ul class="developer-update-list">
-                    <li>Portal HTML is smaller, with the stylesheet and application script served as compressed, versioned assets.</li>
-                    <li>WHO growth-reference workbooks load only when the first BMI-for-age calculation is requested.</li>
-                    <li>Compressed portal responses are cached with bounded memory usage.</li>
+                    <li>Sign-in remembers the most recent account using secure credential storage; signing in still requires your click.</li>
+                    <li>Sign-out reports failures and keeps the session active if logout cannot be confirmed.</li>
+                    <li>Tarpapel Maker can stretch an image across the selected sheets while retaining print margins.</li>
+                    <li>Removed the unused Checklist tool and teacher PDS/SALN profile tabs.</li>
+                    <li>Portal styles and scripts revalidate so browser caches do not block updates.</li>
                   </ul>
                 </div>
               </section>
@@ -1702,7 +1677,6 @@
               <select id="toolsSelector" aria-controls="tarpaulinPanel">
                 <option value="tarpaulinPanel" selected>Tarpapel Maker</option>
                 <option value="calendarPanel">Calendar</option>
-                <option value="checklistPanel">Checklist</option>
                 <option value="moreToolsPanel">More tools</option>
               </select>
             </div>
@@ -1742,7 +1716,7 @@
                       <h3 id="tarpaulinAppearanceHeading">Appearance</h3>
                       <div class="form-grid">
                         <div class="tool-field"><label for="tarpaulinColor">Background color</label><select id="tarpaulinColor"><option value="#1f5a85">Deep blue</option><option value="#28734e">Green</option><option value="#982f3f">Red</option><option value="#704a9b">Purple</option><option value="#f0c84b">Yellow</option><option value="#ffffff">White</option></select></div>
-                        <div class="tool-field"><label for="tarpaulinImageFit">Picture fit</label><select id="tarpaulinImageFit"><option value="cover">Fill banner</option><option value="contain">Fit inside</option></select></div>
+                        <div class="tool-field"><label for="tarpaulinImageFit">Picture fit</label><select id="tarpaulinImageFit"><option value="cover">Fill banner</option><option value="contain">Fit inside</option><option value="stretch">Auto fit to pages (stretch)</option></select></div>
                       </div>
                     </section>
                   </div>
@@ -2119,23 +2093,6 @@
                   </div>
                 </form>
               </dialog>
-            </section>
-            <section class="tools-panel" id="checklistPanel" aria-labelledby="checklistHeading" hidden>
-              <section class="data-card" aria-labelledby="checklistHeading">
-                <h2 id="checklistHeading">Checklist</h2>
-                <p class="field-hint">The table lists currently enrolled students across your active class. Edit column headers to customize checklist items; use Refresh student list after roster changes.</p>
-                <div class="checklist-toolbar" aria-label="Checklist table actions">
-                  <button class="btn ghost" id="checklistRefreshRoster" type="button">Refresh student list</button>
-                  <button class="btn ghost" id="checklistAddColumn" type="button">Add checklist item</button>
-                </div>
-                <div class="checklist-table-wrap" role="region" aria-label="Checklist table; scroll horizontally to view all columns" tabindex="0">
-                  <table class="checklist-table" id="checklistTable">
-                    <thead><tr id="checklistHeaderRow"><th scope="col">No.</th><th scope="col">Student</th></tr></thead>
-                    <tbody id="checklistRows"></tbody>
-                  </table>
-                </div>
-                <p class="checklist-status" id="checklistStatus" role="status" aria-live="polite"></p>
-              </section>
             </section>
             <section class="tools-panel" id="moreToolsPanel" aria-labelledby="moreToolsHeading" hidden>
               <div class="data-card empty-state"><h2 id="moreToolsHeading">More tools are on the way</h2><p>Additional classroom tools can be added here.</p></div>

@@ -52,10 +52,12 @@ const PORTAL_ASSETS = new Map([
   ["/assets/portal.css", {
     filename: path.join(__dirname, "assets", "portal.css"),
     contentType: "text/css; charset=utf-8",
+    cacheControl: "no-cache",
   }],
   ["/assets/portal.js", {
     filename: path.join(__dirname, "assets", "portal.js"),
     contentType: "text/javascript; charset=utf-8",
+    cacheControl: "no-cache",
   }],
 ]);
 const PORTAL_ENTRY_PATHS = new Map([
@@ -11479,7 +11481,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         response.writeHead(200, {
           "Content-Type": portalAsset.contentType,
           "Content-Length": content.length,
-          "Cache-Control": "public, max-age=86400",
+          "Cache-Control": portalAsset.cacheControl || "public, max-age=86400",
           "X-Content-Type-Options": "nosniff",
         });
         response.end(content);

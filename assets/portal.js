@@ -78,13 +78,6 @@
   var teacherProfileBasicDirty=false;
   var teacherProfileSchoolDirty=false;
   var teacherProfileSavedIdentity={name:"",email:"",classroomNumber:""};
-  var teacherPdsTemplate=[];
-  var teacherPdsEntries={};
-  var teacherPdsLoaded=false;
-  var teacherPdsLoading=null;
-  var teacherPdsDirty=false;
-  var teacherPdsRequestId=0;
-  var activeTeacherPdsSheet="C1";
   var teacherSubjectsDirty=false;
   var teacherSubjectsLocked=true;
   var teacherPasswordDirty=false;
@@ -316,32 +309,89 @@
     return result;
   }
 
-  async function rememberAuthenticatedAccount(email,password){
-    var bridge=window.gradePortal;
-    if(!bridge||typeof bridge.saveRememberedLogin!=="function")return;
+  async function storeBrowserCredential(email,password){
+    if(!window.PasswordCredential||!navigator.credentials
+      ||typeof navigator.credentials.store!=="function")return false;
     try{
-      var result=await bridge.saveRememberedLogin({email:email,password:password});
-      if(!result.saved){
-        $("msg").textContent="Signed in, but this device cannot securely remember your account. Sign in manually next time.";
+      await navigator.credentials.store(new window.PasswordCredential({id:email,password:password}));
+      return true;
+    }catch(error){
+      console.error("Could not save the sign-in with the browser password manager:",error);
+      $("msg").textContent="The browser could not save your sign-in. Enter it manually next time.";
+      return false;
+    }
+  }
+
+  async function rememberAuthenticatedAccount(email,password){
+    try{
+      window.localStorage.setItem("gradePortalRecentSignInEmail",email);
+    }catch(error){
+      console.error("Could not save the recent sign-in email:",error);
+    }
+    var bridge=window.gradePortal;
+    if(bridge&&typeof bridge.saveRememberedLogin==="function"){
+      try{
+        var result=await bridge.saveRememberedLogin({email:email,password:password});
+        if(result.saved)return;
+        if(result.reason!=="unavailable"){
+          $("msg").textContent="Signed in, but this device could not save your account for next time.";
+        }
+      }catch(error){
+        console.error("Could not securely remember the signed-in account:",error);
+        $("msg").textContent="Signed in, but this device could not securely remember your account.";
+        return;
+      }
+    }
+    await storeBrowserCredential(email,password);
+  }
+
+  async function prefillRememberedAccount(){
+    var recentEmail="";
+    try{
+      recentEmail=window.localStorage.getItem("gradePortalRecentSignInEmail")||"";
+      if(recentEmail&&!$("email").value)$("email").value=recentEmail;
+    }catch(error){
+      console.error("Could not load the recent sign-in email:",error);
+    }
+    var bridge=window.gradePortal;
+    if(bridge&&typeof bridge.loadRememberedLogin==="function"){
+      var saved=await bridge.loadRememberedLogin();
+      if(saved&&saved.credentials){
+        $("email").value=saved.credentials.email;
+        $("pw").value=saved.credentials.password;
+        return;
+      }
+    }
+    if(!window.PasswordCredential||!navigator.credentials
+      ||typeof navigator.credentials.get!=="function")return;
+    try{
+      var credential=await navigator.credentials.get({password:true,mediation:"silent"});
+      if(credential&&credential.type==="password"
+        &&(!recentEmail||credential.id.toLowerCase()===recentEmail.toLowerCase())){
+        if(!recentEmail)$("email").value=credential.id;
+        $("pw").value=credential.password;
       }
     }catch(error){
-      console.error("Could not securely remember the signed-in account:",error);
-      $("msg").textContent="Signed in, but this device could not securely remember your account. Sign in manually next time.";
+      console.error("Could not load the saved sign-in from the browser password manager:",error);
     }
   }
 
   async function updateRememberedPassword(password){
     var bridge=window.gradePortal;
-    if(!bridge||typeof bridge.updateRememberedPassword!=="function")return;
-    try{
-      var result=await bridge.updateRememberedPassword(password);
-      if(!result.saved&&result.reason!=="missing"){
-        $("msg").textContent="Your password changed, but automatic sign-in could not be updated. Sign in manually next time.";
+    if(bridge&&typeof bridge.updateRememberedPassword==="function"){
+      try{
+        var result=await bridge.updateRememberedPassword(password);
+        if(result.saved)return;
+        if(result.reason!=="missing"&&result.reason!=="unavailable"){
+          $("msg").textContent="Your password changed, but the saved sign-in could not be updated. Sign in manually next time.";
+        }
+      }catch(error){
+        console.error("Could not update the securely remembered password:",error);
+        $("msg").textContent="Your password changed, but the saved sign-in could not be updated. Sign in manually next time.";
       }
-    }catch(error){
-      console.error("Could not update the securely remembered password:",error);
-      $("msg").textContent="Your password changed, but automatic sign-in could not be updated. Sign in manually next time.";
     }
+    var email=$("email").value;
+    if(email)await storeBrowserCredential(email,password);
   }
 
   function applyStorageHealth(){
@@ -989,7 +1039,6 @@
   }
 
   async function loadStudents(){
-    rosterStudentsLoaded=false;
     $("studentNotice").textContent="";
     $("studentNotice").classList.remove("error");
     $("studentCount").textContent="Loading students...";
@@ -1006,7 +1055,6 @@
         throw new Error("The roster response is outdated. Restart the portal server to load parent account links.");
       }
       rosterParents=result.parents;
-      rosterStudentsLoaded=true;
       if(Array.isArray(result.sectionsHandled)){
         handledSections=result.sectionsHandled;
         populateSectionControls(activeStudentSection);
@@ -1026,17 +1074,12 @@
         $("studentNotice").textContent="Roster refreshed, but saved E-Class inputs could not be reconciled: "+error.message;
         $("studentNotice").classList.add("error");
       }
-      if(!$("checklistPanel").hidden)renderChecklist();
       return true;
     }catch(error){
       $("studentCount").textContent="Unable to load";
       $("clearStudentRoster").disabled=true;
       $("studentNotice").textContent=error.message;
       $("studentNotice").classList.add("error");
-      if(!$("checklistPanel").hidden){
-        renderChecklist();
-        setChecklistStatus("Student roster could not be loaded. "+error.message,true);
-      }
       return false;
     }
   }
@@ -5302,7 +5345,7 @@
     if(!showRma)rmaDirty=false;
     if(!showAttendance)attendanceDirty=false;
     if(page!=="profile"){
-      teacherProfileDirty=teacherPdsDirty;
+      teacherProfileDirty=false;
       teacherProfileDetailsDirty=false;
       teacherProfileBasicDirty=false;
       teacherProfileSchoolDirty=false;
@@ -8285,9 +8328,6 @@
       ||(entryType==="main"&&sessionUser.role!=="teacher");
     if(wrongPortal){
       await api("/api/auth/logout",{method:"POST"});
-      if(window.gradePortal&&typeof window.gradePortal.clearRememberedLogin==="function"){
-        await window.gradePortal.clearRememberedLogin();
-      }
       if(window.gradePortal&&typeof window.gradePortal.clearPortalAuthCookies==="function"){
         await window.gradePortal.clearPortalAuthCookies();
       }
@@ -8809,12 +8849,7 @@
     if(!$("toolsPage").hidden)setActiveToolPanel("calendarPanel");
   };
   (function(){
-    var panelIds=["tarpaulinPanel","lessonPlanPanel","calendarPanel","checklistPanel","moreToolsPanel"];
-    var checklistColumns=[];
-    var checklistStudentRecords=[];
-    var checklistOwnerKey="";
-    var checklistMigrationMessage="";
-    var rosterStudentsLoaded=false;
+    var panelIds=["tarpaulinPanel","lessonPlanPanel","calendarPanel","moreToolsPanel"];
     var lessonPlanInitialized=false;
     var lessonPlanMode="lesson-plan";
     var lessonPlanSourceFiles=[];
@@ -10743,390 +10778,6 @@
       if($("toolsSelector").value==="calendarPanel")loadTeacherCalendar();
     });
 
-    function checklistStorageKey(){
-      var userKey=currentUser&&(currentUser.id||currentUser.username||currentUser.email);
-      if(!userKey)throw new Error("Sign in to use the checklist.");
-      return "gradePortalStudentChecklist:"+encodeURIComponent(String(userKey));
-    }
-    function checklistLegacyStorageKey(){
-      var userKey=currentUser&&(currentUser.id||currentUser.username||currentUser.email);
-      if(!userKey)throw new Error("Sign in to use the checklist.");
-      return "gradePortalChecklist:"+encodeURIComponent(String(userKey));
-    }
-    function defaultChecklistColumns(){
-      return [{id:"checklist-1",label:"Checklist item"}];
-    }
-    function migratedChecklistColumns(data){
-      var labels=[];
-      var seen=new Set();
-      var skippedLabels=0;
-      function addLabel(value){
-        if(typeof value!=="string")return;
-        var label=value.trim().slice(0,50);
-        if(!label||seen.has(label.toLowerCase()))return;
-        if(labels.length>=12){
-          skippedLabels++;
-          return;
-        }
-        seen.add(label.toLowerCase());
-        labels.push(label);
-      }
-      if(Array.isArray(data)){
-        if(data.length>100||data.some(function(item){
-          return !item||typeof item.id!=="string"||!item.id
-            ||typeof item.text!=="string"||!item.text.trim()||item.text.length>200
-            ||typeof item.done!=="boolean";
-        })){
-          throw new Error("The saved checklist data is invalid.");
-        }
-        data.forEach(function(item){addLabel(item.text)});
-      }else if(data&&data.version===2&&Array.isArray(data.columns)&&Array.isArray(data.rows)){
-        data.rows.forEach(function(row){
-          if(!row||!Array.isArray(row.cells))throw new Error("The saved checklist data is invalid.");
-          var firstCell=row.cells[0];
-          if(firstCell&&typeof firstCell.text==="string")addLabel(firstCell.text);
-        });
-        data.columns.slice(2).forEach(function(column){addLabel(column&&column.label)});
-      }else{
-        throw new Error("The saved checklist data is invalid.");
-      }
-      return {
-        columns:labels.length
-          ?labels.map(function(label,index){return {id:"checklist-"+(index+1),label:label}})
-          :defaultChecklistColumns(),
-        migratedLabels:labels.length,
-        skippedLabels:skippedLabels
-      };
-    }
-    function validateChecklistTable(columns,studentRecords){
-      if(!Array.isArray(columns)||columns.length<1||columns.length>12
-        ||!Array.isArray(studentRecords)||studentRecords.length>10000){
-        throw new Error("The saved checklist table is invalid.");
-      }
-      var columnIds=new Set();
-      var columnLabels=new Set();
-      columns.forEach(function(column){
-        if(!column||typeof column.id!=="string"||!column.id||columnIds.has(column.id)
-          ||typeof column.label!=="string"||!column.label.trim()||column.label.length>50){
-          throw new Error("The saved checklist table has an invalid column.");
-        }
-        columnIds.add(column.id);
-        var normalizedLabel=column.label.trim().toLowerCase();
-        if(columnLabels.has(normalizedLabel))throw new Error("The saved checklist table has duplicate column names.");
-        columnLabels.add(normalizedLabel);
-      });
-      var studentIds=new Set();
-      studentRecords.forEach(function(record){
-        if(!record||typeof record.studentId!=="string"||!record.studentId||studentIds.has(record.studentId)
-          ||!Array.isArray(record.checks)){
-          throw new Error("The saved checklist table has an invalid student record.");
-        }
-        studentIds.add(record.studentId);
-        var checkedColumnIds=new Set();
-        record.checks.forEach(function(check){
-          if(!check||!columnIds.has(check.columnId)||checkedColumnIds.has(check.columnId)
-            ||typeof check.checked!=="boolean"){
-            throw new Error("The saved checklist table has an invalid checkbox value.");
-          }
-          checkedColumnIds.add(check.columnId);
-        });
-      });
-    }
-    function loadChecklistItems(){
-      var key=checklistStorageKey();
-      if(checklistOwnerKey===key)return;
-      var saved=window.localStorage.getItem(key);
-      var columns;
-      var studentRecords=[];
-      checklistMigrationMessage="";
-      if(saved){
-        var data=JSON.parse(saved);
-        if(data&&data.version===3){
-          columns=data.columns;
-          studentRecords=data.students;
-        }else{
-          throw new Error("The saved student checklist data is invalid.");
-        }
-      }else{
-        var legacySaved=window.localStorage.getItem(checklistLegacyStorageKey());
-        if(legacySaved){
-          var legacyResult=migratedChecklistColumns(JSON.parse(legacySaved));
-          columns=legacyResult.columns;
-          checklistMigrationMessage=legacyResult.migratedLabels
-            ?" Earlier checklist item names are now column headers; the previous checklist data remains saved on this device."
-            :"";
-          if(legacyResult.skippedLabels){
-            checklistMigrationMessage+=" Only the first 12 item names fit as headers.";
-          }
-        }else{
-          columns=defaultChecklistColumns();
-        }
-      }
-      validateChecklistTable(columns,studentRecords);
-      checklistColumns=columns;
-      checklistStudentRecords=studentRecords;
-      checklistOwnerKey=key;
-    }
-    function saveChecklistItems(){
-      try{
-        window.localStorage.setItem(checklistStorageKey(),JSON.stringify({
-          version:3,
-          columns:checklistColumns,
-          students:checklistStudentRecords
-        }));
-        return "";
-      }catch(error){
-        return error.message;
-      }
-    }
-    function setChecklistStatus(message,isError){
-      var status=$("checklistStatus");
-      status.textContent=message;
-      status.classList.toggle("error",Boolean(isError));
-    }
-    function checklistRosterStudents(){
-      return rosterStudents.filter(function(student){
-        return student&&student.id!==undefined&&student.id!==null&&String(student.id).trim()&&!student.enrollmentStatus;
-      });
-    }
-    function syncChecklistStudentRecords(students){
-      var previousRecords=checklistStudentRecords;
-      var nextRecords=previousRecords.slice();
-      var knownIds=new Set(nextRecords.map(function(record){return record.studentId}));
-      students.forEach(function(student){
-        var studentId=String(student.id);
-        if(!knownIds.has(studentId)){
-          knownIds.add(studentId);
-          nextRecords.push({studentId:studentId,checks:[]});
-        }
-      });
-      if(nextRecords.length===previousRecords.length)return "";
-      checklistStudentRecords=nextRecords;
-      var saveError=saveChecklistItems();
-      if(saveError){
-        checklistStudentRecords=previousRecords;
-        return saveError;
-      }
-      return "";
-    }
-    function checklistStudentRecord(studentId){
-      return checklistStudentRecords.find(function(record){return record.studentId===String(studentId)})||null;
-    }
-    function checklistCellIsChecked(record,columnId){
-      if(!record)return false;
-      var check=record.checks.find(function(item){return item.columnId===columnId});
-      return Boolean(check&&check.checked);
-    }
-    function checklistSummary(students){
-      var completed=0;
-      students.forEach(function(student){
-        var record=checklistStudentRecord(student.id);
-        checklistColumns.forEach(function(column){
-          if(checklistCellIsChecked(record,column.id))completed++;
-        });
-      });
-      var total=students.length*checklistColumns.length;
-      return students.length+" student"+(students.length===1?"":"s")+"; "+completed+" of "+total+" checklist items complete."
-    }
-    function renderChecklist(errorMessage,isError){
-      var table=$("checklistTable");
-      var headerRow=$("checklistHeaderRow");
-      var body=$("checklistRows");
-      headerRow.replaceChildren();
-      body.replaceChildren();
-      try{
-        loadChecklistItems();
-      }catch(error){
-        table.hidden=true;
-        setChecklistStatus("Checklist could not be loaded. "+error.message,true);
-        return;
-      }
-      if(!rosterStudentsLoaded){
-        table.hidden=true;
-        setChecklistStatus("The student roster is loading. Refresh the student list to try again.",false);
-        return;
-      }
-      table.hidden=false;
-      var students=checklistRosterStudents();
-      var syncError=syncChecklistStudentRecords(students);
-      function addHeader(label,className){
-        var cell=document.createElement("th");
-        cell.scope="col";
-        cell.textContent=label;
-        if(className)cell.className=className;
-        headerRow.appendChild(cell);
-        return cell;
-      }
-      addHeader("No.","checklist-number-cell");
-      addHeader("Student","checklist-student-cell");
-      checklistColumns.forEach(function(column,columnIndex){
-        var header=addHeader("","checklist-column-heading");
-        var labelInput=document.createElement("input");
-        labelInput.type="text";
-        labelInput.maxLength=50;
-        labelInput.value=column.label;
-        labelInput.setAttribute("aria-label","Column name: "+column.label);
-        labelInput.addEventListener("change",function(){
-          var nextLabel=labelInput.value.trim();
-          if(!nextLabel||checklistColumns.some(function(existing,index){
-            return index!==columnIndex&&existing.label.toLowerCase()===nextLabel.toLowerCase();
-          })){
-            labelInput.value=column.label;
-            setChecklistStatus("Column names must be non-empty and unique.",true);
-            return;
-          }
-          var previousLabel=column.label;
-          column.label=nextLabel;
-          var saveError=saveChecklistItems();
-          if(saveError){
-            column.label=previousLabel;
-            labelInput.value=previousLabel;
-            setChecklistStatus("Checklist could not be saved. "+saveError,true);
-            return;
-          }
-          labelInput.setAttribute("aria-label","Checklist item: "+nextLabel);
-          if(removeColumnButton)removeColumnButton.setAttribute("aria-label","Remove "+nextLabel+" checklist column");
-          setChecklistStatus(checklistSummary(students));
-        });
-        header.appendChild(labelInput);
-        var removeColumnButton=null;
-        if(columnIndex>0){
-          removeColumnButton=document.createElement("button");
-          removeColumnButton.className="btn ghost checklist-column-remove";
-          removeColumnButton.type="button";
-          removeColumnButton.textContent="Remove";
-          removeColumnButton.setAttribute("aria-label","Remove "+column.label+" checklist column");
-          removeColumnButton.addEventListener("click",function(){
-            if(!window.confirm("Remove the "+column.label+" checklist item and all of its saved checkmarks?"))return;
-            var previousColumns=checklistColumns;
-            var previousRecords=checklistStudentRecords;
-            checklistColumns=checklistColumns.filter(function(existing){return existing.id!==column.id});
-            checklistStudentRecords=checklistStudentRecords.map(function(record){
-              return {
-                studentId:record.studentId,
-                checks:record.checks.filter(function(check){return check.columnId!==column.id})
-              };
-            });
-            var saveError=saveChecklistItems();
-            if(saveError){
-              checklistColumns=previousColumns;
-              checklistStudentRecords=previousRecords;
-              renderChecklist("Checklist could not be saved. "+saveError,true);
-              return;
-            }
-            renderChecklist();
-          });
-          header.appendChild(removeColumnButton);
-        }
-      });
-      if(!students.length){
-        var emptyRow=document.createElement("tr");
-        var emptyCell=document.createElement("td");
-        emptyCell.className="checklist-empty-cell";
-        emptyCell.colSpan=checklistColumns.length+2;
-        emptyCell.textContent="No currently enrolled students were found in this class.";
-        emptyRow.appendChild(emptyCell);
-        body.appendChild(emptyRow);
-      }
-      students.forEach(function(student,rowIndex){
-        var studentId=String(student.id);
-        var studentName=[student.lastName,student.firstName,student.middleName].filter(Boolean).join(", ")
-          ||String(student.name||"Unnamed student");
-        var record=checklistStudentRecord(studentId);
-        var row=document.createElement("tr");
-        var numberCell=document.createElement("td");
-        numberCell.className="checklist-number-cell";
-        numberCell.textContent=String(rowIndex+1);
-        row.appendChild(numberCell);
-        var nameCell=document.createElement("td");
-        nameCell.className="checklist-student-cell";
-        nameCell.textContent=studentName;
-        row.appendChild(nameCell);
-        checklistColumns.forEach(function(column){
-          var dataCell=document.createElement("td");
-          dataCell.className="checklist-check-cell";
-          var checkbox=document.createElement("input");
-          checkbox.type="checkbox";
-          checkbox.checked=checklistCellIsChecked(record,column.id);
-          checkbox.setAttribute("aria-label","Mark "+column.label+" complete for "+studentName);
-          checkbox.addEventListener("change",function(){
-            var previousRecords=checklistStudentRecords;
-            var nextRecords=previousRecords.slice();
-            var recordIndex=nextRecords.findIndex(function(existing){return existing.studentId===studentId});
-            var previousRecord=recordIndex===-1?{studentId:studentId,checks:[]}:nextRecords[recordIndex];
-            var nextChecks=previousRecord.checks.slice();
-            var checkIndex=nextChecks.findIndex(function(existing){return existing.columnId===column.id});
-            var nextCheck={columnId:column.id,checked:checkbox.checked};
-            if(checkIndex===-1)nextChecks.push(nextCheck);
-            else nextChecks[checkIndex]=nextCheck;
-            var nextRecord={studentId:studentId,checks:nextChecks};
-            if(recordIndex===-1)nextRecords.push(nextRecord);
-            else nextRecords[recordIndex]=nextRecord;
-            checklistStudentRecords=nextRecords;
-            var saveError=saveChecklistItems();
-            if(saveError){
-              checklistStudentRecords=previousRecords;
-              checkbox.checked=!checkbox.checked;
-              setChecklistStatus("Checklist could not be saved. "+saveError,true);
-              return;
-            }
-            setChecklistStatus(checklistSummary(students)+(checklistMigrationMessage||""));
-          });
-          dataCell.appendChild(checkbox);
-          row.appendChild(dataCell);
-        });
-        body.appendChild(row);
-      });
-      $("checklistAddColumn").disabled=checklistColumns.length>=12;
-      $("checklistRefreshRoster").disabled=false;
-      if(typeof errorMessage==="string"){
-        setChecklistStatus(errorMessage,isError);
-      }else if(syncError){
-        setChecklistStatus("Student rows are shown, but their saved checklist data could not be updated: "+syncError,true);
-      }else{
-        setChecklistStatus(checklistSummary(students)+(checklistMigrationMessage||""));
-      }
-    }
-    $("checklistAddColumn").addEventListener("click",function(){
-      try{
-        loadChecklistItems();
-      }catch(error){
-        renderChecklist();
-        return;
-      }
-      if(checklistColumns.length>=12){
-        setChecklistStatus("A checklist can have up to 12 items.",true);
-        return;
-      }
-      var previousColumns=checklistColumns;
-      var labelNumber=checklistColumns.length+1;
-      while(checklistColumns.some(function(existing){return existing.label.toLowerCase()==="checklist item "+labelNumber}))labelNumber++;
-      checklistColumns=checklistColumns.concat({
-        id:"checklist-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,6),
-        label:"Checklist item "+labelNumber
-      });
-      var saveError=saveChecklistItems();
-      if(saveError){
-        checklistColumns=previousColumns;
-        renderChecklist("Checklist could not be saved. "+saveError,true);
-        return;
-      }
-      renderChecklist();
-      var headers=$("checklistHeaderRow").querySelectorAll("input");
-      if(headers.length)headers[headers.length-1].focus();
-    });
-    $("checklistRefreshRoster").addEventListener("click",async function(){
-      var button=$("checklistRefreshRoster");
-      button.disabled=true;
-      button.textContent="Refreshing…";
-      try{
-        var loaded=await loadStudents();
-        if(!loaded)setChecklistStatus("The student roster could not be refreshed. "+$("studentNotice").textContent,true);
-      }finally{
-        button.disabled=false;
-        button.textContent="Refresh student list";
-      }
-    });
     function selectToolPanel(panelId,focus){
       panelIds.forEach(function(id){
         $(id).hidden=id!==panelId;
@@ -11134,16 +10785,6 @@
       $("toolsSelector").value=panelId;
       $("toolsSelector").setAttribute("aria-controls",panelId);
       if(panelId==="calendarPanel")loadTeacherCalendar();
-      if(panelId==="checklistPanel"){
-        if(rosterStudentsLoaded){
-          renderChecklist();
-        }else{
-          setChecklistStatus("Loading the student roster…",false);
-          loadStudents().then(function(loaded){
-            if(!loaded)setChecklistStatus("The student roster could not be loaded. "+$("studentNotice").textContent,true);
-          });
-        }
-      }
       if(panelId==="lessonPlanPanel")initializeLessonPlan();
       if(focus)$("toolsSelector").focus();
     }
@@ -11416,7 +11057,24 @@
       );
       return fitScale>=minScale?fitScale:null;
     }
+    function tarpaulinBannerSizeForGrid(dimensions,layout,stretch){
+      var maxWidthCm=(layout.tileWidthMm+(layout.columns-1)*layout.strideWidthMm)/10;
+      var maxHeightCm=(layout.tileHeightMm+(layout.rows-1)*layout.strideHeightMm)/10;
+      if(stretch){
+        return maxWidthCm>=1&&maxWidthCm<=1000&&maxHeightCm>=1&&maxHeightCm<=1000
+          ?{widthCm:maxWidthCm,heightCm:maxHeightCm}
+          :null;
+      }
+      var fitScale=tarpaulinBannerScaleForGrid(dimensions,layout);
+      return fitScale===null?null:{
+        widthCm:dimensions.widthCm*fitScale,
+        heightCm:dimensions.heightCm*fitScale
+      };
+    }
     function getTarpaulinPdfImagePlacement(imageWidth,imageHeight,bannerWidthMm,bannerHeightMm,fit){
+      if(fit==="stretch"){
+        return {x:0,y:0,width:bannerWidthMm,height:bannerHeightMm};
+      }
       var scale=fit==="cover"
         ?Math.max(bannerWidthMm/imageWidth,bannerHeightMm/imageHeight)
         :Math.min(bannerWidthMm/imageWidth,bannerHeightMm/imageHeight);
@@ -11532,15 +11190,16 @@
       var grid=requestedTarpaulinSheetGrid(),dimensions=bannerDimensions();
       if(!grid||!dimensions)return false;
       var layout=getTarpaulinPrintLayout(dimensions,bannerPaperSize.value,bannerOrientation.value,grid);
-      var fitScale=tarpaulinBannerScaleForGrid(dimensions,layout);
-      if(fitScale===null){
-        tarpaulinSheetGridError="This paper grid cannot fit the banner proportions within the supported size limits.";
+      var fitSize=tarpaulinBannerSizeForGrid(dimensions,layout,bannerImageFit.value==="stretch");
+      if(!fitSize){
+        tarpaulinSheetGridError="This paper grid exceeds the supported banner size limits.";
         return false;
       }
       tarpaulinSheetGridError="";
+      var outputScale=bannerUnit.value==="in"?1/2.54:1;
       var precision=bannerUnit.value==="in"?3:2;
-      bannerWidth.value=(dimensions.width*fitScale).toFixed(precision);
-      bannerHeight.value=(dimensions.height*fitScale).toFixed(precision);
+      bannerWidth.value=(fitSize.widthCm*outputScale).toFixed(precision);
+      bannerHeight.value=(fitSize.heightCm*outputScale).toFixed(precision);
       return true;
     }
     function updateTarpaulinSheetPreview(dimensions){
@@ -11585,7 +11244,7 @@
             image.className="tarpaulin-sheet-image";
             image.src=previewImage.src;
             image.alt="";
-            image.style.objectFit=bannerImageFit.value;
+            image.style.objectFit=bannerImageFit.value==="stretch"?"fill":bannerImageFit.value;
             art.appendChild(image);
           }
           printable.appendChild(art);
@@ -11630,12 +11289,18 @@
       preview.style.aspectRatio="auto";
       preview.style.setProperty("--tarpaulin-ratio",dimensions?dimensions.widthCm+" / "+dimensions.heightCm:"3 / 1");
       $("tarpaulinPreviewEmpty").hidden=true;
-      previewImage.style.objectFit=bannerImageFit.value;
+      previewImage.style.objectFit=bannerImageFit.value==="stretch"?"fill":bannerImageFit.value;
       if(dimensions){
         $("tarpaulinDimensions").textContent=dimensions.width+" "+dimensions.unit+" × "+dimensions.height+" "+dimensions.unit;
         $("tarpaulinSheetGridHint").textContent=bannerSheetLayout.value==="custom"
-          ?tarpaulinSheetGridError||"Banner dimensions are scaled to fit the selected sheet grid while preserving proportions."
-          :"Choose a paper grid to scale the banner to fit that many sheets while preserving its proportions.";
+          ?tarpaulinSheetGridError||(
+            bannerImageFit.value==="stretch"
+              ?"The picture is stretched to fill the selected paper grid. Print margins stay unchanged."
+              :"Banner dimensions are scaled to fit the selected sheet grid while preserving proportions."
+          )
+          :bannerImageFit.value==="stretch"
+            ?"Choose a paper grid to stretch the picture across a specific number of pages."
+            :"Choose a paper grid to scale the banner to fit that many sheets while preserving its proportions.";
         $("tarpaulinPrintHint").textContent=printLayout
           ?"Dashed boundaries show "+printLayout.total+" "+(printLayout.total===1?"sheet":"sheets")+" of "+bannerPaperSize.options[bannerPaperSize.selectedIndex].text+" "+bannerOrientation.options[bannerOrientation.selectedIndex].text.toLowerCase()+" paper at actual size with 1 in top/left and 0.5 in right/bottom margins. Each page prints a unique banner segment; align the scissor-marked printable edges and tape from the back. SVG keeps the selected "+dimensions.width+" × "+dimensions.height+" "+dimensions.unit+" size."
           :tarpaulinSheetGridError||"Enter valid sheet counts to prepare the tiled print.";
@@ -11673,7 +11338,18 @@
     });
     [bannerColor,bannerImageFit].forEach(function(input){
       input.addEventListener("input",updateTarpaulin);
-      input.addEventListener("change",updateTarpaulin);
+      input.addEventListener("change",function(){
+        if(input===bannerImageFit&&input.value==="stretch"&&bannerSheetLayout.value!=="custom"){
+          bannerSheetLayout.value="custom";
+          bannerSheetLayout.dispatchEvent(new Event("change"));
+          return;
+        }
+        if(input===bannerImageFit&&bannerSheetLayout.value==="custom"){
+          tarpaulinSheetGridError="";
+          fitBannerToSheetGrid();
+        }
+        updateTarpaulin();
+      });
     });
     [bannerPaperSize,bannerOrientation].forEach(function(input){
       input.addEventListener("change",function(){
@@ -11737,14 +11413,15 @@
       $("tarpaulinImageName").textContent=file.name;
       $("removeTarpaulinImage").hidden=false;
       previewImage.onload=function(){
-        var matchedAspect=syncBannerSizeToImage(previewImage);
+        var stretchingToGrid=bannerImageFit.value==="stretch"&&bannerSheetLayout.value==="custom";
+        var matchedAspect=stretchingToGrid||syncBannerSizeToImage(previewImage);
         var fittedGrid=true;
         if(matchedAspect&&bannerSheetLayout.value==="custom"){
           tarpaulinSheetGridError="";
           fittedGrid=fitBannerToSheetGrid();
         }
         showTarpaulinNotice(
-          "Picture added ("+previewImage.naturalWidth+" × "+previewImage.naturalHeight+" px). "+(!matchedAspect?"Its aspect ratio is outside the supported banner size range.":!fittedGrid?tarpaulinSheetGridError:"Banner size was adjusted to match its aspect ratio."),
+          "Picture added ("+previewImage.naturalWidth+" × "+previewImage.naturalHeight+" px). "+(!matchedAspect?"Its aspect ratio is outside the supported banner size range.":!fittedGrid?tarpaulinSheetGridError:bannerImageFit.value==="stretch"&&bannerSheetLayout.value==="custom"?"Picture stretched to fill the selected paper grid.":"Banner size was adjusted to match its aspect ratio."),
           !matchedAspect||!fittedGrid
         );
         updateTarpaulin();
@@ -11912,7 +11589,7 @@
       try{
         var imageDataUrl=bannerImageFile?await readImageAsDataUrl(bannerImageFile):"";
         var pictureSvg=imageDataUrl
-          ?'<image href="'+imageDataUrl+'" x="0" y="0" width="'+dimensions.widthCm+'" height="'+dimensions.heightCm+'" preserveAspectRatio="'+(bannerImageFit.value==="cover"?"xMidYMid slice":"xMidYMid meet")+'"/>'
+          ?'<image href="'+imageDataUrl+'" x="0" y="0" width="'+dimensions.widthCm+'" height="'+dimensions.heightCm+'" preserveAspectRatio="'+(bannerImageFit.value==="stretch"?"none":bannerImageFit.value==="cover"?"xMidYMid slice":"xMidYMid meet")+'"/>'
           :"";
         var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+dimensions.width+dimensions.unit+'" height="'+dimensions.height+dimensions.unit+'" viewBox="0 0 '+dimensions.widthCm+' '+dimensions.heightCm+'"><rect width="100%" height="100%" fill="'+bannerColor.value+'"/>'+pictureSvg+"</svg>";
         var url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));
@@ -11981,7 +11658,7 @@
             image.className="tarpaulin-print-image";
             image.src=previewImage.src;
             image.alt="";
-            image.style.objectFit=bannerImageFit.value;
+            image.style.objectFit=bannerImageFit.value==="stretch"?"fill":bannerImageFit.value;
             canvas.appendChild(image);
           }
           tile.appendChild(canvas);
@@ -13685,7 +13362,7 @@
   ]);
   function updateTeacherProfileDirtyState(){
     teacherProfileDetailsDirty=teacherProfileBasicDirty||teacherProfileSchoolDirty;
-    teacherProfileDirty=teacherProfileDetailsDirty||teacherSubjectsDirty||teacherPdsDirty;
+    teacherProfileDirty=teacherProfileDetailsDirty||teacherSubjectsDirty;
   }
   ["teacherProfileName","teacherProfilePosition","teacherProfileEmail","teacherProfileClassroom","teacherProfileSectionsHandled","teacherProfileSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId","teacherProfileRegion","teacherProfileDivision","teacherProfileDistrict","teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"].forEach(function(id){
     $(id).addEventListener("input",function(){
@@ -13769,7 +13446,6 @@
       profileTab.tabIndex=selected?0:-1;
       $(profileTab.getAttribute("aria-controls")).hidden=!selected;
     });
-    if(tab.id==="teacherProfileBackgroundTab")loadTeacherPds();
   }
   teacherProfileTabs.forEach(function(tab){
     tab.addEventListener("click",function(){selectTeacherProfileTab(tab)});
@@ -13787,238 +13463,6 @@
       nextTab.focus();
     });
   });
-  var pdsSheetTabs=Array.prototype.slice.call($("pdsSheetTabs").querySelectorAll('[role="tab"]'));
-  function pdsCoordinates(address){
-    var match=/^([A-Z]+)(\d+)$/.exec(address);
-    if(!match)return null;
-    var column=0;
-    for(var index=0;index<match[1].length;index++)column=column*26+match[1].charCodeAt(index)-64;
-    return {row:Number(match[2]),column:column};
-  }
-  function setPdsCellStyle(cell,style){
-    if(!style)return;
-    if(style.fontFamily)cell.style.fontFamily=style.fontFamily;
-    if(style.fontSize)cell.style.fontSize=style.fontSize+"pt";
-    if(style.fontColor)cell.style.color=style.fontColor;
-    if(style.background)cell.style.backgroundColor=style.background;
-    if(style.bold)cell.style.fontWeight="700";
-    if(style.italic)cell.style.fontStyle="italic";
-    if(style.horizontal)cell.style.textAlign=style.horizontal;
-    if(style.vertical)cell.style.verticalAlign=style.vertical;
-    cell.style.whiteSpace=style.wrap?"pre-wrap":"nowrap";
-    cell.style.overflowWrap=style.wrap?"anywhere":"normal";
-    ["top","right","bottom","left"].forEach(function(side){
-      if(style.border&&style.border[side]){
-        cell.style["border"+side.charAt(0).toUpperCase()+side.slice(1)]=style.border[side];
-      }
-    });
-  }
-  function captureActiveTeacherPdsSheet(){
-    if(!teacherPdsLoaded)return;
-    var values=Object.create(null);
-    $("pdsSheetTable").querySelectorAll("[data-pds-cell]").forEach(function(field){
-      var address=field.getAttribute("data-pds-cell");
-      if(field.type==="checkbox"){
-        values[address]=field.checked;
-      }else{
-        var value=(field.innerText||field.textContent||"").replace(/\r\n?/g,"\n").trim();
-        if(value)values[address]=value;
-      }
-    });
-    teacherPdsEntries[activeTeacherPdsSheet]=values;
-  }
-  function renderTeacherPdsSheet(){
-    var sheet=teacherPdsTemplate.find(function(candidate){return candidate.name===activeTeacherPdsSheet});
-    if(!sheet)return;
-    $("pdsSheetDescription").textContent=sheet.description;
-    var table=$("pdsSheetTable");
-    table.setAttribute("aria-label","PDS 2026 sheet "+sheet.name);
-    $("pdsSheetScroll").setAttribute("aria-labelledby","pdsSheetTab"+sheet.name);
-    table.style.width=sheet.widths.reduce(function(total,width){return total+width},0)+"px";
-    table.textContent="";
-    var colgroup=document.createElement("colgroup");
-    sheet.widths.forEach(function(width){
-      var column=document.createElement("col");
-      column.style.width=width+"px";
-      colgroup.appendChild(column);
-    });
-    table.appendChild(colgroup);
-    var body=document.createElement("tbody");
-    var mergedCells=Object.create(null);
-    var coveredCells=new Set();
-    sheet.merges.forEach(function(range){
-      var endpoints=range.split(":");
-      var start=pdsCoordinates(endpoints[0]);
-      var end=pdsCoordinates(endpoints[1]);
-      if(!start||!end)return;
-      mergedCells[endpoints[0]]={rowSpan:end.row-start.row+1,colSpan:end.column-start.column+1};
-      for(var rowNumber=start.row;rowNumber<=end.row;rowNumber++){
-        for(var columnNumber=start.column;columnNumber<=end.column;columnNumber++){
-          if(rowNumber!==start.row||columnNumber!==start.column){
-            coveredCells.add(rowNumber+":"+columnNumber);
-          }
-        }
-      }
-    });
-    var savedCells=teacherPdsEntries[activeTeacherPdsSheet]||{};
-    sheet.rows.forEach(function(row){
-      var tableRow=document.createElement("tr");
-      tableRow.style.height=row.height+"px";
-      var rowLabel=(row.cells.find(function(cell){return cell.value&&cell.value.trim()})||{}).value||"entry";
-      row.cells.forEach(function(cell){
-        var coordinates=pdsCoordinates(cell.address);
-        if(!coordinates||coveredCells.has(coordinates.row+":"+coordinates.column))return;
-        var tableCell=document.createElement("td");
-        var span=mergedCells[cell.address];
-        if(span){
-          tableCell.rowSpan=span.rowSpan;
-          tableCell.colSpan=span.colSpan;
-        }
-        setPdsCellStyle(tableCell,cell.style);
-        if(typeof cell.checked==="boolean"){
-          tableCell.classList.add("pds-checkbox-cell");
-          var checkbox=document.createElement("input");
-          checkbox.type="checkbox";
-          checkbox.setAttribute("data-pds-cell",cell.address);
-          checkbox.setAttribute("aria-label",sheet.name+" "+rowLabel+" "+cell.address);
-          checkbox.checked=Object.prototype.hasOwnProperty.call(savedCells,cell.address)
-            ?savedCells[cell.address]===true
-            :cell.checked;
-          tableCell.appendChild(checkbox);
-        }else if(cell.editable){
-          tableCell.classList.add("pds-editable-cell");
-          tableCell.contentEditable="true";
-          tableCell.setAttribute("role","textbox");
-          tableCell.setAttribute("aria-label",sheet.name+" "+rowLabel+" "+cell.address);
-          tableCell.setAttribute("data-pds-cell",cell.address);
-          tableCell.textContent=typeof savedCells[cell.address]==="string"?savedCells[cell.address]:"";
-        }else{
-          tableCell.textContent=cell.value;
-        }
-        tableRow.appendChild(tableCell);
-      });
-      body.appendChild(tableRow);
-    });
-    table.appendChild(body);
-  }
-  function selectTeacherPdsSheet(tab){
-    if(!teacherPdsLoaded)return;
-    captureActiveTeacherPdsSheet();
-    activeTeacherPdsSheet=tab.getAttribute("data-pds-sheet");
-    pdsSheetTabs.forEach(function(sheetTab){
-      var selected=sheetTab===tab;
-      sheetTab.setAttribute("aria-selected",selected?"true":"false");
-      sheetTab.tabIndex=selected?0:-1;
-    });
-    renderTeacherPdsSheet();
-  }
-  pdsSheetTabs.forEach(function(tab){
-    tab.addEventListener("click",function(){selectTeacherPdsSheet(tab)});
-    tab.addEventListener("keydown",function(event){
-      var currentIndex=pdsSheetTabs.indexOf(tab);
-      var nextIndex=currentIndex;
-      if(event.key==="ArrowRight")nextIndex=(currentIndex+1)%pdsSheetTabs.length;
-      else if(event.key==="ArrowLeft")nextIndex=(currentIndex+pdsSheetTabs.length-1)%pdsSheetTabs.length;
-      else if(event.key==="Home")nextIndex=0;
-      else if(event.key==="End")nextIndex=pdsSheetTabs.length-1;
-      else return;
-      event.preventDefault();
-      var nextTab=pdsSheetTabs[nextIndex];
-      selectTeacherPdsSheet(nextTab);
-      nextTab.focus();
-    });
-  });
-  function markTeacherPdsDirty(){
-    teacherPdsDirty=true;
-    updateTeacherProfileDirtyState();
-    $("pdsSaveError").textContent="";
-    $("pdsSaveNotice").textContent="Unsaved changes. Save PDS to keep them in your teacher profile.";
-  }
-  $("pdsSheetTable").addEventListener("input",markTeacherPdsDirty);
-  $("pdsSheetTable").addEventListener("change",markTeacherPdsDirty);
-  async function loadTeacherPds(){
-    if(teacherPdsLoaded)return;
-    if(teacherPdsLoading)return teacherPdsLoading;
-    var requestId=++teacherPdsRequestId;
-    $("pdsSaveError").textContent="";
-    $("pdsSaveNotice").textContent="";
-    $("pdsSheetDescription").textContent="Loading PDS 2026 workbook…";
-    $("pdsSheetScroll").setAttribute("aria-busy","true");
-    var loadPromise=(async function(){
-      var result=await api("/api/teacher/profile/pds");
-      if(requestId!==teacherPdsRequestId)return;
-      if(!Array.isArray(result.sheets)||result.sheets.map(function(sheet){return sheet.name}).join(",")!=="C1,C2,C3,C4"){
-        throw new Error("The PDS 2026 workbook does not contain the expected C1–C4 sheets.");
-      }
-      teacherPdsTemplate=result.sheets;
-      teacherPdsEntries=result.entries||{};
-      activeTeacherPdsSheet="C1";
-      teacherPdsDirty=false;
-      updateTeacherProfileDirtyState();
-      teacherPdsLoaded=true;
-      pdsSheetTabs.forEach(function(tab){
-        var selected=tab.getAttribute("data-pds-sheet")==="C1";
-        tab.setAttribute("aria-selected",selected?"true":"false");
-        tab.tabIndex=selected?0:-1;
-      });
-      renderTeacherPdsSheet();
-      $("pdsSaveNotice").textContent=result.updatedAt
-        ?"Saved PDS entries loaded from your teacher profile."
-        :"Your PDS is ready. Save changes to keep them in your teacher profile.";
-    })();
-    teacherPdsLoading=loadPromise;
-    try{
-      await loadPromise;
-    }catch(error){
-      if(requestId===teacherPdsRequestId){
-        $("pdsSaveError").textContent=error.message;
-        $("pdsSheetDescription").textContent="The PDS workbook could not be loaded.";
-      }
-    }finally{
-      if(teacherPdsLoading===loadPromise)teacherPdsLoading=null;
-      if(requestId===teacherPdsRequestId)$("pdsSheetScroll").setAttribute("aria-busy","false");
-    }
-  }
-  async function saveTeacherPds(){
-    var button=$("savePdsSheet");
-    if(!teacherPdsLoaded){
-      $("pdsSaveError").textContent="Load the PDS workbook before saving.";
-      return;
-    }
-    captureActiveTeacherPdsSheet();
-    $("pdsSaveError").textContent="";
-    $("pdsSaveNotice").textContent="";
-    button.disabled=true;
-    button.setAttribute("aria-busy","true");
-    button.textContent="Saving...";
-    var requestId=teacherPdsRequestId;
-    try{
-      var result=await api("/api/teacher/profile/pds",{
-        method:"PUT",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({sheets:teacherPdsEntries})
-      });
-      if(requestId!==teacherPdsRequestId)return;
-      teacherPdsDirty=false;
-      updateTeacherProfileDirtyState();
-      $("pdsSaveNotice").textContent="PDS C1–C4 saved to your teacher profile.";
-      if(result.updatedAt)$("pdsSaveNotice").textContent+=" Saved "+new Date(result.updatedAt).toLocaleString()+".";
-    }catch(error){
-      if(requestId===teacherPdsRequestId)$("pdsSaveError").textContent=error.message;
-    }finally{
-      button.disabled=false;
-      button.removeAttribute("aria-busy");
-      button.textContent="Save PDS";
-    }
-  }
-  $("savePdsSheet").addEventListener("click",saveTeacherPds);
-  $("printPdsSheet").addEventListener("click",function(){
-    if(!teacherPdsLoaded)return;
-    captureActiveTeacherPdsSheet();
-    document.body.classList.add("pds-printing");
-    window.print();
-  });
-  window.addEventListener("afterprint",function(){document.body.classList.remove("pds-printing")});
   function firstInvalidTeacherProfileField(fieldIds){
     for(var index=0;index<fieldIds.length;index++){
       var field=$(fieldIds[index]);
@@ -14863,14 +14307,24 @@
       console.error("Could not flush the E-Class draft before sign out:",error);
     }
     var desktopBridge=window.gradePortal;
-    if(desktopBridge&&typeof desktopBridge.clearRememberedLogin==="function"){
+    var logoutError=null;
+    try{await api("/api/auth/logout",{method:"POST"})}catch(error){logoutError=error;console.error("Sign out failed:",error)}
+    var sessionCleared=!logoutError;
+    var cookieClearError=null;
+    if(desktopBridge&&typeof desktopBridge.clearPortalAuthCookies==="function"){
       try{
-        await desktopBridge.clearRememberedLogin();
+        await desktopBridge.clearPortalAuthCookies();
+        sessionCleared=true;
       }catch(error){
-        $("msg").textContent="Could not clear the securely remembered account. Please try signing out again.";
-        console.error("Could not clear the remembered account during sign out:",error);
-        return;
+        cookieClearError=error;
+        console.error("Could not clear the portal session cookie:",error);
       }
+    }
+    if(!sessionCleared){
+      var signOutErrorMessage="Could not safely finish signing out. Check that the portal is running and try again.";
+      $("msg").textContent=signOutErrorMessage;
+      window.alert(signOutErrorMessage);
+      return;
     }
     readingDirty=false;
     rmaDirty=false;
@@ -14882,29 +14336,6 @@
     teacherProfileSavedIdentity={name:"",email:"",classroomNumber:""};
     teacherSubjectsDirty=false;
     teacherPasswordDirty=false;
-    teacherPdsRequestId++;
-    teacherPdsTemplate=[];
-    teacherPdsEntries={};
-    teacherPdsLoaded=false;
-    teacherPdsLoading=null;
-    teacherPdsDirty=false;
-    activeTeacherPdsSheet="C1";
-    $("pdsSheetTable").textContent="";
-    $("pdsSaveError").textContent="";
-    $("pdsSaveNotice").textContent="";
-    var logoutError=null;
-    try{await api("/api/auth/logout",{method:"POST"})}catch(error){logoutError=error;console.error("Sign out failed:",error)}
-    if(desktopBridge&&typeof desktopBridge.clearPortalAuthCookies==="function"){
-      try{
-        await desktopBridge.clearPortalAuthCookies();
-      }catch(error){
-        console.error("Could not clear the portal session cookie:",error);
-        if(logoutError){
-          $("msg").textContent="Could not safely finish signing out. Check that the portal is running and try again.";
-          return;
-        }
-      }
-    }
     window.dispatchEvent(new Event("lessonPlanSourcesClear"));
     currentUser=null;
     if(window.stopTeacherCalendarDeadlineNotifications)window.stopTeacherCalendarDeadlineNotifications();
@@ -14914,6 +14345,17 @@
     $("studentForm").reset();
     $("form").reset();
     mode="in";closeSidebar();render();
+    try{
+      await prefillRememberedAccount();
+    }catch(error){
+      console.error("Could not prefill the saved sign-in after sign out:",error);
+      $("msg").textContent="Signed out. Enter your account details to sign in again.";
+    }
+    if(logoutError){
+      $("msg").textContent="Signed out on this device, but the server could not confirm the logout.";
+    }else if(cookieClearError){
+      $("msg").textContent="Signed out. The server session was closed, but the local session cookie could not be cleared.";
+    }
   }
   document.querySelectorAll("[data-logout]").forEach(function(button){button.onclick=signOut});
   $("studentBirthdate").max=localISODate();
@@ -14956,31 +14398,13 @@
       if(!authSessionChecked){
         authSessionChecked=true;
         api("/api/auth/session").then(function(result){return enter(result.user)}).catch(function(error){
+          prefillRememberedAccount().catch(function(prefillError){
+            console.error("Could not prefill the saved sign-in:",prefillError);
+            $("msg").textContent="Could not load the saved sign-in. Enter your account details to continue.";
+          });
           if(error.status!==401){
             $("msg").textContent=error.message;
-            return;
           }
-          var bridge=window.gradePortal;
-          if(!bridge||typeof bridge.restoreRememberedLogin!=="function")return;
-          bridge.restoreRememberedLogin().then(async function(result){
-            if(result.restored){
-              try{
-                await enter({});
-              }catch(restoreError){
-                if(restoreError.status===401&&typeof bridge.clearRememberedLogin==="function"){
-                  await bridge.clearRememberedLogin();
-                }
-                throw restoreError;
-              }
-            }else if(result.reason==="invalid"){
-              $("msg").textContent="Your saved sign-in could not be restored. Please sign in again.";
-            }else if(result.reason==="unavailable"){
-              $("msg").textContent="Automatic sign-in is temporarily unavailable. Please sign in manually.";
-            }
-          }).catch(function(restoreError){
-            console.error("Could not restore the saved sign-in:",restoreError);
-            $("msg").textContent="Automatic sign-in could not be completed. Please sign in manually.";
-          });
         });
       }
       return result;

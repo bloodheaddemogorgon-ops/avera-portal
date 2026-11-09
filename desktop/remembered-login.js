@@ -94,21 +94,7 @@ function createRememberedLoginStore({
   return { save, load, clear, updatePassword };
 }
 
-async function restoreRememberedLogin({ store, authenticate }) {
-  const saved = await store.load();
-  if (!saved.credentials) return { restored: false, reason: saved.reason };
-
-  const result = await authenticate(saved.credentials);
-  if (result.status === 401 || result.status === 403) {
-    await store.clear();
-    return { restored: false, reason: "invalid" };
-  }
-  if (!result.ok) return { restored: false, reason: "unavailable" };
-  return { restored: true, reason: null };
-}
-
 module.exports = {
   createRememberedLoginStore,
   isSecureStorageAvailable,
-  restoreRememberedLogin,
 };

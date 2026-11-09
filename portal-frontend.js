@@ -30,10 +30,12 @@ const STATIC_ASSETS = new Map([
   ["/assets/portal.css", {
     filename: path.join("assets", "portal.css"),
     contentType: "text/css; charset=utf-8",
+    cacheControl: "no-cache",
   }],
   ["/assets/portal.js", {
     filename: path.join("assets", "portal.js"),
     contentType: "text/javascript; charset=utf-8",
+    cacheControl: "no-cache",
   }],
   ["/assets/jspdf.umd.min.js", {
     filename: path.join("node_modules", "jspdf", "dist", "jspdf.umd.min.js"),
@@ -293,7 +295,7 @@ function createPortalFrontendServer(options = {}) {
             response,
             200,
             asset.contentType,
-            "public, max-age=86400",
+            asset.cacheControl || "public, max-age=86400",
             content,
           );
           return;

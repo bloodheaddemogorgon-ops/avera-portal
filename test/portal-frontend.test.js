@@ -91,12 +91,19 @@ test("separate portal frontends serve distinct entries and proxy to one API", as
       assert.doesNotMatch(html, /id="authAccountType"/);
       assert.match(html, /data-mode="up"/);
       assert.doesNotMatch(html, /data-mode="up" hidden/);
+      assert.ok(html.includes(`class="brand-version">${require("../package.json").version}</span>`));
       const apiResponse = await fetch(`${portalOrigins[index]}/api/health`, {
         headers: { Cookie: `portal_session=${entry}` },
       });
       assert.equal(apiResponse.status, 200);
       assert.deepEqual(await apiResponse.json(), { status: "ok", storage: "sqlite" });
       assert.match(apiResponse.headers.get("set-cookie"), /portal_session=shared/);
+    }
+
+    for (const pathname of ["/assets/portal.css", "/assets/portal.js"]) {
+      const assetResponse = await fetch(`${portalOrigins[0]}${pathname}`);
+      assert.equal(assetResponse.status, 200);
+      assert.equal(assetResponse.headers.get("cache-control"), "no-cache");
     }
 
     const faviconResponse = await fetch(`${portalOrigins[0]}/favicon.png`);
