@@ -4,6 +4,7 @@ const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } = require("ele
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const { createRememberedLoginStore } = require("./remembered-login");
+const { checkForUpdatesWithRetry, getUpdateCheckErrorMessage } = require("./update-check");
 const {
   createDatabaseBackup,
   restoreBestDatabase,
@@ -148,7 +149,8 @@ let activeCheck = null;
 
 function runUpdateCheck() {
   if (!activeCheck) {
-    activeCheck = getAutoUpdater().checkForUpdates().finally(() => { activeCheck = null; });
+    activeCheck = checkForUpdatesWithRetry(() => getAutoUpdater().checkForUpdates())
+      .finally(() => { activeCheck = null; });
   }
   return activeCheck;
 }
@@ -203,12 +205,8 @@ ipcMain.handle("update-check", async (event) => {
       ? { state: "available", version: info.version }
       : { state: "current", version: app.getVersion() };
   } catch (error) {
-    if (/releases\.atom|No published versions|Cannot find latest\.yml|\b404\b/i.test(error.message)) {
-      return {
-        state: "error",
-        message: "The update source is unavailable. The GitHub repository bloodheaddemogorgon-ops/avera-portal must be public and have a published release containing latest.yml.",
-      };
-    }
+    const message = getUpdateCheckErrorMessage(error);
+    if (message) return { state: "error", message };
     throw error;
   }
 });

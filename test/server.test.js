@@ -1521,6 +1521,7 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
+      "Update checks retry temporary GitHub server failures and show a clear message if the service remains unavailable.",
       "Sign-in remembers the most recent account using secure credential storage; signing in still requires your click.",
       "Sign-out reports failures and keeps the session active if logout cannot be confirmed.",
       "Tarpapel Maker can stretch an image across the selected sheets while retaining print margins.",
