@@ -1,0 +1,565 @@
+{
+  "schoolYear": "2026–2027",
+  "firstDay": "2026-06-08",
+  "lastDay": "2027-04-08",
+  "totalClassDays": 201,
+  "sourceName": "DepEd Order No. 009, s. 2026, Annex B",
+  "sourceUrl": "https://www.deped.gov.ph/wp-content/uploads/DO_s2026_009r.pdf",
+  "terms": [
+    {
+      "name": "Term 1",
+      "startDate": "2026-06-08",
+      "endDate": "2026-09-15",
+      "classDays": 69,
+      "openingBlock": {
+        "startDate": "2026-06-08",
+        "endDate": "2026-06-11",
+        "classDays": 4
+      },
+      "instructionalBlock": {
+        "startDate": "2026-06-15",
+        "endDate": "2026-09-01",
+        "classDays": 55
+      },
+      "endOfTermBlock": {
+        "startDate": "2026-09-02",
+        "endDate": "2026-09-15",
+        "classDays": 10
+      }
+    },
+    {
+      "name": "Term 2",
+      "startDate": "2026-09-16",
+      "endDate": "2026-12-18",
+      "classDays": 65,
+      "instructionalBlock": {
+        "startDate": "2026-09-16",
+        "endDate": "2026-12-04",
+        "classDays": 56
+      },
+      "endOfTermBlock": {
+        "startDate": "2026-12-07",
+        "endDate": "2026-12-18",
+        "classDays": 9
+      }
+    },
+    {
+      "name": "Term 3",
+      "startDate": "2027-01-04",
+      "endDate": "2027-04-08",
+      "classDays": 67,
+      "instructionalBlock": {
+        "startDate": "2027-01-04",
+        "endDate": "2027-03-23",
+        "classDays": 57
+      },
+      "endOfTermBlock": {
+        "startDate": "2027-03-24",
+        "endDate": "2027-04-08",
+        "classDays": 10
+      }
+    }
+  ],
+  "activities": [
+    {
+      "date": "2026-04-01",
+      "endDate": "2026-04-30",
+      "title": "Teachers' End-of-School-Year Break",
+      "kind": "break"
+    },
+    {
+      "date": "2026-04-13",
+      "endDate": "2026-04-17",
+      "title": "2026 National Schools Press Conference",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-04-18",
+      "endDate": "2026-04-22",
+      "title": "2026 National Festival of Talents",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-04-25",
+      "endDate": "2026-04-30",
+      "title": "2026 Palarong Pambansa",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-05-01",
+      "title": "End of Teachers' End-of-School-Year Break",
+      "kind": "break"
+    },
+    {
+      "date": "2026-05-04",
+      "endDate": "2026-05-22",
+      "title": "End-of-School-Year Intervention Program",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-05-04",
+      "endDate": "2026-05-29",
+      "title": "Training Window for Teachers, School Heads, and Teaching-Related Personnel",
+      "kind": "training"
+    },
+    {
+      "date": "2026-05-04",
+      "endDate": "2026-05-29",
+      "title": "Oplan Balik Eskwela",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-06-01",
+      "endDate": "2026-06-05",
+      "title": "Brigada Eskwela and Enrollment Period",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-06-08",
+      "endDate": "2026-06-11",
+      "title": "Term 1 Opening Block",
+      "kind": "opening-block"
+    },
+    {
+      "date": "2026-06-08",
+      "title": "Start of Term 1",
+      "kind": "term"
+    },
+    {
+      "date": "2026-06-08",
+      "endDate": "2026-07-10",
+      "title": "Beginning-of-School-Year Assessment Testing Window",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-06-08",
+      "endDate": "2026-07-03",
+      "title": "Mandatory Learners' Health Assessment",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-06-08",
+      "endDate": "2026-06-11",
+      "title": "Learner and Parent Orientation, BOSY Assessments, and School-Year Opening Activities",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-06-15",
+      "endDate": "2026-09-01",
+      "title": "Term 1 Instructional Block",
+      "kind": "instructional-block"
+    },
+    {
+      "date": "2026-06-22",
+      "endDate": "2026-06-26",
+      "title": "Philippine Early Childhood Development Checklist for BOSY",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-06-23",
+      "title": "DepEd Founding Anniversary Flag-Raising Ceremony and Opening Activity",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-06-24",
+      "title": "DepEd Founding Anniversary Proper",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-07-03",
+      "title": "End of Mandatory Learners' Health Assessment",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-07-06",
+      "title": "Term 1 First Teacher-Made Summative Test",
+      "kind": "examination"
+    },
+    {
+      "date": "2026-07-10",
+      "title": "End of BOSY Assessment Testing Window",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-07-13",
+      "endDate": "2026-07-17",
+      "title": "Multi-Factored Assessment Tool (MFAT)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-07-20",
+      "endDate": "2026-07-24",
+      "title": "National Federation SELG and SSLG Election",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-07-28",
+      "title": "Term 1 Second Teacher-Made Summative Test",
+      "kind": "examination"
+    },
+    {
+      "date": "2026-08-28",
+      "endDate": "2026-09-01",
+      "title": "Term 1 Examination",
+      "kind": "examination"
+    },
+    {
+      "date": "2026-09-02",
+      "endDate": "2026-09-15",
+      "title": "Term 1 End-of-Term Block",
+      "kind": "end-of-term-block"
+    },
+    {
+      "date": "2026-09-02",
+      "endDate": "2026-09-08",
+      "title": "ARAL Program, Grade Computation, School Forms, and Co-/Extra-Curricular Activities",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-09-05",
+      "title": "Start of National Teachers' Month",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-09-09",
+      "title": "PTA Meeting and Distribution of Report Cards",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-09-10",
+      "endDate": "2026-09-11",
+      "title": "INSET for Teachers",
+      "kind": "training"
+    },
+    {
+      "date": "2026-09-10",
+      "endDate": "2026-09-15",
+      "title": "Wellness Break for Learners",
+      "kind": "break"
+    },
+    {
+      "date": "2026-09-14",
+      "endDate": "2026-09-15",
+      "title": "Wellness Break for Teachers",
+      "kind": "break"
+    },
+    {
+      "date": "2026-09-15",
+      "title": "End of Term 1",
+      "kind": "term"
+    },
+    {
+      "date": "2026-09-16",
+      "title": "Start of Term 2",
+      "kind": "term"
+    },
+    {
+      "date": "2026-09-16",
+      "endDate": "2026-12-04",
+      "title": "National Career Assessment Examination Testing Window (Grade 10)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-09-16",
+      "endDate": "2026-12-04",
+      "title": "Term 2 Instructional Block",
+      "kind": "instructional-block"
+    },
+    {
+      "date": "2026-09-21",
+      "endDate": "2026-09-25",
+      "title": "Start of Middle-of-School-Year (MOSY) Assessments",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-10-05",
+      "title": "World Teachers' Day and Culmination of National Teachers' Month",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-10-05",
+      "endDate": "2026-10-09",
+      "title": "National Achievement Test (Grade 10)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-10-07",
+      "title": "Term 2 First Teacher-Made Summative Test",
+      "kind": "examination"
+    },
+    {
+      "date": "2026-10-19",
+      "endDate": "2026-10-23",
+      "title": "End of MOSY Assessment Testing Window",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-10-29",
+      "title": "Term 2 Second Teacher-Made Summative Test",
+      "kind": "examination"
+    },
+    {
+      "date": "2026-11-15",
+      "title": "Philippine Educational Placement Test (Luzon and VisMin Clusters)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-11-27",
+      "title": "Araw ng Pagbasa",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-12-03",
+      "endDate": "2026-12-04",
+      "title": "Term 2 Examination",
+      "kind": "examination"
+    },
+    {
+      "date": "2026-12-04",
+      "title": "End of NCAE Testing Window (Grade 10)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2026-12-07",
+      "endDate": "2026-12-18",
+      "title": "Term 2 End-of-Term Block",
+      "kind": "end-of-term-block"
+    },
+    {
+      "date": "2026-12-07",
+      "endDate": "2026-12-14",
+      "title": "ARAL Program, Grade Computation, School Forms, and Co-/Extra-Curricular Activities",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-12-15",
+      "title": "PTA Meeting and Distribution of Progress/Performance Reports",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-12-16",
+      "title": "Year-End Activity",
+      "kind": "school-event"
+    },
+    {
+      "date": "2026-12-17",
+      "endDate": "2026-12-18",
+      "title": "INSET for Teachers",
+      "kind": "training"
+    },
+    {
+      "date": "2026-12-17",
+      "endDate": "2026-12-18",
+      "title": "Wellness Break for Learners",
+      "kind": "break"
+    },
+    {
+      "date": "2026-12-18",
+      "title": "End of Term 2",
+      "kind": "term"
+    },
+    {
+      "date": "2026-12-19",
+      "endDate": "2026-12-31",
+      "title": "Year-End Break",
+      "kind": "break"
+    },
+    {
+      "date": "2027-01-04",
+      "endDate": "2027-03-23",
+      "title": "Term 3 Instructional Block",
+      "kind": "instructional-block"
+    },
+    {
+      "date": "2027-01-04",
+      "title": "Start of Term 3",
+      "kind": "term"
+    },
+    {
+      "date": "2027-01-25",
+      "title": "Term 3 First Teacher-Made Summative Test",
+      "kind": "examination"
+    },
+    {
+      "date": "2027-01-30",
+      "endDate": "2027-02-26",
+      "title": "Early Registration for Incoming Kinder, Grades 1, 7, and 11, OSCYA, and Transferees",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-02-01",
+      "endDate": "2027-02-05",
+      "title": "Start of End-of-School-Year (EOSY) Assessments",
+      "kind": "assessment"
+    },
+    {
+      "date": "2027-02-15",
+      "endDate": "2027-02-19",
+      "title": "National Achievement Test (Grade 12)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2027-02-16",
+      "title": "Term 3 Second Teacher-Made Summative Test",
+      "kind": "examination"
+    },
+    {
+      "date": "2027-02-26",
+      "title": "End of Early Registration",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-03-01",
+      "endDate": "2027-03-05",
+      "title": "Early Language, Literacy, and Numeracy Assessment (Grade 3)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2027-03-08",
+      "endDate": "2027-03-12",
+      "title": "National Achievement Test (Grade 6)",
+      "kind": "assessment"
+    },
+    {
+      "date": "2027-03-08",
+      "endDate": "2027-03-12",
+      "title": "End of EOSY Assessment Testing Window",
+      "kind": "assessment"
+    },
+    {
+      "date": "2027-03-15",
+      "endDate": "2027-03-16",
+      "title": "Term 3 Examination (Moving Up / Graduating Learners)",
+      "kind": "examination"
+    },
+    {
+      "date": "2027-03-15",
+      "endDate": "2027-03-19",
+      "title": "Philippine Early Childhood Development Checklist for EOSY",
+      "kind": "assessment"
+    },
+    {
+      "date": "2027-03-17",
+      "endDate": "2027-03-23",
+      "title": "Grade Computation, School Forms, and Academic Deliberation (Moving Up / Graduating Learners)",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-03-22",
+      "endDate": "2027-03-23",
+      "title": "Term 3 Examination (Other Grade Levels)",
+      "kind": "examination"
+    },
+    {
+      "date": "2027-03-24",
+      "endDate": "2027-04-08",
+      "title": "Term 3 End-of-Term Block",
+      "kind": "end-of-term-block"
+    },
+    {
+      "date": "2027-03-24",
+      "title": "Announcement of Academic Excellence Awardees (Moving Up / Graduating Learners)",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-03-24",
+      "dates": [
+        "2027-03-24",
+        "2027-03-29",
+        "2027-03-30",
+        "2027-03-31"
+      ],
+      "title": "Grade Computation, School Forms, and Co-/Extra-Curricular Activities (Other Grade Levels)",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-04-01",
+      "title": "Accomplishment of School Forms and Co-/Extra-Curricular Activities",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-04-02",
+      "dates": [
+        "2027-04-02",
+        "2027-04-05"
+      ],
+      "title": "INSET for Teachers",
+      "kind": "training"
+    },
+    {
+      "date": "2027-04-06",
+      "endDate": "2027-04-07",
+      "title": "End-of-School-Year Rites",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-04-08",
+      "title": "End of Term 3",
+      "kind": "term"
+    },
+    {
+      "date": "2027-04-08",
+      "title": "PTA Meeting and Distribution of Report Cards",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-04-09",
+      "endDate": "2027-05-09",
+      "title": "Teachers' End-of-School-Year Break",
+      "kind": "break"
+    },
+    {
+      "date": "2027-04-19",
+      "endDate": "2027-04-23",
+      "title": "2027 National Schools Press Conference",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-04-26",
+      "endDate": "2027-04-30",
+      "title": "2027 National Festival of Talents",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-05-03",
+      "endDate": "2027-05-07",
+      "title": "2027 Palarong Pambansa",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-05-09",
+      "title": "End of Teachers' End-of-School-Year Break",
+      "kind": "break"
+    },
+    {
+      "date": "2027-05-10",
+      "endDate": "2027-05-14",
+      "title": "Start of EOSY Intervention Program",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-05-10",
+      "endDate": "2027-06-04",
+      "title": "Training Window for Teachers, School Heads, and Teaching-Related Personnel",
+      "kind": "training"
+    },
+    {
+      "date": "2027-05-17",
+      "endDate": "2027-06-04",
+      "title": "Oplan Balik Eskwela",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-06-01",
+      "endDate": "2027-06-04",
+      "title": "End of Training Window and Oplan Balik Eskwela",
+      "kind": "school-event"
+    },
+    {
+      "date": "2027-06-07",
+      "endDate": "2027-06-11",
+      "title": "Brigada Eskwela and Enrollment Period",
+      "kind": "school-event"
+    }
+  ]
+}

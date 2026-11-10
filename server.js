@@ -23,6 +23,7 @@ const mammoth = require("mammoth");
 const sharp = require("sharp");
 const { createAuthRateLimiter } = require("./auth-rate-limiter");
 const { CalendarValidationError, createTeacherCalendarStore } = require("./teacher-calendar-store");
+const DEPED_SCHOOL_CALENDAR = require("./data/calendar/deped-2026-2027.json");
 const { calculateBmiForAge } = require("./who-growth-reference");
 
 const DOWNLOADS_DIRECTORY = path.join(os.homedir(), "Downloads");
@@ -69,6 +70,7 @@ const PORTAL_ENTRY_PATHS = new Map([
 const APP_VERSION = require("./package.json").version;
 const MAX_SF1_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_SF2_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_SF10_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_LESSON_PLAN_SOURCE_BYTES = 100 * 1024 * 1024;
 const MAX_LESSON_PLAN_SOURCE_FILES = 100;
 const MAX_LESSON_PLAN_SOURCE_PREVIEW_CHARS = 500000;
@@ -89,13 +91,6 @@ const GENERATED_REPORTS_DIRECTORY = path.join(__dirname, "downloads", "generated
 const SF9_TEMPLATE_PATH = path.join(__dirname, "SF9.xlsx");
 const GRADE_SHEET_TEMPLATE_PATH = path.join(__dirname, "Grading Sheet.xlsx");
 const ECLASS_TEMPLATE_PATH = path.join(__dirname, "E-CLASS.xlsx");
-const PDS_TEMPLATE_PATH = path.join(__dirname, "PDS 2026.xlsx");
-const PDS_TEMPLATE_SHEETS = [
-  { name: "C1", description: "Personal information, family background, and education" },
-  { name: "C2", description: "Civil service eligibility and work experience" },
-  { name: "C3", description: "Learning and development, voluntary work, and other information" },
-  { name: "C4", description: "Additional information, references, and oath" },
-];
 const MPS_TEMPLATE_PATH = path.join(__dirname, "MPS TEMPLATE.docx");
 const SF9_LOGO_INCHES = 1.44;
 const SF9_LOGO_PIXELS = SF9_LOGO_INCHES * 96;
@@ -1116,6 +1111,8 @@ function getClassSheet(workbook) {
       strand: ensureColumn(sheet, headers, "Strand"),
       section: ensureColumn(sheet, headers, "Section"),
       schoolYear: ensureColumn(sheet, headers, "School Year"),
+      firstDayOfSchool: ensureColumn(sheet, headers, "First day of school"),
+      endOfSchoolYear: ensureColumn(sheet, headers, "End of school year"),
       schoolName: ensureColumn(sheet, headers, "Name of School"),
       schoolId: ensureColumn(sheet, headers, "School ID"),
       region: ensureColumn(sheet, headers, "Region"),
@@ -1839,11 +1836,6 @@ function openPortalDatabase(databasePath) {
         id INTEGER PRIMARY KEY CHECK (id = 1),
         schema_version INTEGER NOT NULL,
         workbook_state BLOB NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS teacher_pds_records (
-        teacher_id TEXT PRIMARY KEY,
-        sheet_data TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
     `);
@@ -2992,6 +2984,199 @@ async function readSF2Upload(request) {
   return buffer;
 }
 
+async function readSF10Upload(request) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    if (size > MAX_SF10_FILE_BYTES) {
+      throw new HttpError(413, "SF10 files must be 10 MB or smaller.");
+    }
+    chunks.push(chunk);
+  }
+  if (!size) throw new HttpError(400, "Choose an SF10 .xlsx file to import.");
+  const buffer = Buffer.concat(chunks, size);
+  if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
+    throw new HttpError(400, "Upload a valid SF10 workbook in .xlsx format.");
+  }
+  return buffer;
+}
+
+function sf10WorkbookText(value) {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === "object") {
+    if (typeof value.text === "string") return value.text.trim();
+    if (Array.isArray(value.richText)) {
+      return value.richText.map((item) => item.text || "").join("").trim();
+    }
+    if (value.result !== undefined) return sf10WorkbookText(value.result);
+    return "";
+  }
+  return String(value).trim();
+}
+
+function sf10ColumnNumber(column) {
+  return Array.from(column).reduce((total, character) =>
+    total * 26 + character.charCodeAt(0) - 64, 0);
+}
+
+function sf10MergeBounds(sheet, address) {
+  const range = sheet.model.merges.find((candidate) => candidate.split(":")[0] === address);
+  if (!range) {
+    const match = address.match(/^([A-Z]+)\d+$/);
+    return match ? { start: sf10ColumnNumber(match[1]), end: sf10ColumnNumber(match[1]) } : null;
+  }
+  const [startAddress, endAddress] = range.split(":");
+  return {
+    start: sf10ColumnNumber(startAddress.match(/^([A-Z]+)/)[1]),
+    end: sf10ColumnNumber(endAddress.match(/^([A-Z]+)/)[1]),
+  };
+}
+
+function sf10ValueAfterLabel(sheet, rowNumber, label, minColumn, maxColumn) {
+  const normalizedLabel = label.toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+  const row = sheet.getRow(rowNumber);
+  let labelCell = null;
+  for (let column = minColumn; column <= maxColumn; column += 1) {
+    const cell = row.getCell(column);
+    if (cell.isMerged && cell.master.address !== cell.address) continue;
+    const text = sf10WorkbookText(cell.value).toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+    if (text === normalizedLabel) {
+      labelCell = cell;
+      break;
+    }
+  }
+  if (!labelCell) return "";
+  const bounds = sf10MergeBounds(sheet, labelCell.address);
+  const afterColumn = bounds ? bounds.end + 1 : labelCell.col + 1;
+  const nextMerge = sheet.model.merges
+    .map((range) => {
+      const startAddress = range.split(":")[0];
+      const match = startAddress.match(/^([A-Z]+)(\d+)$/);
+      return match && Number(match[2]) === rowNumber
+        ? { address: startAddress, column: sf10ColumnNumber(match[1]) }
+        : null;
+    })
+    .filter((entry) => entry && entry.column >= afterColumn && entry.column <= maxColumn)
+    .sort((left, right) => left.column - right.column)[0];
+  return sf10WorkbookText(sheet.getCell(rowNumber, nextMerge ? nextMerge.column : afterColumn).value);
+}
+
+function sf10InlineValue(text, label, followingLabels = []) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const following = followingLabels
+    .map((entry) => entry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const expression = new RegExp(
+    `${escapedLabel}\\s*:\\s*([\\s\\S]*?)(?=\\s+(?:${following})\\s*:|$)`,
+    "i",
+  );
+  const match = String(text || "").match(expression);
+  return match ? match[1].replace(/_+/g, "").trim() : "";
+}
+
+function sf10Rating(sheet, address) {
+  const value = sf10WorkbookText(sheet.getCell(address).value);
+  if (!value) return "";
+  const rating = Number(value.replace(/,/g, ""));
+  if (!Number.isFinite(rating) || rating < 0 || rating > 100) {
+    throw new HttpError(400, `The SF10 workbook has an invalid final rating in ${sheet.name}!${address}.`);
+  }
+  return String(rating);
+}
+
+async function parseSF10Workbook(buffer) {
+  const workbook = new ExcelJS.Workbook();
+  try {
+    await workbook.xlsx.load(buffer);
+  } catch {
+    throw new HttpError(400, "The selected SF10 workbook could not be read.");
+  }
+  const front = workbook.getWorksheet("Front");
+  const back = workbook.getWorksheet("Back");
+  if (!front || !back
+    || !sf10WorkbookText(front.getCell("B21").value).toLocaleLowerCase().includes("scholastic record")
+    || !sf10WorkbookText(back.getCell("B2").value).toLocaleLowerCase().includes("scholastic record")) {
+    throw new HttpError(400, "Use a completed DepEd SF10-ES workbook with Front and Back worksheets.");
+  }
+
+  const lrn = sf10ValueAfterLabel(front, 10, "Learner Reference Number (LRN):", 2, 50)
+    .replace(/\D/g, "");
+  if (!lrn) throw new HttpError(400, "The SF10 workbook must contain the learner's LRN.");
+
+  const blocks = [
+    { grade: 1, sheet: front, subjectColumn: 2, ratingColumn: 16, remarksColumn: 19, firstRow: 30, lastRow: 44, averageRow: 45, headerRow: 23, left: true },
+    { grade: 2, sheet: front, subjectColumn: 22, ratingColumn: 46, remarksColumn: 49, firstRow: 30, lastRow: 44, averageRow: 45, headerRow: 23, left: false },
+    { grade: 3, sheet: front, subjectColumn: 2, ratingColumn: 16, remarksColumn: 19, firstRow: 60, lastRow: 74, averageRow: 75, headerRow: 52, left: true },
+    { grade: 4, sheet: front, subjectColumn: 22, ratingColumn: 46, remarksColumn: 49, firstRow: 60, lastRow: 74, averageRow: 75, headerRow: 52, left: false },
+    { grade: 5, sheet: back, subjectColumn: 2, ratingColumn: 12, remarksColumn: 15, firstRow: 10, lastRow: 24, averageRow: 25, left: true },
+    { grade: 6, sheet: back, subjectColumn: 19, ratingColumn: 33, remarksColumn: 34, firstRow: 10, lastRow: 24, averageRow: 25, left: false },
+  ];
+  const grades = [];
+  for (const block of blocks) {
+    const { sheet, grade } = block;
+    const gradeRecord = { grade, subjects: [] };
+    if (sheet === front) {
+      const minColumn = block.left ? 2 : 22;
+      const maxColumn = block.left ? 20 : 50;
+      const metadataRow = block.headerRow;
+      const classificationCell = `${block.left ? "F" : "Z"}${metadataRow + 2}`;
+      const fields = {
+        school: sf10ValueAfterLabel(sheet, metadataRow, "School:", minColumn, maxColumn),
+        schoolId: sf10ValueAfterLabel(sheet, metadataRow, "School ID:", minColumn, maxColumn),
+        district: sf10ValueAfterLabel(sheet, metadataRow + 1, "District:", minColumn, maxColumn),
+        division: sf10ValueAfterLabel(sheet, metadataRow + 1, "Division", minColumn, maxColumn),
+        region: sf10ValueAfterLabel(sheet, metadataRow + 1, "Region:", minColumn, maxColumn),
+        classifiedGrade: sf10WorkbookText(sheet.getCell(classificationCell).value) || String(grade),
+        section: sf10ValueAfterLabel(sheet, metadataRow + 2, "Section:", minColumn, maxColumn),
+        schoolYear: sf10ValueAfterLabel(sheet, metadataRow + 2, "School Year:", minColumn, maxColumn),
+        adviser: sf10ValueAfterLabel(sheet, metadataRow + 3, "Name of Adviser/Teacher:", minColumn, maxColumn),
+      };
+      for (const [key, value] of Object.entries(fields)) {
+        if (value) gradeRecord[key] = value;
+      }
+    } else {
+      const schoolAddress = block.left ? "B3" : "S3";
+      const districtAddress = block.left ? "B4" : "S4";
+      const gradeAddress = block.left ? "B5" : "S5";
+      const adviserAddress = block.left ? "B6" : "S6";
+      const schoolRow = sf10WorkbookText(sheet.getCell(schoolAddress).value);
+      const districtRow = sf10WorkbookText(sheet.getCell(districtAddress).value);
+      const gradeRow = sf10WorkbookText(sheet.getCell(gradeAddress).value);
+      const fields = {
+        school: sf10InlineValue(schoolRow, "School"),
+        schoolId: sf10ValueAfterLabel(sheet, 3, "School ID:", block.left ? 2 : 19, block.left ? 17 : 35),
+        district: sf10InlineValue(districtRow, "District", ["Division"]),
+        division: sf10InlineValue(districtRow, "Division", ["Region"]),
+        region: sf10ValueAfterLabel(sheet, 4, "Region:", block.left ? 2 : 19, block.left ? 17 : 35),
+        classifiedGrade: String(grade),
+        section: sf10InlineValue(gradeRow, "Section"),
+        schoolYear: sf10ValueAfterLabel(sheet, 5, "School Year:", block.left ? 2 : 19, block.left ? 17 : 35),
+        adviser: sf10InlineValue(sf10WorkbookText(sheet.getCell(adviserAddress).value), "Name of Adviser/Teacher"),
+      };
+      for (const [key, value] of Object.entries(fields)) {
+        if (value) gradeRecord[key] = value;
+      }
+    }
+
+    for (let rowNumber = block.firstRow; rowNumber <= block.lastRow; rowNumber += 1) {
+      const subject = sf10WorkbookText(sheet.getCell(rowNumber, block.subjectColumn).value);
+      const final = sf10Rating(sheet, sheet.getCell(rowNumber, block.ratingColumn).address);
+      const remarks = sf10WorkbookText(sheet.getCell(rowNumber, block.remarksColumn).value);
+      if (subject && (final || remarks)) gradeRecord.subjects.push({ name: subject, final, remarks });
+    }
+    gradeRecord.generalAverage = sf10Rating(sheet, sheet.getCell(block.averageRow, block.ratingColumn).address);
+    const hasSchoolDetails = Object.entries(gradeRecord).some(([key, value]) =>
+      !["grade", "subjects", "generalAverage", "classifiedGrade"].includes(key) && Boolean(value));
+    if (gradeRecord.generalAverage || gradeRecord.subjects.length || hasSchoolDetails) {
+      grades.push(gradeRecord);
+    }
+  }
+  if (!grades.length) throw new HttpError(400, "The SF10 workbook has no prior-grade school details or final ratings to import.");
+  return { lrn, grades };
+}
+
 function parseEClassWorkbook(buffer, selection) {
   const isExcel = buffer.length >= 4
     && ((buffer[0] === 0x50 && buffer[1] === 0x4b)
@@ -3028,6 +3213,7 @@ function parseEClassWorkbook(buffer, selection) {
         ? workbookSubject.includes(selectedGroup)
         : workbookSubject === selectedSubject
           || (selectedSubject === "epptle" && ["epptle", "epp", "tle"].includes(workbookSubject))
+          || (selectedSubject === "epp" && workbookSubject === "epptle")
           || (selectedSubject.includes("aralingpanlipunan") && workbookSubject.includes("aralingpanlipunan"))
           || (selectedSubject.includes("gmr") && workbookSubject.includes("goodmanners"))
     );
@@ -3118,7 +3304,6 @@ function createServer(options = {}) {
   const authRateLimiter = options.authRateLimiter || createAuthRateLimiter();
   let database = null;
   let databaseInitialization = null;
-  let teacherPdsTemplatePromise = null;
   let appearanceTheme = null;
 
   async function getAppearanceTheme() {
@@ -3213,210 +3398,6 @@ function createServer(options = {}) {
       throw error;
     });
     return databaseInitialization;
-  }
-
-  function pdsColumnNumber(letters) {
-    let number = 0;
-    for (const letter of letters) number = number * 26 + letter.charCodeAt(0) - 64;
-    return number;
-  }
-
-  function pdsCellAddress(address) {
-    const match = /^([A-Z]{1,3})(\d{1,3})$/.exec(address);
-    if (!match) return null;
-    return { column: pdsColumnNumber(match[1]), row: Number(match[2]) };
-  }
-
-  function pdsColorToCss(color) {
-    if (typeof color?.argb === "string") return `#${color.argb.slice(-6)}`;
-    if (typeof color?.rgb === "string") return `#${color.rgb.slice(-6)}`;
-    const indexedColors = {
-      8: "#000000",
-      9: "#FFFFFF",
-      10: "#FF0000",
-      22: "#E6E6E6",
-      55: "#D9D9D9",
-      64: "#000000",
-    };
-    return indexedColors[color?.indexed] || null;
-  }
-
-  function pdsCellStyle(cell) {
-    const style = cell.style || {};
-    const border = {};
-    for (const side of ["top", "right", "bottom", "left"]) {
-      const edge = style.border?.[side];
-      if (!edge?.style) continue;
-      const width = edge.style === "thick" ? "3px" : edge.style === "medium" ? "2px" : "1px";
-      const lineStyle = edge.style === "dotted" || edge.style === "dashed" || edge.style === "double"
-        ? edge.style
-        : "solid";
-      border[side] = `${width} ${lineStyle} ${pdsColorToCss(edge.color) || "#40464F"}`;
-    }
-    const fillColor = style.fill?.type === "pattern" && style.fill.pattern === "solid"
-      ? pdsColorToCss(style.fill.fgColor)
-      : null;
-    return {
-      fontFamily: style.font?.name || null,
-      fontSize: style.font?.size || null,
-      fontColor: pdsColorToCss(style.font?.color),
-      bold: Boolean(style.font?.bold),
-      italic: Boolean(style.font?.italic),
-      background: fillColor,
-      horizontal: style.alignment?.horizontal || null,
-      vertical: style.alignment?.vertical || null,
-      wrap: Boolean(style.alignment?.wrapText),
-      border,
-    };
-  }
-
-  async function getTeacherPdsTemplate() {
-    if (!teacherPdsTemplatePromise) {
-      teacherPdsTemplatePromise = (async () => {
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.readFile(PDS_TEMPLATE_PATH);
-        const sheets = PDS_TEMPLATE_SHEETS.map((specification) => {
-          const worksheet = workbook.getWorksheet(specification.name);
-          if (!worksheet) {
-            throw new Error(`The PDS 2026 workbook is missing worksheet ${specification.name}.`);
-          }
-          const printArea = worksheet.pageSetup.printArea || "";
-          const areaMatch = /^\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)\$?(\d+)$/.exec(printArea);
-          if (!areaMatch) {
-            throw new Error(`The PDS 2026 worksheet ${specification.name} has no supported print area.`);
-          }
-          const startColumn = pdsColumnNumber(areaMatch[1]);
-          const startRow = Number(areaMatch[2]);
-          const endColumn = pdsColumnNumber(areaMatch[3]);
-          const endRow = Number(areaMatch[4]);
-          const rows = [];
-          for (let rowNumber = startRow; rowNumber <= endRow; rowNumber += 1) {
-            const row = worksheet.getRow(rowNumber);
-            const cells = [];
-            for (let columnNumber = startColumn; columnNumber <= endColumn; columnNumber += 1) {
-              const cell = row.getCell(columnNumber);
-              const isCheckbox = typeof cell.value === "boolean";
-              cells.push({
-                address: cell.address,
-                value: isCheckbox ? "" : cell.value == null ? "" : cell.text || String(cell.value),
-                checked: isCheckbox ? cell.value : null,
-                editable: isCheckbox || cell.value == null,
-                style: pdsCellStyle(cell),
-              });
-            }
-            rows.push({
-              number: rowNumber,
-              height: Math.max(1, Math.round((row.height || 15) * 4 / 3)),
-              cells,
-            });
-          }
-          const merges = (worksheet.model.merges || []).filter((merge) => {
-            const [start, end] = merge.split(":");
-            const startAddress = pdsCellAddress(start);
-            const endAddress = pdsCellAddress(end);
-            return startAddress && endAddress
-              && startAddress.row >= startRow && endAddress.row <= endRow
-              && startAddress.column >= startColumn && endAddress.column <= endColumn;
-          });
-          const widths = [];
-          for (let columnNumber = startColumn; columnNumber <= endColumn; columnNumber += 1) {
-            widths.push(Math.max(14, Math.floor((worksheet.getColumn(columnNumber).width || 9) * 7 + 5)));
-          }
-          return {
-            name: specification.name,
-            description: specification.description,
-            startRow,
-            startColumn,
-            widths,
-            rows,
-            merges,
-          };
-        });
-        return { workbook, sheets };
-      })();
-    }
-    try {
-      return await teacherPdsTemplatePromise;
-    } catch (error) {
-      teacherPdsTemplatePromise = null;
-      throw error;
-    }
-  }
-
-  function validateTeacherPdsData(data, template) {
-    if (!data || typeof data !== "object" || Array.isArray(data)
-      || Object.keys(data).length !== 1 || !data.sheets
-      || typeof data.sheets !== "object" || Array.isArray(data.sheets)) {
-      throw new HttpError(400, "Provide Personal Data Sheet entries for sheets C1 through C4.");
-    }
-    const templateSheets = new Map(template.sheets.map((sheet) => [sheet.name, sheet]));
-    const normalizedSheets = Object.create(null);
-    let totalCharacters = 0;
-    for (const [sheetName, cells] of Object.entries(data.sheets)) {
-      const templateSheet = templateSheets.get(sheetName);
-      if (!templateSheet || !cells || typeof cells !== "object" || Array.isArray(cells)) {
-        throw new HttpError(400, "Only PDS sheets C1 through C4 can be saved.");
-      }
-      if (Object.keys(cells).length > 1500) {
-        throw new HttpError(400, "A PDS sheet contains too many cell values.");
-      }
-      const worksheet = template.workbook.getWorksheet(sheetName);
-      const normalizedCells = Object.create(null);
-      for (const [address, value] of Object.entries(cells)) {
-        const coordinates = pdsCellAddress(address);
-        if (!coordinates || coordinates.row < templateSheet.startRow
-          || coordinates.row > templateSheet.rows[templateSheet.rows.length - 1].number
-          || coordinates.column < templateSheet.startColumn
-          || coordinates.column >= templateSheet.startColumn + templateSheet.widths.length) {
-          throw new HttpError(400, `The PDS cell ${address} is outside sheet ${sheetName}.`);
-        }
-        const templateCell = worksheet.getCell(address);
-        if (typeof templateCell.value === "boolean") {
-          if (typeof value !== "boolean") {
-            throw new HttpError(400, `The PDS cell ${address} must be a checkbox value.`);
-          }
-          normalizedCells[address] = value;
-          continue;
-        }
-        if (templateCell.value != null || typeof value !== "string" || value.length > 2000) {
-          throw new HttpError(400, `The PDS cell ${address} is not an editable text field.`);
-        }
-        if (!value.trim()) continue;
-        totalCharacters += value.length;
-        if (totalCharacters > 500000) {
-          throw new HttpError(413, "PDS entries exceed the maximum saved size.");
-        }
-        normalizedCells[address] = value;
-      }
-      normalizedSheets[sheetName] = normalizedCells;
-    }
-    return normalizedSheets;
-  }
-
-  async function getTeacherPdsRecord(session) {
-    await initializeDatabase();
-    const record = database.prepare(
-      "SELECT sheet_data, updated_at FROM teacher_pds_records WHERE teacher_id = ?",
-    ).get(session.userId);
-    return {
-      sheets: record ? JSON.parse(record.sheet_data) : {},
-      updatedAt: record?.updated_at || null,
-    };
-  }
-
-  async function saveTeacherPdsRecord(session, data) {
-    const template = await getTeacherPdsTemplate();
-    const sheets = validateTeacherPdsData(data, template);
-    await initializeDatabase();
-    const updatedAt = new Date().toISOString();
-    database.prepare(`
-      INSERT INTO teacher_pds_records (teacher_id, sheet_data, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(teacher_id) DO UPDATE SET
-        sheet_data = excluded.sheet_data,
-        updated_at = excluded.updated_at
-    `).run(session.userId, JSON.stringify(sheets), updatedAt);
-    return { saved: true, updatedAt };
   }
 
   async function readDatabaseWorkbook() {
@@ -9414,10 +9395,11 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       `${month}-${String(index + 1).padStart(2, "0")}`);
   }
 
-  function attendanceSchoolDays(month) {
+  function attendanceSchoolDays(month, schoolYear = null) {
     return attendanceDates(month).filter((date) => {
       const weekday = new Date(`${date}T00:00:00.000Z`).getUTCDay();
-      return weekday !== 0 && weekday !== 6;
+      return weekday !== 0 && weekday !== 6
+        && (!schoolYear || (date >= schoolYear.startDate && date <= schoolYear.endDate));
     });
   }
 
@@ -9445,7 +9427,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       .toLowerCase().replace(/[^a-z0-9]/g, "");
   }
 
-  async function parseSF2Upload(buffer, month) {
+  async function parseSF2Upload(buffer, month, schoolYear) {
     const workbook = new ExcelJS.Workbook();
     try {
       await workbook.xlsx.load(buffer);
@@ -9471,7 +9453,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       throw new HttpError(400, "The selected worksheet does not match the SF2 template layout.");
     }
 
-    const schoolDays = attendanceSchoolDays(month);
+    const schoolDays = attendanceSchoolDays(month, schoolYear);
     const datesByColumn = new Map();
     for (let column = SF2_FIRST_DAY_COLUMN; column <= SF2_LAST_DAY_COLUMN; column += 1) {
       const rawDay = sheet.getCell(10, column).value;
@@ -9673,9 +9655,35 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
     return events.filter((event) => event.date <= monthEnd).slice(-1)[0] || null;
   }
 
+  async function getAttendanceSchoolYear(session) {
+    const profile = await getTeacherProfile(session);
+    const startDate = profile.firstDayOfSchool;
+    const endDate = profile.endOfSchoolYear;
+    if (!startDate || !endDate) {
+      throw new HttpError(400, "Set both First day of school and End of school year in Teacher Profile to use attendance.");
+    }
+    validateAttendanceDate(startDate);
+    validateAttendanceDate(endDate);
+    if (startDate > endDate) {
+      throw new HttpError(400, "First day of school must be on or before End of school year.");
+    }
+    return { startDate, endDate };
+  }
+
+  function validateAttendanceMonthInSchoolYear(month, schoolYear) {
+    if (month < schoolYear.startDate.slice(0, 7) || month > schoolYear.endDate.slice(0, 7)) {
+      throw new HttpError(
+        400,
+        `Attendance is only available from ${schoolYear.startDate.slice(0, 7)} through ${schoolYear.endDate.slice(0, 7)}.`,
+      );
+    }
+  }
+
   async function getAttendanceMonth(session, monthValue) {
     const month = validateAttendanceMonth(monthValue);
-    const dates = attendanceSchoolDays(month);
+    const schoolYear = await getAttendanceSchoolYear(session);
+    validateAttendanceMonthInSchoolYear(month, schoolYear);
+    const dates = attendanceSchoolDays(month, schoolYear);
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
       const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
@@ -9771,6 +9779,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
   }
 
   async function getAttendanceSummary(session) {
+    const schoolYear = await getAttendanceSchoolYear(session);
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
       const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
@@ -9808,7 +9817,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           ) continue;
           const studentId = cellText(row.getCell(columns.studentId).value);
           const date = attendanceDateText(row.getCell(columns.date).value);
-          if (!studentsById.has(studentId) || !date) continue;
+          if (!studentsById.has(studentId) || date < schoolYear.startDate || date > schoolYear.endDate) continue;
           recordsByLearnerDate.set(`${studentId}\u0000${date}`, {
             studentId,
             date,
@@ -9855,7 +9864,9 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
   async function saveAttendanceMonth(session, data) {
     const month = validateAttendanceMonth(data.month);
-    const dates = attendanceSchoolDays(month);
+    const schoolYear = await getAttendanceSchoolYear(session);
+    validateAttendanceMonthInSchoolYear(month, schoolYear);
+    const dates = attendanceSchoolDays(month, schoolYear);
     if (data.noClassDates !== undefined && !Array.isArray(data.noClassDates)) {
       throw new HttpError(400, "Choose valid dates to mark as Holiday/No Class.");
     }
@@ -10118,16 +10129,21 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
   async function clearAttendanceMonth(session, monthValue) {
     const month = validateAttendanceMonth(monthValue);
+    const schoolYear = await getAttendanceSchoolYear(session);
+    validateAttendanceMonthInSchoolYear(month, schoolYear);
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
       const { sheet, columns } = getAttendanceSheet(workbook);
       const rowsToDelete = [];
       for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
         const row = sheet.getRow(rowNumber);
+        const date = attendanceDateText(row.getCell(columns.date).value);
         if (
           cellText(row.getCell(columns.classId).value) === session.classId
           && cellText(row.getCell(columns.teacherUserId).value) === session.userId
-          && attendanceDateText(row.getCell(columns.date).value).startsWith(`${month}-`)
+          && date.startsWith(`${month}-`)
+          && date >= schoolYear.startDate
+          && date <= schoolYear.endDate
         ) {
           rowsToDelete.push(row.number);
         }
@@ -10138,10 +10154,13 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       const noClassRowsToDelete = [];
       for (let rowNumber = 2; rowNumber <= calendar.sheet.rowCount; rowNumber += 1) {
         const row = calendar.sheet.getRow(rowNumber);
+        const date = attendanceDateText(row.getCell(calendar.columns.date).value);
         if (
           cellText(row.getCell(calendar.columns.classId).value) === session.classId
           && cellText(row.getCell(calendar.columns.teacherUserId).value) === session.userId
-          && attendanceDateText(row.getCell(calendar.columns.date).value).startsWith(`${month}-`)
+          && date.startsWith(`${month}-`)
+          && date >= schoolYear.startDate
+          && date <= schoolYear.endDate
         ) {
           noClassRowsToDelete.push(row.number);
         }
@@ -10160,7 +10179,9 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
   async function importAttendanceSF2(session, monthValue, buffer) {
     const month = validateAttendanceMonth(monthValue);
-    const importedRecords = await parseSF2Upload(buffer, month);
+    const schoolYear = await getAttendanceSchoolYear(session);
+    validateAttendanceMonthInSchoolYear(month, schoolYear);
+    const importedRecords = await parseSF2Upload(buffer, month, schoolYear);
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
       const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
@@ -10457,7 +10478,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
     };
     writeSignatory("AE140", teacherProfile.name);
     writeSignatory("AE145", teacherProfile.schoolHead);
-    const weekdayDates = attendanceSchoolDays(month);
+    const weekdayDates = attendance.dates;
     const classDayCount = weekdayDates.filter((date) =>
       !attendance.noClassDates.includes(date)).length;
     sheet.getCell("AQ9").value = classDayCount;
@@ -10739,6 +10760,10 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
   async function getAttendance(session, attendanceDate) {
     const date = validateAttendanceDate(attendanceDate);
+    const schoolYear = await getAttendanceSchoolYear(session);
+    if (!attendanceSchoolDays(date.slice(0, 7), schoolYear).includes(date)) {
+      throw new HttpError(400, "Attendance can only be recorded on school days within the configured school year.");
+    }
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
       const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
@@ -10773,6 +10798,10 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
 
   async function saveAttendance(session, data) {
     const date = validateAttendanceDate(data.date);
+    const schoolYear = await getAttendanceSchoolYear(session);
+    if (!attendanceSchoolDays(date.slice(0, 7), schoolYear).includes(date)) {
+      throw new HttpError(400, "Attendance can only be recorded on school days within the configured school year.");
+    }
     if (!Array.isArray(data.records)) {
       throw new HttpError(400, "Submit an attendance status for every student.");
     }
@@ -10921,6 +10950,8 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         generalAverageSubjects: generalAverageSubjectsForGrade(grade, strand),
         eClassSubjects: eClassSubjectsForGrade(grade, strand),
         schoolYear: cellText(classRow.getCell(classColumns.schoolYear).value),
+        firstDayOfSchool: cellText(classRow.getCell(classColumns.firstDayOfSchool).value),
+        endOfSchoolYear: cellText(classRow.getCell(classColumns.endOfSchoolYear).value),
         schoolName: cellText(classRow.getCell(classColumns.schoolName).value),
         schoolId: cellText(classRow.getCell(classColumns.schoolId).value),
         region: cellText(classRow.getCell(classColumns.region).value),
@@ -10987,6 +11018,8 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       ["grade", "Grade", 100],
       ["section", "Section", 100],
       ["schoolYear", "School Year", 50],
+      ["firstDayOfSchool", "First day of school", 10],
+      ["endOfSchoolYear", "End of school year", 10],
       ["schoolName", "Name of School", 200],
       ["schoolId", "School ID", 20],
       ["region", "Region", 100],
@@ -11003,6 +11036,24 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         throw new HttpError(400, `Enter ${label} using no more than ${maxLength} characters.`);
       }
       suppliedProfileFields.set(key, data[key].trim());
+    }
+    if (suppliedProfileFields.has("firstDayOfSchool")) {
+      const firstDayOfSchool = suppliedProfileFields.get("firstDayOfSchool");
+      if (firstDayOfSchool
+        && (!/^\d{4}-\d{2}-\d{2}$/.test(firstDayOfSchool)
+          || Number.isNaN(Date.parse(firstDayOfSchool))
+          || new Date(firstDayOfSchool).toISOString().slice(0, 10) !== firstDayOfSchool)) {
+        throw new HttpError(400, "Enter a valid first day of school.");
+      }
+    }
+    if (suppliedProfileFields.has("endOfSchoolYear")) {
+      const endOfSchoolYear = suppliedProfileFields.get("endOfSchoolYear");
+      if (endOfSchoolYear
+        && (!/^\d{4}-\d{2}-\d{2}$/.test(endOfSchoolYear)
+          || Number.isNaN(Date.parse(endOfSchoolYear))
+          || new Date(endOfSchoolYear).toISOString().slice(0, 10) !== endOfSchoolYear)) {
+        throw new HttpError(400, "Enter a valid end of school year.");
+      }
     }
     const suppliedLists = new Map();
     for (const [key, label] of [["sectionsHandled", "Sections handled"], ["subjectsHandled", "Subjects handled"]]) {
@@ -11060,6 +11111,45 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         }
       }
       if (!classRow) throw new HttpError(404, "The teacher's classroom could not be found.");
+      const currentSections = getHandledSections(classRow, classColumns);
+      const currentPrimarySection = cellText(classRow.getCell(classColumns.section).value);
+      const requestedSections = uniqueTextList([
+        ...(suppliedLists.get("sectionsHandled") || currentSections),
+        ...(suppliedProfileFields.has("section") ? [suppliedProfileFields.get("section")] : []),
+      ]);
+      let sectionRename = null;
+      const removedSections = currentSections.filter((section) =>
+        !requestedSections.some((requested) =>
+          requested.toLocaleLowerCase() === section.toLocaleLowerCase()));
+      const addedSections = requestedSections.filter((section) =>
+        !currentSections.some((current) =>
+          current.toLocaleLowerCase() === section.toLocaleLowerCase()));
+      if (removedSections.length && addedSections.length) {
+        if (removedSections.length !== 1 || addedSections.length !== 1) {
+          throw new HttpError(400, "Rename one section at a time so its students and saved records can be preserved.");
+        }
+        sectionRename = { from: removedSections[0], to: addedSections[0] };
+        const currentPassword = typeof data.currentPassword === "string" ? data.currentPassword : "";
+        if (currentPassword.length < 6 || currentPassword.length > 256) {
+          throw new HttpError(400, "Enter your current password to rename a section.");
+        }
+        const passwordMatches = await verifyPassword(
+          currentPassword,
+          cellText(userRow.getCell(userColumns.password).value),
+        );
+        if (!passwordMatches) throw new HttpError(400, "The current password is incorrect.");
+      }
+      const currentFirstDayOfSchool = cellText(classRow.getCell(classColumns.firstDayOfSchool).value);
+      const currentEndOfSchoolYear = cellText(classRow.getCell(classColumns.endOfSchoolYear).value);
+      const firstDayOfSchool = suppliedProfileFields.has("firstDayOfSchool")
+        ? suppliedProfileFields.get("firstDayOfSchool")
+        : currentFirstDayOfSchool;
+      const endOfSchoolYear = suppliedProfileFields.has("endOfSchoolYear")
+        ? suppliedProfileFields.get("endOfSchoolYear")
+        : currentEndOfSchoolYear;
+      if (firstDayOfSchool && endOfSchoolYear && firstDayOfSchool > endOfSchoolYear) {
+        throw new HttpError(400, "First day of school must be on or before End of school year.");
+      }
       const availableSubjects = teacherSubjectsForGrade(
         cellText(classRow.getCell(classColumns.grade).value),
         cellText(classRow.getCell(classColumns.strand).value),
@@ -11069,11 +11159,14 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         throw new HttpError(400, "Choose subjects available for this grade level.");
       }
 
-      const primarySection = suppliedProfileFields.has("section")
+      const primarySection = sectionRename
+        && currentPrimarySection.toLocaleLowerCase() === sectionRename.from.toLocaleLowerCase()
+        ? sectionRename.to
+        : suppliedProfileFields.has("section")
         ? suppliedProfileFields.get("section")
-        : cellText(classRow.getCell(classColumns.section).value);
+        : currentPrimarySection;
       const sectionsHandled = uniqueTextList([
-        ...(suppliedLists.get("sectionsHandled") || getHandledSections(classRow, classColumns)),
+        ...requestedSections,
         primarySection,
       ]);
       if (sectionsHandled.length > 30) {
@@ -11081,6 +11174,18 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       }
       if (suppliedLists.has("sectionsHandled")) {
         const { sheet: studentSheet, columns: studentColumns } = getStudentSheet(workbook);
+        if (sectionRename) {
+          for (let rowNumber = 2; rowNumber <= studentSheet.rowCount; rowNumber += 1) {
+            const studentRow = studentSheet.getRow(rowNumber);
+            if (cellText(studentRow.getCell(studentColumns.classId).value) === session.classId
+              && (!cellText(studentRow.getCell(studentColumns.teacherUserId).value)
+                || cellText(studentRow.getCell(studentColumns.teacherUserId).value) === session.userId)
+              && cellText(studentRow.getCell(studentColumns.section).value).toLocaleLowerCase()
+                === sectionRename.from.toLocaleLowerCase()) {
+              studentRow.getCell(studentColumns.section).value = sectionRename.to;
+            }
+          }
+        }
         for (let rowNumber = 2; rowNumber <= studentSheet.rowCount; rowNumber += 1) {
           const studentRow = studentSheet.getRow(rowNumber);
           const studentSection = cellText(studentRow.getCell(studentColumns.section).value);
@@ -11096,8 +11201,66 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       const sectionGrades = readStoredSectionGrades(classRow.getCell(classColumns.sectionGrades).value);
       const sectionSubjects = readStoredSectionSubjects(
         classRow.getCell(classColumns.subjectsHandled).value,
-        cellText(classRow.getCell(classColumns.section).value),
+        currentPrimarySection,
       );
+      if (sectionRename) {
+        const oldSectionKey = sectionRename.from.toLocaleLowerCase();
+        const newSectionKey = sectionRename.to.toLocaleLowerCase();
+        if (sectionGrades.has(newSectionKey)) {
+          throw new HttpError(409, `Section "${sectionRename.to}" already has saved grade settings.`);
+        }
+        const oldGrade = sectionGrades.get(oldSectionKey);
+        if (oldGrade) {
+          sectionGrades.delete(oldSectionKey);
+          sectionGrades.set(newSectionKey, { ...oldGrade, section: sectionRename.to });
+        }
+        const oldSubjectsKey = Object.keys(sectionSubjects).find((section) =>
+          section.toLocaleLowerCase() === oldSectionKey);
+        const newSubjectsKey = Object.keys(sectionSubjects).find((section) =>
+          section.toLocaleLowerCase() === newSectionKey);
+        if (oldSubjectsKey && newSubjectsKey) {
+          throw new HttpError(409, `Section "${sectionRename.to}" already has saved subject settings.`);
+        }
+        if (oldSubjectsKey) {
+          sectionSubjects[sectionRename.to] = sectionSubjects[oldSubjectsKey];
+          delete sectionSubjects[oldSubjectsKey];
+        }
+
+        const existingEClassSheet = workbook.getWorksheet("E-Class Records");
+        if (existingEClassSheet) {
+          const { sheet, columns } = getEClassRecordSheet(workbook);
+          const recordKey = (row) => JSON.stringify([
+            cellText(row.getCell(columns.term).value),
+            cellText(row.getCell(columns.subject).value),
+            cellText(row.getCell(columns.mapehGroup).value),
+          ]);
+          const targetRecordKeys = new Set();
+          for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+            const row = sheet.getRow(rowNumber);
+            if (cellText(row.getCell(columns.classId).value) === session.classId
+              && cellText(row.getCell(columns.teacherUserId).value) === session.userId
+              && cellText(row.getCell(columns.section).value).toLocaleLowerCase() === newSectionKey) {
+              targetRecordKeys.add(recordKey(row));
+            }
+          }
+          const recordsToRename = [];
+          for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+            const row = sheet.getRow(rowNumber);
+            if (cellText(row.getCell(columns.classId).value) !== session.classId
+              || cellText(row.getCell(columns.teacherUserId).value) !== session.userId
+              || cellText(row.getCell(columns.section).value).toLocaleLowerCase() !== oldSectionKey) {
+              continue;
+            }
+            if (targetRecordKeys.has(recordKey(row))) {
+              throw new HttpError(409, `Section "${sectionRename.to}" already has a saved E-Class record.`);
+            }
+            recordsToRename.push(row);
+          }
+          recordsToRename.forEach((row) => {
+            row.getCell(columns.section).value = sectionRename.to;
+          });
+        }
+      }
       if (suppliedLists.has("sectionsHandled")) {
         const validSections = new Map(sectionsHandled.map((section) => [section.toLocaleLowerCase(), section]));
         for (const [key, entry] of sectionGrades) {
@@ -11136,6 +11299,10 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       for (const [key, value] of suppliedProfileFields) {
         classRow.getCell(classColumns[key]).value = value || null;
       }
+      if (sectionRename
+        && currentPrimarySection.toLocaleLowerCase() === sectionRename.from.toLocaleLowerCase()) {
+        classRow.getCell(classColumns.section).value = sectionRename.to;
+      }
       classRow.getCell(classColumns.sectionsHandled).value = JSON.stringify(sectionsHandled);
       classRow.getCell(classColumns.sectionGrades).value = JSON.stringify(serializeSectionGrades(sectionGrades));
       classRow.getCell(classColumns.subjectsHandled).value = JSON.stringify(sectionSubjects);
@@ -11161,6 +11328,8 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         generalAverageSubjects: generalAverageSubjectsForGrade(grade, strand),
         eClassSubjects: eClassSubjectsForGrade(grade, strand),
         schoolYear: cellText(classRow.getCell(classColumns.schoolYear).value),
+        firstDayOfSchool: cellText(classRow.getCell(classColumns.firstDayOfSchool).value),
+        endOfSchoolYear: cellText(classRow.getCell(classColumns.endOfSchoolYear).value),
         schoolName: cellText(classRow.getCell(classColumns.schoolName).value),
         schoolId: cellText(classRow.getCell(classColumns.schoolId).value),
         region: cellText(classRow.getCell(classColumns.region).value),
@@ -11695,29 +11864,6 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         return;
       }
 
-      if (request.method === "GET" && url.pathname === "/api/teacher/profile/pds") {
-        const session = requireTeacherSession(request);
-        const [template, record] = await Promise.all([
-          getTeacherPdsTemplate(),
-          getTeacherPdsRecord(session),
-        ]);
-        sendJson(response, 200, {
-          sheets: template.sheets,
-          entries: record.sheets,
-          updatedAt: record.updatedAt,
-        });
-        return;
-      }
-
-      if (request.method === "PUT" && url.pathname === "/api/teacher/profile/pds") {
-        const session = requireTeacherSession(request);
-        sendJson(response, 200, await saveTeacherPdsRecord(
-          session,
-          await readJson(request, 1024 * 1024),
-        ));
-        return;
-      }
-
       if (request.method === "GET" && url.pathname === "/api/teacher/profile") {
         const session = requireTeacherSession(request);
         sendJson(response, 200, await getTeacherProfile(session));
@@ -11815,6 +11961,13 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           if (error instanceof CalendarValidationError) throw new HttpError(400, error.message);
           throw error;
         }
+        return;
+      }
+
+      if (url.pathname === "/api/teacher-calendar/school-year") {
+        requireTeacherSession(request);
+        if (request.method !== "GET") throw new HttpError(405, "Method not allowed.");
+        sendJson(response, 200, DEPED_SCHOOL_CALENDAR);
         return;
       }
 
@@ -11920,6 +12073,13 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           url.searchParams.get("grade") || "",
           profileOverrides,
         ));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/teacher/sf10/import") {
+        requireTeacherSession(request);
+        const upload = await readSF10Upload(request);
+        sendJson(response, 200, await parseSF10Workbook(upload));
         return;
       }
 

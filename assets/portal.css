@@ -678,7 +678,20 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .teacher-calendar-legend i{width:9px;height:9px;border-radius:50%;background:var(--accent)}
 .teacher-calendar-legend .calendar-legend-official{background:#b91c1c}
 .teacher-calendar-legend .calendar-legend-local{background:#7c3aed}
+.teacher-calendar-legend .calendar-legend-opening{background:#eab308}
+.teacher-calendar-legend .calendar-legend-instructional{background:#15803d}
+.teacher-calendar-legend .calendar-legend-end-term{background:#ea580c}
+.teacher-calendar-legend .calendar-legend-deped{background:#0f766e}
 .teacher-calendar-legend .calendar-legend-task{background:#2563eb}
+.teacher-calendar-school-year{display:grid;gap:12px;padding:16px 18px}
+.teacher-calendar-school-year-heading h3{margin:0;color:var(--ink);font-size:.98rem}
+.teacher-calendar-school-year-heading p,.teacher-calendar-school-year-note{margin:5px 0 0;color:var(--muted);font-size:.78rem}
+.teacher-calendar-term-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.teacher-calendar-term{min-width:0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.teacher-calendar-term h4{margin:0 0 4px;color:var(--ink);font-size:.82rem}
+.teacher-calendar-term-date{display:block;color:var(--accent);font-size:.76rem;font-weight:800}
+.teacher-calendar-term-days{display:block;margin-top:2px;color:var(--muted);font-size:.7rem}
+.teacher-calendar-term-blocks{display:grid;gap:3px;margin:8px 0 0;padding:0;list-style:none;color:var(--muted);font-size:.68rem;line-height:1.35}
 .teacher-calendar-status{min-height:1.3em;margin:0;color:var(--muted);font-size:.8rem}
 .teacher-calendar-status.error{color:var(--danger,#b42318)}
 .teacher-calendar-grid-wrap{overflow-x:auto}
@@ -688,12 +701,33 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .teacher-calendar-day.is-outside-month{background:color-mix(in srgb,var(--soft) 55%,var(--card));color:var(--muted)}
 .teacher-calendar-day.is-today{position:relative;z-index:1;border:2px solid var(--accent)}
 .teacher-calendar-day.is-holiday{background:color-mix(in srgb,#b91c1c 5%,var(--card))}
+.teacher-calendar-day.has-deped-activity{border-color:color-mix(in srgb,#0f766e 55%,var(--line))}
+.teacher-calendar-day.has-deped-highlight-opening-block{background:color-mix(in srgb,#eab308 24%,var(--card))}
+.teacher-calendar-day.has-deped-highlight-instructional-block{background:color-mix(in srgb,#15803d 18%,var(--card))}
+.teacher-calendar-day.has-deped-highlight-end-of-term-block{background:color-mix(in srgb,#ea580c 20%,var(--card))}
+.teacher-calendar-day.has-deped-highlight-examination,.teacher-calendar-day.has-deped-highlight-assessment,.teacher-calendar-day.has-deped-highlight-break,.teacher-calendar-day.has-deped-highlight-training{background:color-mix(in srgb,#0f766e 18%,var(--card))}
+.teacher-calendar-day.has-deped-highlight-school-event{background:color-mix(in srgb,#0f766e 16%,var(--card))}
+.teacher-calendar-day.has-deped-highlight-term{background:color-mix(in srgb,#0f766e 16%,var(--card))}
+.teacher-calendar-day-indicators{display:flex;flex-wrap:wrap;gap:3px;min-width:0}
+.teacher-calendar-day-indicator{display:block;max-width:100%;overflow:hidden;padding:2px 4px;border-radius:3px;color:#fff;font-size:.57rem;font-weight:800;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
+.teacher-calendar-day-indicator--opening-block{background:#a16207}
+.teacher-calendar-day-indicator--instructional-block{background:#15803d}
+.teacher-calendar-day-indicator--end-of-term-block{background:#c2410c}
+.teacher-calendar-day-indicator--examination,.teacher-calendar-day-indicator--assessment,.teacher-calendar-day-indicator--break,.teacher-calendar-day-indicator--training,.teacher-calendar-day-indicator--school-event,.teacher-calendar-day-indicator--term{background:#0f766e}
 .teacher-calendar-date{display:flex;width:100%;align-items:center;justify-content:space-between;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:.78rem;font-weight:800;text-align:left;cursor:pointer}
 .teacher-calendar-today-label{color:var(--accent);font-size:.62rem;font-weight:800}
 .teacher-calendar-items{display:grid;align-content:start;gap:4px}
 .teacher-calendar-item{display:block;min-width:0;overflow:hidden;padding:4px 6px;border:0;border-left:3px solid #2563eb;border-radius:4px;background:color-mix(in srgb,#2563eb 10%,var(--card));color:var(--ink);font:inherit;font-size:.68rem;line-height:1.3;text-align:left;text-overflow:ellipsis;cursor:pointer}
 .teacher-calendar-item--official{border-left-color:#b91c1c;background:color-mix(in srgb,#b91c1c 10%,var(--card));cursor:default}
 .teacher-calendar-item--local{border-left-color:#7c3aed;background:color-mix(in srgb,#7c3aed 10%,var(--card));cursor:default}
+.teacher-calendar-item--deped{border-left-color:#0f766e;background:color-mix(in srgb,#0f766e 10%,var(--card));cursor:default}
+.teacher-calendar-item--deped-opening-block{border-left-color:#ca8a04;background:color-mix(in srgb,#eab308 12%,var(--card))}
+.teacher-calendar-item--deped-instructional-block{border-left-color:#15803d;background:color-mix(in srgb,#15803d 10%,var(--card))}
+.teacher-calendar-item--deped-end-of-term-block{border-left-color:#ea580c;background:color-mix(in srgb,#ea580c 10%,var(--card))}
+.teacher-calendar-item--deped-examination{border-left-color:#7c3aed;background:color-mix(in srgb,#7c3aed 10%,var(--card))}
+.teacher-calendar-item--deped-assessment{border-left-color:#2563eb;background:color-mix(in srgb,#2563eb 10%,var(--card))}
+.teacher-calendar-item--deped-break{border-left-color:#64748b;background:color-mix(in srgb,#64748b 10%,var(--card))}
+.teacher-calendar-item--deped-training{border-left-color:#0891b2;background:color-mix(in srgb,#0891b2 10%,var(--card))}
 .teacher-calendar-item time{display:block;font-size:.62rem;font-weight:700}
 .teacher-calendar-item.is-done{opacity:.62;text-decoration:line-through}
 .teacher-calendar-day-add{align-self:flex-start;margin-top:auto;padding:2px 4px;border:0;background:transparent;color:var(--accent);font-size:.68rem;font-weight:700;cursor:pointer}
@@ -708,7 +742,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .teacher-calendar-dialog-actions .calendar-delete-task{margin-right:auto;color:#b42318}
 .teacher-calendar-dialog .tool-field textarea{min-height:90px}
 .teacher-calendar-dialog-error{margin:0;color:#b42318;font-size:.8rem}
-@media(max-width:720px){.teacher-calendar-heading{align-items:flex-start;flex-direction:column}.teacher-calendar-clock{text-align:left}.teacher-calendar-toolbar{align-items:flex-start;flex-direction:column}.teacher-calendar-navigation{width:100%;justify-content:space-between}.teacher-calendar-navigation h3{min-width:0}.teacher-calendar-grid-wrap{margin-right:-12px;padding-right:12px}.teacher-calendar-weekdays,.teacher-calendar-grid{min-width:720px}.teacher-calendar-day{min-height:112px;padding:6px}.teacher-calendar-view-controls{width:100%;justify-content:space-between}}
+@media(max-width:720px){.teacher-calendar-heading{align-items:flex-start;flex-direction:column}.teacher-calendar-clock{text-align:left}.teacher-calendar-toolbar{align-items:flex-start;flex-direction:column}.teacher-calendar-navigation{width:100%;justify-content:space-between}.teacher-calendar-navigation h3{min-width:0}.teacher-calendar-grid-wrap{margin-right:-12px;padding-right:12px}.teacher-calendar-weekdays,.teacher-calendar-grid{min-width:720px}.teacher-calendar-day{min-height:112px;padding:6px}.teacher-calendar-view-controls{width:100%;justify-content:space-between}.teacher-calendar-term-list{grid-template-columns:1fr}}
 .tarpaulin-editor{display:grid;grid-template-columns:minmax(280px,var(--tarpaulin-controls-width,39%)) 18px minmax(0,1fr);align-items:start}
 .tarpaulin-resize-handle{display:grid;min-height:140px;align-self:stretch;place-items:center;margin:0;border:0;border-radius:10px;background:transparent;color:var(--muted);cursor:col-resize;touch-action:none;user-select:none}
 .tarpaulin-resize-handle span{display:grid;width:16px;height:48px;place-items:center;border-radius:999px;background:var(--soft);font-size:1.2rem;font-weight:800;line-height:1;transition:background .15s,color .15s}

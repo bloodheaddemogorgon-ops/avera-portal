@@ -301,12 +301,12 @@
                 <strong id="dashboardActiveCount">—</strong>
                 <small id="dashboardGenderSubline">Loading roster…</small>
               </article>
-              <article class="dashboard-metric-card" data-dashboard-category="attendance">
+              <article class="dashboard-metric-card" data-dashboard-category="overview attendance">
                 <span class="dashboard-metric-label">Attendance this month</span>
                 <strong id="dashboardAttendancePercent">—</strong>
                 <small id="dashboardAttendanceSubline">Loading attendance…</small>
               </article>
-              <article class="dashboard-metric-card" data-dashboard-category="academic">
+              <article class="dashboard-metric-card" data-dashboard-category="overview academic">
                 <span class="dashboard-metric-label">Class general average</span>
                 <strong id="dashboardAverageGrade">—</strong>
                 <small id="dashboardGradeDescriptor">Term 1</small>
@@ -321,31 +321,32 @@
                 <strong id="dashboardMathMastery">—</strong>
                 <small id="dashboardMathSubline">Proficient or above</small>
               </article>
-              <button class="dashboard-metric-card dashboard-metric-action" id="dashboardPendingMetric" data-dashboard-category="deadlines" type="button">
+              <button class="dashboard-metric-card dashboard-metric-action" id="dashboardPendingMetric" data-dashboard-category="overview deadlines" type="button">
                 <span class="dashboard-metric-label">Pending deadlines</span>
                 <strong id="dashboardDeadlineCount">—</strong>
                 <small id="dashboardDeadlineSubline">Open Teacher Calendar</small>
               </button>
             </div>
             <div class="dashboard-grid">
-              <section class="data-card dashboard-card dashboard-span-half" data-dashboard-category="attendance" aria-labelledby="dashboardClassProfileHeading">
-                <div class="dashboard-card-heading"><span class="dashboard-section-label">Class profile</span><h2 id="dashboardClassProfileHeading">Gender &amp; attendance</h2></div>
+              <section class="data-card dashboard-card dashboard-span-half" data-dashboard-category="overview attendance" aria-labelledby="dashboardClassProfileHeading">
+                <div class="dashboard-card-heading"><span class="dashboard-section-label">Classroom snapshot</span><h2 id="dashboardClassProfileHeading">Learners &amp; attendance</h2></div>
                 <div class="dashboard-split-charts">
                   <div>
-                    <h3 class="dashboard-chart-heading">Gender and enrollment</h3>
+                    <h3 class="dashboard-chart-heading">Learner mix</h3>
                     <div class="dashboard-chart-slot" id="dashboardGenderChart" aria-busy="true"></div>
                     <ul class="dashboard-legend" id="dashboardGenderLegend"></ul>
                   </div>
                   <div>
-                    <h3 class="dashboard-chart-heading">Attendance this month</h3>
+                    <h3 class="dashboard-chart-heading">Attendance status · this month</h3>
                     <div class="dashboard-chart-slot dashboard-stack-slot" id="dashboardAttendanceStack" aria-busy="true"></div>
                     <ul class="dashboard-legend dashboard-legend-compact" id="dashboardAttendanceLegend"></ul>
                   </div>
                 </div>
               </section>
-              <section class="data-card dashboard-card dashboard-span-half" data-dashboard-category="attendance" aria-labelledby="dashboardAttendanceTrendHeading">
-                <div class="dashboard-card-heading"><span class="dashboard-section-label">Attendance</span><h2 id="dashboardAttendanceTrendHeading">Monthly trend</h2></div>
+              <section class="data-card dashboard-card dashboard-span-half" data-dashboard-category="overview attendance" aria-labelledby="dashboardAttendanceTrendHeading">
+                <div class="dashboard-card-heading"><span class="dashboard-section-label">Attendance</span><h2 id="dashboardAttendanceTrendHeading">Present vs. absent by month</h2></div>
                 <div class="dashboard-chart-slot dashboard-wide-chart" id="dashboardAttendanceTrend" aria-busy="true"></div>
+                <ul class="dashboard-legend dashboard-legend-compact" id="dashboardAttendanceTrendLegend"></ul>
               </section>
               <section class="data-card dashboard-card dashboard-span-full" data-dashboard-category="academic" aria-labelledby="dashboardGradeHeading">
                 <div class="dashboard-card-heading"><span class="dashboard-section-label">Academic progress</span><h2 id="dashboardGradeHeading">Grade distribution &amp; subject averages</h2></div>
@@ -525,6 +526,7 @@
                   <input id="attendanceSearch" type="search" placeholder="Type a name…" autocomplete="off">
                 </div>
               </div>
+              <p class="field-hint" id="attendanceSchoolYearHint">Attendance is limited to the dates set in Teacher Profile. Weekends and dates marked Holiday/No Class are excluded from school-day totals.</p>
               <div class="attendance-legend" aria-label="Attendance mark legend">
                 <span class="attendance-chip" data-status="Present"><b>-</b> Present</span>
                 <span class="attendance-chip" data-status="Tardy"><b>T</b> Tardy</span>
@@ -868,13 +870,16 @@
             <div class="sf10-toolbar">
               <div class="form-field"><label for="sf10LearnerSelect">Learner record</label><select id="sf10LearnerSelect"><option value="">Enter learner manually</option></select></div>
               <div class="sf10-actions">
+                <button class="btn ghost" id="sf10GradeUploadButton" type="button">Upload Students Grade</button>
+                <input id="sf10GradeUpload" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
                 <button class="btn ghost" id="sf10Print" type="button">Print / Save PDF</button>
                 <button class="btn primary" id="sf10Save" type="button">Save draft</button>
               </div>
               <p class="sf10-save-status" id="sf10SaveStatus" role="status" aria-live="polite"></p>
+              <p class="sf10-save-status" id="sf10ImportStatus" role="status" aria-live="polite"></p>
               <p class="sf10-roster-notice" id="sf10RosterNotice" role="status" aria-live="polite"></p>
             </div>
-            <p class="sf10-note">Drafts are saved in this browser on this device. Use Print / Save PDF to create a printable copy.</p>
+            <p class="sf10-note">Select a learner from the roster, then upload a completed SF10-ES .xlsx file with the same LRN to import prior-grade final ratings and school details; term fields are left unchanged. Drafts are saved in this browser on this device. Use Print / Save PDF to create a printable copy.</p>
             <div class="sf10-page-tabs" role="tablist" aria-label="SF 10 pages">
               <button class="sf10-page-tab" id="sf10FrontTab" type="button" role="tab" aria-selected="true" aria-controls="sf10FrontPage" tabindex="0">Page 1 <span>Front</span></button>
               <button class="sf10-page-tab" id="sf10BackTab" type="button" role="tab" aria-selected="false" aria-controls="sf10BackPage" tabindex="-1">Page 2 <span>Back</span></button>
@@ -1517,7 +1522,8 @@
                   <div class="form-field"><label for="teacherProfileClassroom">Classroom number</label><input id="teacherProfileClassroom" name="classroomNumber" maxlength="100" required></div>
                   <div class="form-field teacher-profile-advisory-field"><label for="teacherProfileGrade">Grade <span class="advisory-field-badge">View only</span></label><input id="teacherProfileGrade" name="grade" maxlength="100" autocomplete="off" readonly aria-describedby="teacherProfileGradeHint"><p class="field-hint" id="teacherProfileGradeHint">Assigned to this classroom and cannot be edited here.</p></div>
                   <div class="form-field teacher-profile-advisory-field"><label for="teacherProfileSection">Advisory section <span class="advisory-field-badge">Locked</span></label><input id="teacherProfileSection" name="section" maxlength="100" autocomplete="off" readonly aria-describedby="teacherProfileSectionHint"><p class="field-hint" id="teacherProfileSectionHint">This is the advisory section assigned to your classroom.</p></div>
-                  <div class="form-field"><label for="teacherProfileSectionsHandled">Sections handled</label><textarea id="teacherProfileSectionsHandled" name="sectionsHandled" maxlength="3050" rows="2" placeholder="Mabini, Rizal"></textarea><p class="field-hint">Separate section names with commas or new lines.</p></div>
+                  <div class="form-field"><label for="teacherProfileSectionsHandled">Sections handled</label><textarea id="teacherProfileSectionsHandled" name="sectionsHandled" maxlength="3050" rows="2" placeholder="Mabini, Rizal"></textarea><p class="field-hint">Separate section names with commas or new lines. Rename one section at a time; each rename asks for your current password.</p></div>
+                  <div class="form-field" id="teacherProfileSectionRenamePasswordField" hidden><label for="teacherProfileSectionRenamePassword">Current password to rename a section</label><input id="teacherProfileSectionRenamePassword" type="password" autocomplete="current-password" minlength="6" maxlength="256"><p class="field-hint">Students, saved E-Class records, grade settings, and subject settings will follow the renamed section.</p></div>
                   <fieldset class="form-field full teacher-subject-fieldset" aria-labelledby="teacherProfileSubjectsHandledLabel"><div class="teacher-subject-header"><div class="teacher-subject-heading"><h3 id="teacherProfileSubjectsHandledLabel">Subjects handled</h3><p class="teacher-subject-description">Choose the subjects taught in each section.</p></div><div class="teacher-subject-section-control"><label class="teacher-subject-section-label" for="teacherSubjectSection">Section</label><select class="teacher-subject-section" id="teacherSubjectSection" aria-label="Choose section for subject selections"></select></div><button class="btn ghost" id="toggleTeacherSubjects" type="button" aria-pressed="true">Add Subjects</button></div><div class="teacher-subject-options" id="teacherProfileSubjectsHandled" role="group" aria-labelledby="teacherProfileSubjectsHandledLabel"></div><p class="field-hint" id="teacherSubjectsHint">Subjects are locked. Choose Add Subjects to edit your selections.</p><p class="notice" id="teacherSubjectsNotice" role="status" aria-live="polite"></p></fieldset>
                   <div class="form-field"><label>Parent class code</label><span class="teacher-class-code" id="teacherProfileClassCode">—</span><p class="field-hint">Share this code with parents to join your class.</p></div>
                 </div>
@@ -1528,6 +1534,8 @@
               <div class="teacher-profile-tab-panel" id="teacherProfileSchoolPanel" role="tabpanel" aria-labelledby="teacherProfileSchoolTab" tabindex="0" hidden>
                 <div class="form-grid">
                   <div class="form-field"><label for="teacherProfileSchoolYear">School Year</label><input id="teacherProfileSchoolYear" name="schoolYear" maxlength="50" placeholder="2026-2027" autocomplete="off"></div>
+                  <div class="form-field"><label for="teacherProfileFirstDayOfSchool">First day of school</label><input id="teacherProfileFirstDayOfSchool" name="firstDayOfSchool" type="date"></div>
+                  <div class="form-field"><label for="teacherProfileEndOfSchoolYear">End of school year</label><input id="teacherProfileEndOfSchoolYear" name="endOfSchoolYear" type="date"></div>
                   <div class="form-field"><label for="teacherProfileSchoolName">Name of School</label><input id="teacherProfileSchoolName" name="schoolName" maxlength="200" autocomplete="organization"></div>
                   <div class="form-field"><label for="teacherProfileSchoolId">School ID</label><input id="teacherProfileSchoolId" name="schoolId" maxlength="20" inputmode="numeric" autocomplete="off"></div>
                   <div class="form-field"><label for="teacherProfileRegion">Region</label><input id="teacherProfileRegion" name="region" maxlength="100" autocomplete="address-level1"></div>
@@ -1656,14 +1664,13 @@
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.64</p>
+                  <p class="developer-update-meta">Version 1.0.65</p>
                   <ul class="developer-update-list">
-                    <li>Update checks retry temporary GitHub server failures and show a clear message if the service remains unavailable.</li>
-                    <li>Sign-in remembers the most recent account using secure credential storage; signing in still requires your click.</li>
-                    <li>Sign-out reports failures and keeps the session active if logout cannot be confirmed.</li>
-                    <li>Tarpapel Maker can stretch an image across the selected sheets while retaining print margins.</li>
-                    <li>Removed the unused Checklist tool and teacher PDS/SALN profile tabs.</li>
-                    <li>Portal styles and scripts revalidate so browser caches do not block updates.</li>
+                    <li>EPP imports accept EPP/TLE workbooks when EPP is selected.</li>
+                    <li>Section renames require the current password and keep assigned students and saved records linked.</li>
+                    <li>Attendance respects the configured school-year dates and uses the DepEd 2026-2027 school calendar.</li>
+                    <li>SF10 uploads import prior-grade details without changing unrelated term grades.</li>
+                    <li>Removed the unused PDS endpoint so profiles no longer depend on a missing workbook.</li>
                   </ul>
                 </div>
               </section>
@@ -2023,7 +2030,7 @@
               <div class="teacher-calendar">
                 <header class="teacher-calendar-heading">
                   <div class="teacher-calendar-heading-main">
-                    <div><h2 id="teacherCalendarHeading">Teacher Calendar</h2><p>Plan classroom tasks and see national and local observances.</p></div>
+                    <div><h2 id="teacherCalendarHeading">Teacher Calendar</h2><p>Plan classroom tasks and view holidays and the official SY 2026–2027 terms.</p></div>
                   </div>
                   <div class="teacher-calendar-clock" id="teacherCalendarClock"><span id="teacherCalendarClockTime">Loading time…</span><time id="teacherCalendarClockDate"></time></div>
                 </header>
@@ -2059,8 +2066,22 @@
                 <div class="teacher-calendar-legend" aria-label="Calendar item legend">
                   <span><i class="calendar-legend-official"></i>Official national holiday</span>
                   <span><i class="calendar-legend-local"></i>Local observance</span>
+                  <span><i class="calendar-legend-opening"></i>Opening block</span>
+                  <span><i class="calendar-legend-instructional"></i>Instructional block</span>
+                  <span><i class="calendar-legend-end-term"></i>End-of-term block</span>
+                  <span><i class="calendar-legend-deped"></i>Exams and other DepEd activities</span>
                   <span><i class="calendar-legend-task"></i>Your task</span>
                 </div>
+                <section class="data-card teacher-calendar-school-year" aria-labelledby="teacherCalendarSchoolYearHeading">
+                  <div class="teacher-calendar-school-year-heading">
+                    <div>
+                      <h3 id="teacherCalendarSchoolYearHeading">DepEd School Calendar · SY 2026–2027</h3>
+                      <p id="teacherCalendarSchoolYearSummary" role="status" aria-live="polite">Loading official term dates…</p>
+                    </div>
+                  </div>
+                  <ol class="teacher-calendar-term-list" id="teacherCalendarTermList"></ol>
+                  <p class="teacher-calendar-school-year-note">Term and block ranges are from Annex B. Class-day counts exclude weekends and legal holidays.</p>
+                </section>
                 <section class="data-card" aria-label="Calendar">
                   <div class="settings-card-body teacher-calendar-grid-wrap">
                     <div class="teacher-calendar-weekdays" aria-hidden="true">
@@ -2072,7 +2093,7 @@
                     <div class="teacher-calendar-grid" id="teacherCalendarGrid" role="grid" aria-label="Teacher calendar dates"></div>
                   </div>
                 </section>
-                <p class="teacher-calendar-source-note">National dates use the 2026 presidential proclamations, supplemented by the Nager.Date JSON feed. Eid holidays may be announced separately. The bundled Zamboanga del Sur founding-anniversary entry is a local observance, not a guarantee of a non-working day. <a href="https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html" target="_blank" rel="noopener noreferrer">View Proclamation No. 1006</a>.</p>
+                <p class="teacher-calendar-source-note">School-year dates follow <a href="https://www.deped.gov.ph/wp-content/uploads/DO_s2026_009r.pdf" target="_blank" rel="noopener noreferrer">DepEd Order No. 009, s. 2026 (Annex B)</a>. Bundled 2026 national dates follow presidential proclamations; other years use the Nager.Date JSON feed. Eid holidays may be announced separately. The bundled Zamboanga del Sur founding-anniversary entry is a local observance, not a guarantee of a non-working day. <a href="https://lawphil.net/executive/proc/proc2025/proc_1006_2025.html" target="_blank" rel="noopener noreferrer">View Proclamation No. 1006</a>.</p>
               </div>
               <dialog class="teacher-calendar-dialog" id="teacherCalendarEventDialog" aria-labelledby="teacherCalendarDialogTitle">
                 <form id="teacherCalendarEventForm">

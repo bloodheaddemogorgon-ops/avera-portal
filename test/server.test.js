@@ -17,7 +17,13 @@ const { SaxesParser } = require("saxes");
 const XLSX = require("@e965/xlsx");
 const sharp = require("sharp");
 const { createAuthRateLimiter } = require("../auth-rate-limiter");
-const { createServer, readPortalDatabaseWorkbook, writePortalDatabaseWorkbook, eClassGradingMethod, computeEClassTermGrade } = require("../server");
+const {
+  createServer,
+  readPortalDatabaseWorkbook,
+  writePortalDatabaseWorkbook,
+  eClassGradingMethod,
+  computeEClassTermGrade,
+} = require("../server");
 const { createPortalFrontendServer } = require("../portal-frontend");
 const {
   calculateAgeMonths,
@@ -198,16 +204,24 @@ test("dashboard display filter offers specific categories without an Everything 
   assert.doesNotMatch(dropdownMarkup, /<option value="all">/);
   assert.equal(optionCategories[0], "overview");
   const dashboardCategories = new Set(
-    [...portalPage.matchAll(/data-dashboard-category="([^"]+)"/g)].map(([, category]) => category),
+    [...portalPage.matchAll(/data-dashboard-category="([^"]+)"/g)]
+      .flatMap(([, categories]) => categories.split(/\s+/)),
   );
   assert.ok(optionCategories.every((category) => dashboardCategories.has(category)));
+  assert.match(portalPage, /data-dashboard-category="overview attendance"[^>]*aria-labelledby="dashboardClassProfileHeading"/);
+  assert.match(portalPage, /data-dashboard-category="overview attendance"[^>]*aria-labelledby="dashboardAttendanceTrendHeading"/);
+  assert.match(portalPage, /id="dashboardAttendanceTrend"[\s\S]*?id="dashboardAttendanceTrendLegend"/);
   const filterSource = portalPage.match(/function applyDashboardDisplayFilter\(\)\{[\s\S]*?\n    \}/);
   assert.ok(filterSource, "dashboard category filter helper exists");
 
   const items = [
     { category: "overview", group: "hero" },
     { category: "overview", group: "metrics" },
-    { category: "attendance", group: "metrics" },
+    { category: "overview attendance", group: "metrics" },
+    { category: "overview academic", group: "metrics" },
+    { category: "overview deadlines", group: "metrics" },
+    { category: "overview attendance", group: "cards" },
+    { category: "attendance", group: "cards" },
     { category: "academic", group: "metrics" },
     { category: "academic", group: "mps-deadline" },
     { category: "deadlines", group: "metrics" },
@@ -237,15 +251,34 @@ test("dashboard display filter offers specific categories without an Everything 
   });
 
   applyFilter();
-  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), ["overview", "overview"]);
+  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), [
+    "overview",
+    "overview",
+    "overview attendance",
+    "overview academic",
+    "overview deadlines",
+    "overview attendance",
+  ]);
   assert.equal(elements.dashboardMetricGrid.hidden, false);
   assert.equal(elements.dashboardMpsDeadlineRow.hidden, true);
 
   elements.dashboardDisplayFilter.value = "academic";
   applyFilter();
-  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), ["academic", "academic"]);
+  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), [
+    "overview academic",
+    "academic",
+    "academic",
+  ]);
   assert.equal(elements.dashboardMetricGrid.hidden, false);
   assert.equal(elements.dashboardMpsDeadlineRow.hidden, false);
+
+  elements.dashboardDisplayFilter.value = "attendance";
+  applyFilter();
+  assert.deepEqual(items.filter((item) => !item.hidden).map((item) => item.category), [
+    "overview attendance",
+    "overview attendance",
+    "attendance",
+  ]);
 
   elements.dashboardDisplayFilter.value = "wellbeing";
   applyFilter();
@@ -1403,15 +1436,19 @@ test("SF 10 term grades follow the matching Classified as Grade field", async ()
   const termGradeHelper = portalPage.match(/function sf10TermGradeFields\([\s\S]*?\n  \}/);
   const lockGradeHelper = portalPage.match(/function sf10LockGradeInputs\([\s\S]*?\n  \}/);
   const metadataHelper = portalPage.match(/function sf10GradeMetadataFields\([\s\S]*?\n  \}/);
+  const gradeNumberHelper = portalPage.match(/function sf10GradeNumber\([\s\S]*?\n  \}/);
+  const importedGradeHelper = portalPage.match(/function sf10ImportedGradeFields\([\s\S]*?\n  \}/);
   assert.ok(gradeSubjects, "SF 10 grade subject rows exist");
   assert.ok(classifiedGradeHelper, "SF 10 classified-grade lookup exists");
   assert.ok(termGradeHelper, "SF 10 Term Grades mapping exists");
   assert.ok(lockGradeHelper, "SF 10 synced grade inputs can be locked");
   assert.ok(metadataHelper, "SF 10 teacher-profile metadata mapping exists");
+  assert.ok(gradeNumberHelper, "SF 10 class grade is parsed");
+  assert.ok(importedGradeHelper, "SF 10 prior-grade imports are mapped");
 
   const helpers = vm.runInNewContext(
-    `${gradeSubjects[0]}\n${classifiedGradeHelper[0]}\n${termGradeHelper[0]}\n${lockGradeHelper[0]}\n${metadataHelper[0]}\n` +
-      "({ sf10ClassifiedGradeIndex, sf10TermGradeFields, sf10LockGradeInputs, sf10GradeMetadataFields })",
+    `${gradeSubjects[0]}\n${classifiedGradeHelper[0]}\n${termGradeHelper[0]}\n${lockGradeHelper[0]}\n${metadataHelper[0]}\n${gradeNumberHelper[0]}\n${importedGradeHelper[0]}\n` +
+      "({ sf10ClassifiedGradeIndex, sf10TermGradeFields, sf10LockGradeInputs, sf10GradeMetadataFields, sf10ImportedGradeFields })",
   );
   const gradeIndex = helpers.sf10ClassifiedGradeIndex(
     ["1", "2", "3", "4", "5", "6"],
@@ -1503,12 +1540,135 @@ test("SF 10 term grades follow the matching Classified as Grade field", async ()
   assert.equal(metadata["grade.5.section"], "Mabini");
   assert.equal(metadata["grade.5.classifiedGrade"], "5");
   assert.equal(metadata["grade.4.school"], undefined);
+  const imported = helpers.sf10ImportedGradeFields({
+    lrn: "123-456-789-012",
+    grades: [
+      {
+        grade: 1,
+        school: "Previous School",
+        schoolYear: "2024-2025",
+        subjects: [{ name: "Language", final: "87", remarks: "Passed" }],
+        generalAverage: "88",
+      },
+      {
+        grade: 5,
+        subjects: [{ name: "Filipino", final: "90", remarks: "Passed" }],
+      },
+    ],
+  }, "123456789012", "Grade 5");
+  assert.equal(imported.fields["grade.1.school"], "Previous School");
+  assert.equal(imported.fields["grade.1.subjects.0.final"], "87");
+  assert.equal(imported.fields["grade.1.subjects.0.remarks"], "Passed");
+  assert.equal(imported.fields["grade.1.generalAverage"], "88");
+  assert.equal(imported.fields["grade.1.subjects.0.q1"], undefined);
+  assert.equal(imported.fields["grade.5.subjects.0.final"], undefined);
+  assert.deepEqual(Array.from(imported.grades), [1]);
+  assert.throws(
+    () => helpers.sf10ImportedGradeFields({ lrn: "000000000000", grades: [] }, "123456789012", "Grade 5"),
+    /does not match the selected learner/,
+  );
+  assert.throws(
+    () => helpers.sf10ImportedGradeFields({
+      lrn: "123456789012",
+      grades: [{ grade: 5, subjects: [{ name: "Filipino", final: "90" }] }],
+    }, "123456789012", "Grade 5"),
+    /no importable grades below/,
+  );
   assert.match(portalPage, /api\("\/api\/grades\?studentId="\+encodeURIComponent\(recordKey\)/);
   assert.match(portalPage, /sf10LockGradeInputs\(gradeIndex,\$\("sf10Form"\)\)/);
+  assert.match(portalPage, /id="sf10GradeUploadButton"[^>]*>Upload Students Grade/);
+  assert.match(portalPage, /id="sf10GradeUpload" type="file"[^>]*accept="\.xlsx/);
+  assert.match(portalPage, /api\("\/api\/teacher\/sf10\/import"/);
   assert.equal((portalPage.match(/\[1,2,3\]\.map\(function\(term\)/g) || []).length, 2);
   assert.equal((portalPage.match(/<th colspan="3">Term<\/th>/g) || []).length, 2);
   assert.doesNotMatch(portalPage, /\[1,2,3,4\]\.map\(function\(/);
   assert.doesNotMatch(portalPage, /<th colspan="4">Term<\/th>/);
+});
+
+test("SF10 upload endpoint authenticates teachers and imports final ratings", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sf10-import-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  const server = createServer({ databasePath, migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(path.join(__dirname, "..", "SF10.xlsx"));
+  const front = workbook.getWorksheet("Front");
+  front.getCell("J10").value = "123456789012";
+  front.getCell("D23").value = "Previous Grade School";
+  front.getCell("S23").value = "765432";
+  front.getCell("D24").value = "North District";
+  front.getCell("I24").value = "Sample Division";
+  front.getCell("T24").value = "Region IX";
+  front.getCell("J25").value = "Mabini";
+  front.getCell("S25").value = "2024-2025";
+  front.getCell("H26").value = "Teacher Example";
+  front.getCell("P30").value = 87;
+  front.getCell("S30").value = "Passed";
+  front.getCell("P45").value = 88;
+  const workbookBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const importUrl = `${baseUrl}/api/teacher/sf10/import`;
+  const headers = {
+    "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  };
+  const unauthorized = await fetch(importUrl, {
+    method: "POST",
+    headers,
+    body: workbookBuffer,
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const registration = await fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "SF10 Import Teacher",
+      email: "sf10.import@example.com",
+      password: "secure-pass-123",
+      role: "teacher",
+      extra: "SF10 Import Room",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+  const importedResponse = await fetch(importUrl, {
+    method: "POST",
+    headers: { ...headers, Cookie: cookie },
+    body: workbookBuffer,
+  });
+  assert.equal(importedResponse.status, 200);
+  const imported = await importedResponse.json();
+  assert.equal(imported.lrn, "123456789012");
+  const gradeOne = imported.grades.find((record) => record.grade === 1);
+  assert.equal(gradeOne.school, "Previous Grade School");
+  assert.equal(gradeOne.schoolId, "765432");
+  assert.equal(gradeOne.district, "North District");
+  assert.equal(gradeOne.division, "Sample Division");
+  assert.equal(gradeOne.region, "Region IX");
+  assert.equal(gradeOne.section, "Mabini");
+  assert.equal(gradeOne.schoolYear, "2024-2025");
+  assert.equal(gradeOne.adviser, "Teacher Example");
+  assert.equal(gradeOne.subjects[0].final, "87");
+  assert.equal(gradeOne.subjects[0].remarks, "Passed");
+  assert.equal(gradeOne.generalAverage, "88");
+  assert.equal(Object.keys(gradeOne.subjects[0]).includes("q1"), false);
+
+  const invalidWorkbook = await fetch(importUrl, {
+    method: "POST",
+    headers: { ...headers, Cookie: cookie },
+    body: Buffer.from("not an xlsx file"),
+  });
+  assert.equal(invalidWorkbook.status, 400);
 });
 
 test("developer updates list only changes from the current app version", async () => {
@@ -1521,12 +1681,11 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
-      "Update checks retry temporary GitHub server failures and show a clear message if the service remains unavailable.",
-      "Sign-in remembers the most recent account using secure credential storage; signing in still requires your click.",
-      "Sign-out reports failures and keeps the session active if logout cannot be confirmed.",
-      "Tarpapel Maker can stretch an image across the selected sheets while retaining print margins.",
-      "Removed the unused Checklist tool and teacher PDS/SALN profile tabs.",
-      "Portal styles and scripts revalidate so browser caches do not block updates.",
+      "EPP imports accept EPP/TLE workbooks when EPP is selected.",
+      "Section renames require the current password and keep assigned students and saved records linked.",
+      "Attendance respects the configured school-year dates and uses the DepEd 2026-2027 school calendar.",
+      "SF10 uploads import prior-grade details without changing unrelated term grades.",
+      "Removed the unused PDS endpoint so profiles no longer depend on a missing workbook.",
     ],
   );
 });
@@ -1704,6 +1863,63 @@ test("term grade page makes the lock state prominent", async () => {
   assert.match(portalPage, /\$\("gradeLockBadge"\)\.textContent=locked\?"LOCKED":"UNLOCKED"/);
 });
 
+test("E-Class import accepts an EPP/TLE workbook for the EPP subject", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "eclass-import-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  const server = createServer({ databasePath, migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const registration = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "E-Class Import Teacher",
+      email: "eclass.import@example.com",
+      password: "secure-pass-123",
+      role: "teacher",
+      extra: "E-Class Import Room",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+
+  const rows = Array.from({ length: 12 }, () => []);
+  rows[1][1] = "Class Record - Term 1";
+  rows[9][26] = "EPP/TLE";
+  rows[10][1] = "Highest Possible Score";
+  rows[11][1] = 1;
+  rows[11][2] = "Jordan Learner";
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "TERM 1");
+  const workbookBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  const response = await fetch(
+    `http://127.0.0.1:${server.address().port}/api/e-class/import?term=Term%201&subject=EPP`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        Cookie: cookie,
+      },
+      body: workbookBuffer,
+    },
+  );
+
+  assert.equal(response.status, 200, await response.clone().text());
+  const imported = await response.json();
+  assert.equal(imported.subject, "EPP");
+  assert.equal(imported.students.length, 1);
+  assert.equal(imported.students[0].name, "Jordan Learner");
+});
+
 test("E-Class export fills the project workbook template with current app records", async (context) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "eclass-export-"));
   const databasePath = path.join(directory, "database.sqlite");
@@ -1747,12 +1963,21 @@ test("E-Class export fills the project workbook template with current app record
       schoolName: "Sample Elementary School",
       schoolId: "123456",
       schoolYear: "2026-2027",
+      firstDayOfSchool: "2026-06-15",
+      endOfSchoolYear: "2027-03-31",
       position: "Teacher I",
       schoolHead: "Alex Principal",
       schoolHeadPosition: "Principal II",
     }),
   });
   assert.equal(profileResponse.status, 200);
+  const savedProfileResponse = await fetch(`${baseUrl}/api/teacher/profile`, {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(savedProfileResponse.status, 200);
+  const savedProfile = await savedProfileResponse.json();
+  assert.equal(savedProfile.firstDayOfSchool, "2026-06-15");
+  assert.equal(savedProfile.endOfSchoolYear, "2027-03-31");
 
   const templateWorkbook = new ExcelJS.Workbook();
   const templatePath = path.join(__dirname, "..", "E-CLASS.xlsx");
@@ -2241,6 +2466,126 @@ test("clearing a selected student section preserves students in other sections",
   assert.deepEqual(recreatedSection.sectionGrades, { FUENTES: "Grade 5" });
 });
 
+test("teacher profile section renames require the current password and preserve section data", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "section-rename-"));
+  const databasePath = path.join(directory, "database.sqlite");
+  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
+  await createEmptyTestWorkbook(migrationWorkbookPath);
+  const server = createServer({ databasePath, migrationWorkbookPath });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    if (server.listening) {
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const registration = await fetch(`${baseUrl}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Section Rename Teacher",
+      email: "section.rename@example.com",
+      password: "secure-pass-123",
+      role: "teacher",
+      extra: "Section Rename Room",
+      grade: "Grade 5",
+    }),
+  });
+  assert.equal(registration.status, 201);
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+  const updateProfile = (sectionsHandled, currentPassword) => fetch(`${baseUrl}/api/teacher/profile`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      name: "Section Rename Teacher",
+      email: "section.rename@example.com",
+      classroomNumber: "Section Rename Room",
+      section: sectionsHandled.includes("Mabini") ? "Mabini" : "Rizal",
+      sectionsHandled,
+      ...(currentPassword ? { currentPassword } : {}),
+    }),
+  });
+
+  const addSection = await updateProfile(["Mabini"]);
+  assert.equal(addSection.status, 200);
+  const saveSubjects = await fetch(`${baseUrl}/api/teacher/profile/subjects`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ section: "Mabini", subjectsHandled: ["English"] }),
+  });
+  assert.equal(saveSubjects.status, 200);
+
+  const addStudent = await fetch(`${baseUrl}/api/students`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      firstName: "Jordan",
+      lastName: "Learner",
+      gender: "Male",
+      lrn: "123456789012",
+      birthdate: "2016-01-15",
+      section: "Mabini",
+    }),
+  });
+  assert.equal(addStudent.status, 201, await addStudent.clone().text());
+
+  const databaseWorkbook = readPortalDatabaseWorkbook(databasePath);
+  const classSheet = databaseWorkbook.getWorksheet("Classes");
+  const classHeaders = classSheet.getRow(1).values;
+  const classColumn = (label) => classHeaders.findIndex((value) => value === label);
+  const classRow = Array.from({ length: classSheet.rowCount - 1 }, (_, index) =>
+    classSheet.getRow(index + 2)).find((row) =>
+    row.getCell(classColumn("Classroom number")).value === "Section Rename Room");
+  assert.ok(classRow);
+  const eClassSheet = databaseWorkbook.addWorksheet("E-Class Records");
+  eClassSheet.addRow([
+    "Class ID", "Teacher User ID", "Term", "Subject", "MAPEH Group", "Section",
+    "Scores", "Highest Scores", "Grades", "Locked", "Updated",
+  ]);
+  eClassSheet.addRow([
+    classRow.getCell(classColumn("Class ID")).value,
+    classRow.getCell(classColumn("Teacher User ID")).value,
+    "Term 1", "English", "", "Mabini", "{}", "[]", "{}", false, new Date(),
+  ]);
+  writePortalDatabaseWorkbook(databasePath, databaseWorkbook);
+
+  const missingPassword = await updateProfile(["Rizal"]);
+  assert.equal(missingPassword.status, 400);
+  const wrongPassword = await updateProfile(["Rizal"], "incorrect-password");
+  assert.equal(wrongPassword.status, 400);
+  const ambiguousRename = await updateProfile(["Rizal", "Bonifacio"]);
+  assert.equal(ambiguousRename.status, 400);
+  assert.match((await ambiguousRename.json()).error, /Rename one section at a time/);
+  const unchangedProfile = await (await fetch(`${baseUrl}/api/teacher/profile`, {
+    headers: { Cookie: cookie },
+  })).json();
+  assert.deepEqual(unchangedProfile.sectionsHandled, ["Mabini"]);
+
+  const renamedResponse = await updateProfile(["Rizal"], "secure-pass-123");
+  assert.equal(renamedResponse.status, 200, await renamedResponse.clone().text());
+  const renamedProfile = await renamedResponse.json();
+  assert.equal(renamedProfile.section, "Rizal");
+  assert.deepEqual(renamedProfile.sectionsHandled, ["Rizal"]);
+  assert.deepEqual(renamedProfile.sectionGrades, { Rizal: "Grade 5" });
+  assert.deepEqual(renamedProfile.sectionSubjects, { Rizal: ["English"] });
+
+  const roster = await (await fetch(`${baseUrl}/api/students`, {
+    headers: { Cookie: cookie },
+  })).json();
+  assert.equal(roster.students[0].section, "Rizal");
+  const subjectProfile = await (await fetch(`${baseUrl}/api/teacher/profile/subjects`, {
+    headers: { Cookie: cookie },
+  })).json();
+  assert.equal(subjectProfile.advisorySection, "Rizal");
+  assert.deepEqual(subjectProfile.sectionsHandled, ["Rizal"]);
+
+  const savedWorkbook = readPortalDatabaseWorkbook(databasePath);
+  const savedEClassRecords = savedWorkbook.getWorksheet("E-Class Records");
+  assert.equal(savedEClassRecords.getRow(2).getCell(6).value, "Rizal");
+});
+
 test("teacher profile marks the assigned advisory grade and section as read-only", async () => {
   const portalPage = await readPortalPageSource();
   const serverSource = await fs.readFile(path.join(__dirname, "..", "server.js"), "utf8");
@@ -2251,13 +2596,18 @@ test("teacher profile marks the assigned advisory grade and section as read-only
   assert.doesNotMatch(portalPage, /teacherProfileBackgroundTab|teacherProfileSalnTab|pdsWorkbook|pdsSheetTable/);
   assert.match(portalPage, /id="teacherProfileBasicPanel" role="tabpanel"[\s\S]*?id="teacherProfileName"/);
   assert.match(portalPage, /id="teacherProfileSchoolPanel" role="tabpanel"[\s\S]*?id="teacherProfileSchoolName"/);
+  assert.match(portalPage, /id="teacherProfileSchoolYear"[^>]*>[\s\S]*?<input id="teacherProfileFirstDayOfSchool" name="firstDayOfSchool" type="date">/);
+  assert.match(portalPage, /id="teacherProfileFirstDayOfSchool"[^>]*>[\s\S]*?<input id="teacherProfileEndOfSchoolYear" name="endOfSchoolYear" type="date">/);
+  assert.match(portalPage, /id="attendanceSchoolYearHint"/);
+  assert.match(portalPage, /function attendanceSchoolYearRange\(\)/);
   assert.match(portalPage, /#teacherProfileForm \.teacher-profile-tabs\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)/);
   assert.doesNotMatch(portalPage, /teacherPds|pds-printing|pds-workbook|pds-sheet/);
-  assert.match(serverSource, /CREATE TABLE IF NOT EXISTS teacher_pds_records/);
-  assert.match(serverSource, /function validateTeacherPdsData\(data, template\)/);
+  assert.doesNotMatch(serverSource, /url\.pathname === "\/api\/teacher\/profile\/pds"/);
   assert.match(portalPage, /function selectTeacherProfileTab\(tab\)/);
   assert.match(portalPage, /id="saveTeacherBasicProfile" type="button">Save Basic Info<\/button>/);
   assert.match(portalPage, /id="saveTeacherSchoolProfile" type="button">Save School Info<\/button>/);
+  assert.match(portalPage, /id="teacherProfileSectionRenamePassword" type="password"/);
+  assert.match(portalPage, /profileData\.currentPassword=\$\("teacherProfileSectionRenamePassword"\)\.value/);
   assert.match(portalPage, /async function saveTeacherBasicProfile\(\)/);
   assert.match(portalPage, /async function saveTeacherSchoolProfile\(\)/);
   assert.match(portalPage, /teacherProfileBasicNotice"\)\.textContent="Basic Info saved successfully\."/);
@@ -2269,6 +2619,8 @@ test("teacher profile marks the assigned advisory grade and section as read-only
   assert.ok(schoolProfileSave);
   assert.doesNotMatch(basicProfileSave[1], /schoolYear:|schoolName:|schoolId:/);
   assert.match(schoolProfileSave[1], /name:teacherProfileSavedIdentity\.name,[\s\S]*?schoolYear:\$\("teacherProfileSchoolYear"\)\.value/);
+  assert.match(schoolProfileSave[1], /firstDayOfSchool:\$\("teacherProfileFirstDayOfSchool"\)\.value/);
+  assert.match(schoolProfileSave[1], /endOfSchoolYear:\$\("teacherProfileEndOfSchoolYear"\)\.value/);
   assert.doesNotMatch(schoolProfileSave[1], /name:\$\("teacherProfileName"\)\.value/);
   assert.doesNotMatch(portalPage, /id="saveTeacherProfile"/);
   assert.match(portalPage, /<label for="teacherProfileGrade">Grade <span class="advisory-field-badge">View only<\/span><\/label><input id="teacherProfileGrade"[^>]*readonly/);
@@ -2305,96 +2657,6 @@ test("teacher profile marks the assigned advisory grade and section as read-only
   assert.match(portalPage, /<option value="Arts and Design">Arts and Design<\/option>/);
   assert.match(portalPage, /strand:strand/);
   assert.match(portalPage, /function ensureGradeSubjectInput\(subject\)/);
-});
-
-test("teacher PDS exposes the C1-C4 workbook sheets and saves entries per teacher", async (context) => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "teacher-pds-"));
-  const databasePath = path.join(directory, "database.sqlite");
-  const migrationWorkbookPath = path.join(directory, "migration.xlsx");
-  await createEmptyTestWorkbook(migrationWorkbookPath);
-  const server = createServer({ databasePath, migrationWorkbookPath });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  context.after(async () => {
-    if (server.listening) {
-      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    }
-    await fs.rm(directory, { recursive: true, force: true });
-  });
-
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
-  const unauthorized = await fetch(`${baseUrl}/api/teacher/profile/pds`);
-  assert.equal(unauthorized.status, 401);
-
-  async function registerTeacher(name, email, classroom) {
-    const response = await fetch(`${baseUrl}/api/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        email,
-        password: "secure-pass-123",
-        role: "teacher",
-        extra: classroom,
-        grade: "Grade 5",
-      }),
-    });
-    assert.equal(response.status, 201);
-    return response.headers.get("set-cookie").split(";")[0];
-  }
-
-  const firstTeacherCookie = await registerTeacher("PDS Teacher One", "pds.one@example.com", "12");
-  const workbookResponse = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
-    headers: { Cookie: firstTeacherCookie },
-  });
-  assert.equal(workbookResponse.status, 200);
-  const workbook = await workbookResponse.json();
-  assert.deepEqual(workbook.sheets.map((sheet) => sheet.name), ["C1", "C2", "C3", "C4"]);
-  assert.deepEqual(workbook.sheets.map((sheet) => sheet.startRow), [1, 2, 1, 1]);
-  assert.equal(workbook.sheets[0].widths.length, 14);
-  assert.equal(
-    workbook.sheets[0].rows.find((row) => row.number === 9).cells[0].value,
-    "I. PERSONAL INFORMATION",
-  );
-  assert.equal(
-    workbook.sheets[0].rows.find((row) => row.number === 10).cells.find((cell) => cell.address === "D10").editable,
-    true,
-  );
-  const c2WorkExperienceNote = workbook.sheets[1].rows.find((row) => row.number === 14);
-  assert.equal(c2WorkExperienceNote.height, 16);
-  assert.equal(c2WorkExperienceNote.cells.find((cell) => cell.address === "A14").style.wrap, false);
-  assert.equal(workbook.sheets[1].widths[0], 28);
-
-  const saveResponse = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: firstTeacherCookie },
-    body: JSON.stringify({
-      sheets: {
-        C1: { D10: "Teacher One" },
-        C4: { H6: false },
-      },
-    }),
-  });
-  assert.equal(saveResponse.status, 200);
-  assert.equal((await saveResponse.json()).saved, true);
-
-  const invalidSave = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: firstTeacherCookie },
-    body: JSON.stringify({ sheets: { C1: { A9: "Not editable" } } }),
-  });
-  assert.equal(invalidSave.status, 400);
-  const savedWorkbook = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
-    headers: { Cookie: firstTeacherCookie },
-  });
-  const savedEntries = await savedWorkbook.json();
-  assert.equal(savedEntries.entries.C1.D10, "Teacher One");
-  assert.equal(savedEntries.entries.C4.H6, false);
-
-  const secondTeacherCookie = await registerTeacher("PDS Teacher Two", "pds.two@example.com", "13");
-  const secondTeacherWorkbook = await fetch(`${baseUrl}/api/teacher/profile/pds`, {
-    headers: { Cookie: secondTeacherCookie },
-  });
-  assert.deepEqual((await secondTeacherWorkbook.json()).entries, {});
 });
 
 test("registered grade and strand determine all subject lists", async (context) => {
@@ -4098,6 +4360,15 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /id="calendarPanel" aria-labelledby="teacherCalendarHeading" hidden>[\s\S]*?id="teacherCalendarGrid"/);
   assert.match(portalPage, /id="teacherCalendarMunicipality"/);
   assert.match(portalPage, /id="teacherCalendarMonthView"[\s\S]*?id="teacherCalendarWeekView"/);
+  assert.match(portalPage, /id="teacherCalendarSchoolYearHeading">DepEd School Calendar · SY 2026–2027/);
+  assert.match(portalPage, /id="teacherCalendarTermList"/);
+  assert.match(portalPage, /function renderTeacherCalendarSchoolYear\(schedule\)/);
+  assert.match(portalPage, /function calendarSchoolActivityDates\(activity\)/);
+  assert.match(portalPage, /function calendarSchoolActivityIndicatorLabel\(kind\)/);
+  assert.match(portalPage, /cell\.classList\.add\("has-deped-activity"\)/);
+  assert.match(portalPage, /has-deped-highlight-/);
+  assert.match(portalPage, /teacher-calendar-day-indicator/);
+  assert.match(portalPage, /teacher-calendar-item--deped/);
   assert.match(portalPage, /id="spinWheelPanel" hidden/);
   assert.match(portalPage, /id="topbarCalendarToggle"[^>]*aria-controls="topbarCalendarPopover"[^>]*aria-expanded="false"/);
   assert.match(portalPage, /id="topbarCalendarPopover" role="dialog"[^>]*hidden>[\s\S]*?id="topbarMiniCalendarGrid"[\s\S]*?id="topbarMiniCalendarClose"[^>]*>Close calendar[\s\S]*?id="topbarMiniCalendarOpen"[^>]*>Open calendar/);
@@ -4299,6 +4570,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
       "English", "Filipino", "Mathematics", "Science", "Araling Panlipunan", "EPP", "MAPEH", "GMRC",
     ],
     schoolYear: "",
+    firstDayOfSchool: "",
+    endOfSchoolYear: "",
     schoolName: "",
     schoolId: "",
     region: "",
@@ -4310,6 +4583,10 @@ test("registrations persist in the workbook and can sign in after a restart", as
     hasPhoto: false,
     hasSchoolLogo: false,
   });
+  const attendanceWithoutSchoolDates = await fetch(`${baseUrl}/api/attendance/month?month=2026-10`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(attendanceWithoutSchoolDates.status, 400, "attendance requires configured school-year dates");
 
   const updateProfile = (cookie, data) => fetch(`${baseUrl}/api/teacher/profile`, {
     method: "PUT",
@@ -4326,6 +4603,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
     sectionsHandled: ["Mabini", "Rizal"],
     subjectsHandled: ["English", "Mathematics"],
     schoolYear: "2026-2027",
+    firstDayOfSchool: "2025-01-01",
+    endOfSchoolYear: "2027-04-30",
     schoolName: "Sample Elementary School",
     schoolId: "123456",
     region: "Region IX",
@@ -4375,6 +4654,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
       "English", "Filipino", "Mathematics", "Science", "Araling Panlipunan", "EPP", "MAPEH", "GMRC",
     ],
     schoolYear: "2026-2027",
+    firstDayOfSchool: "2025-01-01",
+    endOfSchoolYear: "2027-04-30",
     schoolName: "Sample Elementary School",
     schoolId: "123456",
     region: "Region IX",
@@ -4426,6 +4707,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
     sectionsHandled: ["Mabini", "Rizal"],
     subjectsHandled: ["English", "Mathematics"],
     schoolYear: "2026-2027",
+    firstDayOfSchool: "2025-01-01",
+    endOfSchoolYear: "2027-04-30",
     schoolName: "Sample Elementary School",
     schoolId: "123456",
     region: "Region IX",
@@ -7228,7 +7511,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(finalStudents.length, 3);
   assert.equal(finalStudents[2].lrn, "123456789015");
   assert.equal(finalStudents[2].firstName, "Jamie");
-  const attendanceDate = new Date().toISOString().slice(0, 10);
+  const attendanceDate = "2026-10-01";
   const attendanceResponse = await fetch(`${baseUrl}/api/attendance?date=${attendanceDate}`, {
     headers: { Cookie: teacherCookie },
   });
@@ -7271,7 +7554,27 @@ test("registrations persist in the workbook and can sign in after a restart", as
     { id: importedStudents[1].id, status: "Absent", reason: "Medical appointment" },
     { id: finalStudents[2].id, status: "Tardy", reason: "" },
   ]);
-  const attendanceMonth = `${Number(attendanceDate.slice(0, 4)) - 1}-01`;
+  const attendanceMonth = "2025-01";
+  const outsideAttendanceMonth = await fetch(`${baseUrl}/api/attendance/month?month=2024-12`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(outsideAttendanceMonth.status, 400, "months before the configured school year are blocked");
+  const afterSchoolYearMonth = await fetch(`${baseUrl}/api/attendance/month?month=2027-05`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(afterSchoolYearMonth.status, 400, "months after the configured school year are blocked");
+  const outsideAttendanceDate = await fetch(`${baseUrl}/api/attendance?date=2024-12-31`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(outsideAttendanceDate.status, 400, "daily attendance outside the configured school year is blocked");
+  const invalidSchoolYearRange = await updateProfile(teacherCookie, {
+    name: teacherCredentials.name,
+    email: teacherCredentials.email,
+    classroomNumber: "12",
+    firstDayOfSchool: "2026-11-16",
+    endOfSchoolYear: "2026-10-15",
+  });
+  assert.equal(invalidSchoolYearRange.status, 400, "the first school date cannot be after the end date");
   const emptyMonthResponse = await fetch(`${baseUrl}/api/attendance/month?month=${attendanceMonth}`, {
     headers: { Cookie: teacherCookie },
   });
@@ -8133,6 +8436,47 @@ test("registrations persist in the workbook and can sign in after a restart", as
     headers: { Cookie: teacherCookie },
   });
   assert.equal(invalidAttendanceClearMonth.status, 400);
+  const partialSchoolYearProfile = await updateProfile(teacherCookie, {
+    name: teacherCredentials.name,
+    email: teacherCredentials.email,
+    classroomNumber: "12",
+    firstDayOfSchool: "2026-10-15",
+    endOfSchoolYear: "2026-11-15",
+  });
+  assert.equal(partialSchoolYearProfile.status, 200);
+  const partialOctoberAttendance = await fetch(`${baseUrl}/api/attendance/month?month=2026-10`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(partialOctoberAttendance.status, 200);
+  const partialOctoberDates = (await partialOctoberAttendance.json()).dates;
+  assert.equal(partialOctoberDates[0], "2026-10-15");
+  assert.equal(partialOctoberDates.every((date) => date >= "2026-10-15" && date <= "2026-11-15"), true);
+  const partialNovemberAttendance = await fetch(`${baseUrl}/api/attendance/month?month=2026-11`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(partialNovemberAttendance.status, 200);
+  const partialNovemberDates = (await partialNovemberAttendance.json()).dates;
+  assert.equal(partialNovemberDates[partialNovemberDates.length - 1], "2026-11-13");
+  const beforeFirstSchoolDay = await fetch(`${baseUrl}/api/attendance?date=2026-10-14`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(beforeFirstSchoolDay.status, 400);
+  const weekendAttendance = await fetch(`${baseUrl}/api/attendance?date=2026-10-17`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(weekendAttendance.status, 400, "weekends are not counted as school days");
+  const afterLastSchoolDay = await fetch(`${baseUrl}/api/attendance?date=2026-11-16`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(afterLastSchoolDay.status, 400);
+  const restoreAttendanceYearProfile = await updateProfile(teacherCookie, {
+    name: teacherCredentials.name,
+    email: teacherCredentials.email,
+    classroomNumber: "12",
+    firstDayOfSchool: "2025-01-01",
+    endOfSchoolYear: "2027-04-30",
+  });
+  assert.equal(restoreAttendanceYearProfile.status, 200);
 
   const notExcel = await fetch(`${baseUrl}/api/students/import`, {
     method: "POST",
@@ -8505,6 +8849,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
       "English", "Filipino", "Mathematics", "Science", "Araling Panlipunan", "EPP", "MAPEH", "GMRC",
     ],
     schoolYear: "2026-2027",
+    firstDayOfSchool: "2025-01-01",
+    endOfSchoolYear: "2027-04-30",
     schoolName: "Sample Elementary School",
     schoolId: "123456",
     region: "Region IX",
@@ -9514,6 +9860,47 @@ test("teacher calendar API serves holidays and teacher-owned task CRUD independe
       .isNonWorking,
     false,
   );
+
+  const schoolCalendarResponse = await fetch(`${baseUrl}/api/teacher-calendar/school-year`, {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(schoolCalendarResponse.status, 200);
+  const schoolCalendar = await schoolCalendarResponse.json();
+  assert.equal(schoolCalendar.firstDay, "2026-06-08");
+  assert.equal(schoolCalendar.lastDay, "2027-04-08");
+  assert.equal(schoolCalendar.totalClassDays, 201);
+  assert.deepEqual(schoolCalendar.terms.map(({ name, startDate, endDate, classDays }) => ({
+    name,
+    startDate,
+    endDate,
+    classDays,
+  })), [
+    { name: "Term 1", startDate: "2026-06-08", endDate: "2026-09-15", classDays: 69 },
+    { name: "Term 2", startDate: "2026-09-16", endDate: "2026-12-18", classDays: 65 },
+    { name: "Term 3", startDate: "2027-01-04", endDate: "2027-04-08", classDays: 67 },
+  ]);
+  assert.equal(schoolCalendar.terms.reduce((total, term) => total + term.classDays, 0), 201);
+  assert.ok(schoolCalendar.activities.some((activity) => (
+    activity.title === "Term 3 Examination (Other Grade Levels)"
+      && activity.date === "2027-03-22"
+      && activity.endDate === "2027-03-23"
+  )));
+  assert.ok(schoolCalendar.activities.some((activity) => (
+    activity.title === "Term 1 End-of-Term Block"
+      && activity.date === "2026-09-02"
+      && activity.endDate === "2026-09-15"
+  )));
+  assert.ok(schoolCalendar.activities.some((activity) => (
+    activity.title === "2027 National Festival of Talents"
+      && activity.date === "2027-04-26"
+      && activity.endDate === "2027-04-30"
+  )));
+  assert.ok(schoolCalendar.activities.some((activity) => (
+    activity.title === "INSET for Teachers"
+      && activity.dates?.includes("2027-04-05")
+  )));
+  const unauthenticatedSchoolCalendar = await fetch(`${baseUrl}/api/teacher-calendar/school-year`);
+  assert.equal(unauthenticatedSchoolCalendar.status, 401);
 
   const deletedResponse = await fetch(
     `${baseUrl}/api/teacher-calendar/events/${encodeURIComponent(createdTask.id)}`,

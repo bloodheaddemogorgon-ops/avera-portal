@@ -1553,7 +1553,7 @@
     if(!Array.isArray(result.noClassDates))result.noClassDates=[];
     if(!result.noClassReasons||typeof result.noClassReasons!=="object")result.noClassReasons={};
     $("clearAttendanceMonth").disabled=rosterStudents.length===0;
-    $("clearAttendanceMonth").title="Clear attendance for the entire class and month.";
+    $("clearAttendanceMonth").title="Clear attendance within the school-year dates for the entire class and month.";
     $("attendanceRows").replaceChildren();
     $("attendanceTotals").replaceChildren();
     $("attendanceCount").textContent=String(rosterStudents.filter(function(s){return !inactiveStudentIds.has(s.id)}).length);
@@ -2131,6 +2131,18 @@
     return $("attendanceYear").value+"-"+String($("attendanceMonth").value).padStart(2,"0");
   }
 
+  function attendanceSchoolYearRange(){
+    var startDate=$("teacherProfileFirstDayOfSchool").value;
+    var endDate=$("teacherProfileEndOfSchoolYear").value;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+      ||startDate>endDate)return null;
+    return{startDate:startDate,endDate:endDate};
+  }
+
+  function isAttendanceMonthAllowed(month,range){
+    return Boolean(range)&&month>=range.startDate.slice(0,7)&&month<=range.endDate.slice(0,7);
+  }
+
   function isDefaultPresentDate(result,date,student){
     var weekday=new Date(date+"T00:00:00").getDay();
     var now=new Date();
@@ -2166,6 +2178,27 @@
     $("attendanceTotals").replaceChildren();
     $("saveAttendance").disabled=true;
     $("clearAttendanceMonth").disabled=true;
+    var schoolYear=attendanceSchoolYearRange();
+    if(!schoolYear){
+      attendanceData=null;
+      activeAttendanceMonth="";
+      $("attendanceCount").textContent="Dates required";
+      $("attendanceSavedDays").textContent="—";
+      $("attendanceNotice").textContent="Set valid First day of school and End of school year dates in Teacher Profile before recording attendance.";
+      $("attendanceNotice").classList.add("error");
+      $("attendanceTable").hidden=true;
+      $("attendanceEmpty").hidden=true;
+      renderNoClassSummary({noClassDates:[],noClassReasons:{}});
+      $("importSF2").disabled=true;
+      $("downloadSF2").disabled=true;
+      return;
+    }
+    if(!isAttendanceMonthAllowed(month,schoolYear)){
+      refreshAttendanceYears();
+      month=selectedAttendanceMonth();
+    }
+    $("importSF2").disabled=false;
+    $("downloadSF2").disabled=false;
     try{
       var result=await api("/api/attendance/month?month="+encodeURIComponent(month));
       if(requestId!==attendanceRequestId||month!==selectedAttendanceMonth())return;
@@ -3875,6 +3908,79 @@
     return fields;
   }
 
+  function sf10GradeNumber(value){
+    var match=/^(?:grade\s*)?([1-6])$/i.exec(String(value||"").trim());
+    return match?Number(match[1]):0;
+  }
+
+  function sf10ImportedGradeFields(importData,selectedLrn,currentGrade){
+    var normalizeLrn=function(value){return String(value||"").replace(/\D/g,"")};
+    var expectedLrn=normalizeLrn(selectedLrn);
+    var importedLrn=normalizeLrn(importData&&importData.lrn);
+    if(!expectedLrn)throw new Error("Select a learner with an LRN before uploading an SF10 workbook.");
+    if(!importedLrn)throw new Error("The uploaded SF10 workbook does not contain an LRN.");
+    if(expectedLrn!==importedLrn)throw new Error("The uploaded SF10 LRN does not match the selected learner.");
+    var currentGradeNumber=sf10GradeNumber(currentGrade);
+    if(!currentGradeNumber)throw new Error("The active class grade could not be determined.");
+    if(!importData||!Array.isArray(importData.grades)){
+      throw new Error("The SF10 import response did not contain grade records.");
+    }
+
+    var fields={};
+    var importedGrades=[];
+    var metadataMap={
+      school:"school",
+      schoolId:"schoolId",
+      district:"district",
+      division:"division",
+      region:"region",
+      classifiedGrade:"classifiedGrade",
+      section:"section",
+      schoolYear:"schoolYear",
+      adviser:"adviser"
+    };
+    importData.grades.forEach(function(record){
+      var grade=Number(record&&record.grade);
+      if(!Number.isInteger(grade)||grade<1||grade>=currentGradeNumber)return;
+      var subjects=sf10GradeSubjects[grade-1];
+      if(!subjects)return;
+      var base="grade."+grade+".";
+      subjects.forEach(function(subject,subjectIndex){
+        var normalizedSubject=subject.replace(/[^a-zA-Z0-9]/g,"").toLowerCase();
+        var importedSubject=(record.subjects||[]).find(function(candidate){
+          var normalizedImported=String(candidate&&candidate.name||"")
+            .replace(/[^a-zA-Z0-9]/g,"").toLowerCase();
+          return normalizedImported&&(normalizedImported===normalizedSubject
+            ||normalizedImported.indexOf(normalizedSubject)!==-1
+            ||normalizedSubject.indexOf(normalizedImported)!==-1
+            ||((normalizedSubject==="epp"||normalizedSubject==="tle")
+              &&(normalizedImported==="epp"||normalizedImported==="tle")));
+        });
+        if(!importedSubject)return;
+        if(importedSubject.final!==undefined&&importedSubject.final!==null&&String(importedSubject.final).trim()){
+          fields[base+"subjects."+subjectIndex+".final"]=String(importedSubject.final);
+        }
+        if(importedSubject.remarks!==undefined&&importedSubject.remarks!==null&&String(importedSubject.remarks).trim()){
+          fields[base+"subjects."+subjectIndex+".remarks"]=String(importedSubject.remarks);
+        }
+      });
+      Object.keys(metadataMap).forEach(function(sourceKey){
+        var value=record[metadataMap[sourceKey]];
+        if(value!==undefined&&value!==null&&String(value).trim()){
+          fields[base+sourceKey]=String(value);
+        }
+      });
+      if(record.generalAverage!==undefined&&record.generalAverage!==null&&String(record.generalAverage).trim()){
+        fields[base+"generalAverage"]=String(record.generalAverage);
+      }
+      if(Object.keys(fields).some(function(key){return key.indexOf(base)===0})){
+        importedGrades.push(grade);
+      }
+    });
+    if(!importedGrades.length)throw new Error("The SF10 workbook has no importable grades below the selected learner's current class grade.");
+    return {fields:fields,grades:importedGrades};
+  }
+
   function sf10LoadRecord(recordKey){
     sf10ActiveRecordKey=recordKey||"manual";
     var student=sf10Students.find(function(candidate){return String(candidate.id)===sf10ActiveRecordKey});
@@ -3929,6 +4035,53 @@
     }
   }
 
+  function sf10SetImportStatus(message,isError){
+    var status=$("sf10ImportStatus");
+    status.textContent=message||"";
+    status.classList.toggle("error",Boolean(isError));
+  }
+
+  async function sf10ImportFile(file){
+    var recordKey=sf10ActiveRecordKey;
+    if(!recordKey||recordKey==="manual"){
+      throw new Error("Select a learner from the class roster before uploading an SF10 workbook.");
+    }
+    var student=sf10Students.find(function(candidate){return String(candidate.id)===recordKey});
+    if(!student||!student.lrn){
+      throw new Error("The selected roster learner must have an LRN to import an SF10 workbook.");
+    }
+    var profile=await api("/api/teacher/profile");
+    if(sf10ActiveRecordKey!==recordKey)throw new Error("The selected learner changed during import. Try again.");
+    var importData=await api("/api/teacher/sf10/import",{
+      method:"POST",
+      headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+      body:file
+    });
+    if(sf10ActiveRecordKey!==recordKey)throw new Error("The selected learner changed during import. Try again.");
+    var imported=sf10ImportedGradeFields(importData,student.lrn,profile&&profile.grade);
+    var existing=sf10CollectFields();
+    var fieldsToReplace=Object.keys(imported.fields).filter(function(key){
+      return existing[key]!==undefined&&existing[key]!==null&&String(existing[key]).trim()
+        &&String(existing[key])!==String(imported.fields[key]);
+    });
+    var gradeNames=imported.grades.map(function(grade){return "Grade "+grade}).join(", ");
+    var message="Import final ratings and school details for "+gradeNames+"? "
+      +(fieldsToReplace.length
+        ?fieldsToReplace.length+" existing field(s) will be replaced. "
+        :"")
+      +"Term fields and the current grade will not be changed.";
+    if(!window.confirm(message)){
+      sf10SetImportStatus("SF10 import cancelled.",false);
+      return;
+    }
+    sf10ApplyFields(Object.assign({},existing,imported.fields));
+    if(!sf10PersistRecord(recordKey)){
+      sf10ApplyFields(existing);
+      throw new Error("The imported fields could not be saved in this browser; the existing draft was restored.");
+    }
+    sf10SetImportStatus("Imported prior-grade final ratings and school details for "+gradeNames+".",false);
+  }
+
   function selectSf10Page(page,focusTab){
     var showFront=page!=="back";
     $("sf10FrontPage").hidden=!showFront;
@@ -3967,6 +4120,26 @@
       }
     });
     $("sf10Save").addEventListener("click",function(){sf10PersistRecord()});
+    $("sf10GradeUploadButton").addEventListener("click",function(){$("sf10GradeUpload").click()});
+    $("sf10GradeUpload").addEventListener("change",async function(){
+      var file=this.files&&this.files[0];
+      this.value="";
+      if(!file)return;
+      var button=$("sf10GradeUploadButton");
+      var learnerSelect=$("sf10LearnerSelect");
+      var wasLearnerSelectDisabled=learnerSelect.disabled;
+      button.disabled=true;
+      learnerSelect.disabled=true;
+      sf10SetImportStatus("Reading the SF10 workbook...",false);
+      try{
+        await sf10ImportFile(file);
+      }catch(error){
+        sf10SetImportStatus("Could not import SF10 grades: "+error.message,true);
+      }finally{
+        button.disabled=false;
+        learnerSelect.disabled=wasLearnerSelectDisabled;
+      }
+    });
     $("sf10Print").addEventListener("click",function(){
       sf10PersistRecord();
       document.body.classList.add("sf10-printing");
@@ -4499,6 +4672,7 @@
 
     function dashboardRenderAttendanceTrend(){
       var container=$("dashboardAttendanceTrend");
+      dashboardRenderLegend("dashboardAttendanceTrendLegend",[]);
       var source=dashboardData.attendanceSummary;
       if(!source){
         if(source===undefined)dashboardSetLoading(container);
@@ -4517,6 +4691,10 @@
         });
         return {key:key,present:present,absent:absent};
       });
+      dashboardRenderLegend("dashboardAttendanceTrendLegend",[
+        {key:"present",label:"Present"},
+        {key:"absent",label:"Absent"}
+      ]);
       var chart=dashboardSvgEl("svg",{viewBox:"0 0 640 250",class:"dashboard-chart-svg"});
       chart.appendChild(dashboardSvgEl("title",{},"Present and absent attendance totals by month"));
       if(!points.length){
@@ -4542,7 +4720,7 @@
           rx:4,fill:"var(--accent)"});
         present.appendChild(dashboardSvgEl("title",{},point.key+" present: "+point.present));
         var absent=dashboardSvgEl("rect",{x:x+barWidth+5,y:base-absentHeight,width:barWidth,height:absentHeight,
-          rx:4,fill:"color-mix(in srgb,var(--accent) 55%,var(--muted))"});
+          rx:4,fill:"var(--err)"});
         absent.appendChild(dashboardSvgEl("title",{},point.key+" absent: "+point.absent));
         chart.append(present,absent);
         chart.appendChild(dashboardSvgEl("text",{x:x+barWidth,y:218,"text-anchor":"middle",class:"dashboard-chart-axis-label"},
@@ -5261,7 +5439,8 @@
     function applyDashboardDisplayFilter(){
       var category=$("dashboardDisplayFilter").value;
       Array.prototype.forEach.call(document.querySelectorAll("#dashboardPage [data-dashboard-category]"),function(item){
-        item.hidden=category!=="all"&&item.getAttribute("data-dashboard-category")!==category;
+        var categories=item.getAttribute("data-dashboard-category").split(/\s+/);
+        item.hidden=category!=="all"&&categories.indexOf(category)===-1;
       });
       $("dashboardMetricGrid").hidden=!$("dashboardMetricGrid").querySelector("[data-dashboard-category]:not([hidden])");
       $("dashboardMpsDeadlineRow").hidden=!$("dashboardMpsDeadlineRow").querySelector("[data-dashboard-category]:not([hidden])");
@@ -7713,12 +7892,16 @@
         sectionSubjects[subjectProfile.advisorySection]=handledSubjects;
       }
       $("teacherProfileSectionsHandled").value=handledSections.join(", ");
+      syncTeacherSectionRenamePasswordField();
       teacherSubjectsLocked=true;
       teacherSubjectsDirty=false;
       populateTeacherSubjectSections(subjectProfile.advisorySection||handledSections[0]||"");
       populateSectionControls(result.section||activeStudentSection);
       renderStudents(rosterStudents);
       $("teacherProfileSchoolYear").value=result.schoolYear||"";
+      $("teacherProfileFirstDayOfSchool").value=result.firstDayOfSchool||"";
+      $("teacherProfileEndOfSchoolYear").value=result.endOfSchoolYear||"";
+      refreshAttendanceYears();
       $("teacherProfileSchoolName").value=result.schoolName||"";
       $("teacherProfileSchoolId").value=result.schoolId||"";
       $("teacherProfileRegion").value=result.region||"";
@@ -8362,6 +8545,9 @@
         $("classSummary").textContent="Manage the student records for your class.";
         var profile=await api("/api/teacher/profile");
         $("teacherProfileSchoolYear").value=profile.schoolYear||"";
+        $("teacherProfileFirstDayOfSchool").value=profile.firstDayOfSchool||"";
+        $("teacherProfileEndOfSchoolYear").value=profile.endOfSchoolYear||"";
+        refreshAttendanceYears();
         availableSubjects=profile.availableSubjects||[];
         configureGradeSubjects(profile.gradeSubjects);
         configureEClassSubjects(profile.eClassSubjects,profile.gradeSubjects);
@@ -9978,6 +10164,8 @@
       view:"month",
       tasks:[],
       holidays:[],
+      schoolCalendar:null,
+      schoolCalendarRequest:null,
       loadedHolidayYear:null,
       profileDistrict:"",
       loadSequence:0,
@@ -10497,6 +10685,110 @@
       var endLabel=calendarDateLabel(range.end,{month:"short",day:"numeric",year:"numeric"});
       return startLabel+" – "+endLabel;
     }
+    function loadTeacherSchoolCalendar(){
+      if(calendarState.schoolCalendar)return Promise.resolve(calendarState.schoolCalendar);
+      if(!calendarState.schoolCalendarRequest){
+        calendarState.schoolCalendarRequest=api("/api/teacher-calendar/school-year").then(function(schedule){
+          if(!schedule||!Array.isArray(schedule.terms)||!Array.isArray(schedule.activities)){
+            throw new Error("The DepEd school-calendar response is invalid.");
+          }
+          calendarState.schoolCalendar=schedule;
+          renderTeacherCalendarSchoolYear(schedule);
+          return schedule;
+        }).catch(function(error){
+          calendarState.schoolCalendarRequest=null;
+          throw error;
+        });
+      }
+      return calendarState.schoolCalendarRequest;
+    }
+    function calendarSchoolYearDateRange(startDate,endDate,includeStartYear){
+      var startOptions={month:"short",day:"numeric"};
+      if(includeStartYear)startOptions.year="numeric";
+      var start=calendarDateLabel(calendarDateFromIso(startDate),startOptions);
+      var end=calendarDateLabel(calendarDateFromIso(endDate),{month:"short",day:"numeric",year:"numeric"});
+      return start+" – "+end;
+    }
+    function calendarSchoolActivityDates(activity){
+      if(Array.isArray(activity.dates))return activity.dates;
+      var currentDate=calendarDateFromIso(activity.date);
+      var endDate=calendarDateFromIso(activity.endDate||activity.date);
+      var dates=[];
+      while(currentDate<=endDate){
+        dates.push(calendarDateIso(currentDate));
+        currentDate.setDate(currentDate.getDate()+1);
+      }
+      return dates;
+    }
+    function calendarSchoolActivityIndicators(activities){
+      var block=activities.find(function(activity){
+        return activity.kind==="opening-block"
+          ||activity.kind==="instructional-block"
+          ||activity.kind==="end-of-term-block";
+      });
+      var assessment=activities.find(function(activity){return activity.kind==="examination"})
+        ||activities.find(function(activity){return activity.kind==="assessment"});
+      var indicators=[];
+      if(block)indicators.push(block.kind);
+      if(assessment)indicators.push(assessment.kind);
+      if(!indicators.length){
+        var prioritizedKind=["break","training","school-event","term"];
+        for(var kindIndex=0;kindIndex<prioritizedKind.length;kindIndex++){
+          if(activities.some(function(activity){return activity.kind===prioritizedKind[kindIndex]})){
+            indicators.push(prioritizedKind[kindIndex]);
+            break;
+          }
+        }
+      }
+      return indicators;
+    }
+    function calendarSchoolActivityIndicatorLabel(kind){
+      return {
+        "opening-block":"Opening block",
+        "instructional-block":"Instructional block",
+        "end-of-term-block":"End-of-term block",
+        examination:"Examination",
+        assessment:"Assessment",
+        break:"School break",
+        training:"Training",
+        "school-event":"DepEd activity",
+        term:"Term milestone"
+      }[kind]||"DepEd activity";
+    }
+    function renderTeacherCalendarSchoolYear(schedule){
+      $("teacherCalendarSchoolYearSummary").textContent=
+        calendarSchoolYearDateRange(schedule.firstDay,schedule.lastDay,true)
+        +" · "+schedule.totalClassDays+" class days.";
+      var termList=$("teacherCalendarTermList");
+      termList.replaceChildren();
+      schedule.terms.forEach(function(term){
+        var termItem=document.createElement("li");
+        termItem.className="teacher-calendar-term";
+        var heading=document.createElement("h4");
+        heading.textContent=term.name;
+        var termDates=document.createElement("span");
+        termDates.className="teacher-calendar-term-date";
+        termDates.textContent=calendarSchoolYearDateRange(term.startDate,term.endDate);
+        var days=document.createElement("span");
+        days.className="teacher-calendar-term-days";
+        days.textContent=term.classDays+" class days";
+        var blocks=document.createElement("ul");
+        blocks.className="teacher-calendar-term-blocks";
+        [
+          ["Opening",term.openingBlock],
+          ["Instructional",term.instructionalBlock],
+          ["End-of-term",term.endOfTermBlock]
+        ].forEach(function(block){
+          if(!block[1])return;
+          var blockItem=document.createElement("li");
+          blockItem.textContent=block[0]+": "+calendarSchoolYearDateRange(block[1].startDate,block[1].endDate)
+            +" ("+block[1].classDays+" class days)";
+          blocks.appendChild(blockItem);
+        });
+        termItem.append(heading,termDates,days,blocks);
+        termList.appendChild(termItem);
+      });
+    }
     function calendarSetStatus(message,isError){
       var status=$("teacherCalendarStatus");
       status.textContent=message;
@@ -10545,7 +10837,8 @@
         }
         var results=await Promise.allSettled([
           api("/api/teacher-calendar/events?from="+encodeURIComponent(range.from)+"&to="+encodeURIComponent(range.to)),
-          api("/api/teacher-calendar/holidays?year="+calendarState.currentDate.getFullYear())
+          api("/api/teacher-calendar/holidays?year="+calendarState.currentDate.getFullYear()),
+          loadTeacherSchoolCalendar()
         ]);
         if(requestSequence!==calendarState.loadSequence)return;
         if(results[0].status==="fulfilled")calendarState.tasks=results[0].value;
@@ -10566,6 +10859,10 @@
           calendarState.holidays=[];
           calendarState.loadedHolidayYear=null;
           errors.push("Holidays could not be loaded. "+results[1].reason.message);
+        }
+        if(results[2].status==="rejected"){
+          $("teacherCalendarSchoolYearSummary").textContent="DepEd school-calendar dates could not be loaded.";
+          errors.push("DepEd school-calendar dates could not be loaded. "+results[2].reason.message);
         }
         renderTeacherCalendar(range);
         var statusMessage=errors.join(" ");
@@ -10589,6 +10886,7 @@
       });
       var holidaysByDate=new Map();
       var tasksByDate=new Map();
+      var schoolActivitiesByDate=new Map();
       visibleHolidays.forEach(function(holiday){
         if(!holidaysByDate.has(holiday.date))holidaysByDate.set(holiday.date,[]);
         holidaysByDate.get(holiday.date).push(holiday);
@@ -10597,6 +10895,17 @@
         if(!tasksByDate.has(task.date))tasksByDate.set(task.date,[]);
         tasksByDate.get(task.date).push(task);
       });
+      if(calendarState.schoolCalendar){
+        calendarState.schoolCalendar.activities.forEach(function(activity){
+          calendarSchoolActivityDates(activity).forEach(function(activityDate){
+            if(!schoolActivitiesByDate.has(activityDate))schoolActivitiesByDate.set(activityDate,[]);
+            schoolActivitiesByDate.get(activityDate).push({
+              activity:activity,
+              showLabel:Array.isArray(activity.dates)||activityDate===activity.date
+            });
+          });
+        });
+      }
       var days=calendarState.view==="month"?42:7;
       $("teacherCalendarPeriod").textContent=calendarPeriodLabel(range);
       calendarGrid.replaceChildren();
@@ -10611,7 +10920,36 @@
         if(calendarState.view==="month"&&date.getMonth()!==calendarState.currentDate.getMonth())cell.classList.add("is-outside-month");
         if(isoDate===calendarDateIso(new Date()))cell.classList.add("is-today");
         var holidayItems=holidaysByDate.get(isoDate)||[];
-        if(holidayItems.some(function(holiday){return holiday.isNonWorking}))cell.classList.add("is-holiday");
+        var isNonWorkingHoliday=holidayItems.some(function(holiday){return holiday.isNonWorking});
+        if(isNonWorkingHoliday)cell.classList.add("is-holiday");
+        var schoolActivities=schoolActivitiesByDate.get(isoDate)||[];
+        var schoolActivityIndicators=calendarSchoolActivityIndicators(schoolActivities);
+        if(schoolActivities.length){
+          cell.classList.add("has-deped-activity");
+          schoolActivities.forEach(function(entry){
+            cell.classList.add("has-deped-"+entry.activity.kind);
+          });
+          if(!isNonWorkingHoliday&&schoolActivityIndicators.length){
+            cell.classList.add("has-deped-highlight-"+schoolActivityIndicators[0]);
+          }
+          var schoolActivityLabels=schoolActivities.map(function(entry){
+            var activity=entry.activity;
+            var activityDates=activity.endDate
+              ?calendarSchoolYearDateRange(activity.date,activity.endDate)
+              :Array.isArray(activity.dates)
+                ?activity.dates.map(function(activityDate){
+                  return calendarDateLabel(calendarDateFromIso(activityDate),{month:"short",day:"numeric",year:"numeric"});
+                }).join(", ")
+                :calendarDateLabel(calendarDateFromIso(activity.date),{month:"short",day:"numeric",year:"numeric"});
+            return activity.title+" ("+activityDates+")";
+          });
+          var activitySummary="DepEd schedule: "+schoolActivityLabels.join("; ");
+          if(schoolActivityIndicators.length){
+            activitySummary+="; Indicators: "+schoolActivityIndicators.map(calendarSchoolActivityIndicatorLabel).join(", ");
+          }
+          cell.title=activitySummary;
+          cell.setAttribute("aria-label",cell.getAttribute("aria-label")+"; "+activitySummary);
+        }
 
         var dateButton=document.createElement("button");
         dateButton.className="teacher-calendar-date";
@@ -10629,6 +10967,18 @@
         }
         cell.appendChild(dateButton);
 
+        if(schoolActivityIndicators.length){
+          var indicatorList=document.createElement("div");
+          indicatorList.className="teacher-calendar-day-indicators";
+          schoolActivityIndicators.forEach(function(kind){
+            var indicator=document.createElement("span");
+            indicator.className="teacher-calendar-day-indicator teacher-calendar-day-indicator--"+kind;
+            indicator.textContent=calendarSchoolActivityIndicatorLabel(kind);
+            indicatorList.appendChild(indicator);
+          });
+          cell.appendChild(indicatorList);
+        }
+
         var itemList=document.createElement("div");
         itemList.className="teacher-calendar-items";
         holidayItems.forEach(function(holiday){
@@ -10638,6 +10988,22 @@
           holidayItem.title=holiday.title+" — "+holiday.holidayType+"; "+holiday.sourceName;
           holidayItem.setAttribute("aria-label",holiday.title+", "+holiday.kind+" holiday, "+holiday.holidayType);
           itemList.appendChild(holidayItem);
+        });
+        schoolActivities.forEach(function(entry){
+          if(!entry.showLabel)return;
+          var activity=entry.activity;
+          var activityItem=document.createElement("div");
+          activityItem.className="teacher-calendar-item teacher-calendar-item--deped teacher-calendar-item--deped-"+activity.kind;
+          activityItem.textContent="DepEd · "+activity.title;
+          activityItem.title=activity.title+(activity.endDate
+            ?" — "+calendarSchoolYearDateRange(activity.date,activity.endDate)
+            :Array.isArray(activity.dates)
+              ?" — "+activity.dates.map(function(activityDate){
+                return calendarDateLabel(calendarDateFromIso(activityDate),{month:"long",day:"numeric",year:"numeric"});
+              }).join(", ")
+              :" — "+calendarDateLabel(calendarDateFromIso(activity.date),{month:"long",day:"numeric",year:"numeric"}));
+          activityItem.setAttribute("aria-label",activity.title+", DepEd school-calendar activity");
+          itemList.appendChild(activityItem);
         });
         (tasksByDate.get(isoDate)||[]).forEach(function(task){
           var taskItem=document.createElement("button");
@@ -12114,25 +12480,39 @@
   function stepAttendanceMonth(delta){
     var date=new Date(Number($("attendanceYear").value),Number($("attendanceMonth").value)-1+delta,1);
     var year=String(date.getFullYear());
-    if(!Array.from($("attendanceYear").options).some(function(option){return option.value===year}))return;
+    var nextMonth=year+"-"+String(date.getMonth()+1).padStart(2,"0");
+    if(!Array.from($("attendanceYear").options).some(function(option){return option.value===year})
+      ||!isAttendanceMonthAllowed(nextMonth,attendanceSchoolYearRange()))return;
     $("attendanceYear").value=year;
     $("attendanceMonth").value=String(date.getMonth()+1);
     changeAttendanceMonth();
   }
 
   function updateAttendanceNav(){
-    var years=Array.from($("attendanceYear").options).map(function(option){return Number(option.value)});
-    var year=Number($("attendanceYear").value);
-    var month=Number($("attendanceMonth").value);
-    $("attendancePrevMonth").disabled=year<=Math.min.apply(null,years)&&month===1;
-    $("attendanceNextMonth").disabled=year>=Math.max.apply(null,years)&&month===12;
+    var range=attendanceSchoolYearRange();
+    var month=selectedAttendanceMonth();
+    if(!range){
+      $("attendancePrevMonth").disabled=true;
+      $("attendanceNextMonth").disabled=true;
+      $("attendanceToday").disabled=true;
+      return;
+    }
+    $("attendancePrevMonth").disabled=month<=range.startDate.slice(0,7);
+    $("attendanceNextMonth").disabled=month>=range.endDate.slice(0,7);
+    var now=new Date();
+    var todayMonth=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    $("attendanceToday").disabled=!isAttendanceMonthAllowed(todayMonth,range);
   }
 
   function changeAttendanceMonth(){
+    var range=attendanceSchoolYearRange();
+    if(!range)return;
+    refreshAttendanceYears();
+    if(!isAttendanceMonthAllowed(selectedAttendanceMonth(),range))return;
     if(attendanceDirty&&!window.confirm("Discard unsaved attendance changes?")){
       $("attendanceYear").value=activeAttendanceMonth.slice(0,4);
       $("attendanceMonth").value=String(Number(activeAttendanceMonth.slice(5,7)));
-      updateAttendanceNav();
+      refreshAttendanceYears();
       return;
     }
     attendanceDirty=false;
@@ -12145,7 +12525,9 @@
   $("attendanceNextMonth").onclick=function(){stepAttendanceMonth(1)};
   $("attendanceToday").onclick=function(){
     var now=new Date();
-    if(selectedAttendanceMonth()===now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")){
+    var todayMonth=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    if(!isAttendanceMonthAllowed(todayMonth,attendanceSchoolYearRange()))return;
+    if(selectedAttendanceMonth()===todayMonth){
       scrollAttendanceToToday();
       return;
     }
@@ -12173,7 +12555,7 @@
       $("attendanceNotice").classList.add("error");
       return;
     }
-    if(!window.confirm("Clear all saved daily attendance marks and Holiday/No Class dates for "+month+"? Unsaved changes will be discarded. Cleared no-class dates will return to Class Day. Other months and monthly learner status notes will remain unchanged."))return;
+    if(!window.confirm("Clear saved attendance and Holiday/No Class dates within the configured school-year range for "+month+"? Unsaved changes will be discarded. Cleared no-class dates will return to Class Day. Other months and monthly learner status notes will remain unchanged."))return;
     var button=this;
     var editorControls=Array.from(document.querySelectorAll(
       "#attendanceRows select[data-student-id],#attendanceRows select.attendance-remark-select,#attendanceRows input.attendance-status-date,#attendanceRows input.attendance-reason-input,#attendanceHead .attendance-day-type,#attendanceHead .attendance-no-class-reason"
@@ -12202,7 +12584,7 @@
         .some(function(select){return select.value!==""})){
         throw new Error("Attendance was cleared, but some dropdowns did not reset to -. Refresh the selected month to verify the result.");
       }
-      $("attendanceNotice").textContent="Cleared "+result.deleted+" daily attendance entr"+(result.deleted===1?"y":"ies")+" and "+result.noClassDatesCleared+" Holiday/No Class date"+(result.noClassDatesCleared===1?"":"s")+" for "+month+". Those dates are now Class Day; other months and monthly learner status notes were not changed.";
+      $("attendanceNotice").textContent="Cleared "+result.deleted+" daily attendance entr"+(result.deleted===1?"y":"ies")+" and "+result.noClassDatesCleared+" Holiday/No Class date"+(result.noClassDatesCleared===1?"":"s")+" within the school-year date range for "+month+". Those dates are now Class Day; other months and monthly learner status notes were not changed.";
       await loadAttendanceSummary();
     }catch(error){
       $("attendanceNotice").textContent=error.message;
@@ -13357,14 +13739,14 @@
   };
   $("readingAddStudent").onclick=function(){showDashboardPage("students")};
   var teacherProfileSchoolFieldIds=new Set([
-    "teacherProfileSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId","teacherProfileRegion",
+    "teacherProfileSchoolYear","teacherProfileFirstDayOfSchool","teacherProfileEndOfSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId","teacherProfileRegion",
     "teacherProfileDivision","teacherProfileDistrict","teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"
   ]);
   function updateTeacherProfileDirtyState(){
     teacherProfileDetailsDirty=teacherProfileBasicDirty||teacherProfileSchoolDirty;
     teacherProfileDirty=teacherProfileDetailsDirty||teacherSubjectsDirty;
   }
-  ["teacherProfileName","teacherProfilePosition","teacherProfileEmail","teacherProfileClassroom","teacherProfileSectionsHandled","teacherProfileSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId","teacherProfileRegion","teacherProfileDivision","teacherProfileDistrict","teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"].forEach(function(id){
+  ["teacherProfileName","teacherProfilePosition","teacherProfileEmail","teacherProfileClassroom","teacherProfileSectionsHandled","teacherProfileSchoolYear","teacherProfileFirstDayOfSchool","teacherProfileEndOfSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId","teacherProfileRegion","teacherProfileDivision","teacherProfileDistrict","teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"].forEach(function(id){
     $(id).addEventListener("input",function(){
       var isSchoolField=teacherProfileSchoolFieldIds.has(id);
       if(isSchoolField)teacherProfileSchoolDirty=true;
@@ -13381,6 +13763,7 @@
         ||id==="teacherProfileSchoolHead"||id==="teacherProfileSchoolHeadPosition"){
         syncEnglishLessonPlanProfileFields();
       }
+      if(id==="teacherProfileSectionsHandled")syncTeacherSectionRenamePasswordField();
     });
   });
   $("teacherProfileSubjectsHandled").addEventListener("change",function(){
@@ -13477,14 +13860,51 @@
       classroomNumber:result.classroomNumber
     };
   }
+  function getTeacherSectionChanges(nextSections){
+    var removedSections=handledSections.filter(function(section){
+      return !nextSections.some(function(nextSection){
+        return nextSection.toLocaleLowerCase()===section.toLocaleLowerCase();
+      });
+    });
+    var addedSections=nextSections.filter(function(section){
+      return !handledSections.some(function(currentSection){
+        return currentSection.toLocaleLowerCase()===section.toLocaleLowerCase();
+      });
+    });
+    return {removed:removedSections,added:addedSections};
+  }
+  function getTeacherSectionRename(nextSections){
+    var changes=getTeacherSectionChanges(nextSections);
+    return changes.removed.length===1&&changes.added.length===1
+      ?{from:changes.removed[0],to:changes.added[0]}
+      :null;
+  }
+  function syncTeacherSectionRenamePasswordField(){
+    var renamedSection=getTeacherSectionRename(splitHandledList($("teacherProfileSectionsHandled").value));
+    var passwordField=$("teacherProfileSectionRenamePasswordField");
+    var passwordInput=$("teacherProfileSectionRenamePassword");
+    passwordField.hidden=!renamedSection;
+    passwordInput.required=Boolean(renamedSection);
+    if(!renamedSection)passwordInput.value="";
+    return renamedSection;
+  }
   async function saveTeacherBasicProfile(){
     var button=$("saveTeacherBasicProfile");
     $("teacherProfileBasicError").textContent="";
     $("teacherProfileBasicNotice").textContent="";
-    var invalidField=firstInvalidTeacherProfileField([
+    var sectionsToSave=splitHandledList($("teacherProfileSectionsHandled").value);
+    var sectionChanges=getTeacherSectionChanges(sectionsToSave);
+    var sectionRename=syncTeacherSectionRenamePasswordField();
+    if(sectionChanges.removed.length&&sectionChanges.added.length&&!sectionRename){
+      $("teacherProfileBasicError").textContent="Rename one section at a time so its students and saved records can be preserved.";
+      return;
+    }
+    var profileFieldIds=[
       "teacherProfileName","teacherProfilePosition","teacherProfileEmail",
       "teacherProfileClassroom","teacherProfileSectionsHandled"
-    ]);
+    ];
+    if(sectionRename)profileFieldIds.push("teacherProfileSectionRenamePassword");
+    var invalidField=firstInvalidTeacherProfileField(profileFieldIds);
     if(invalidField){
       invalidField.reportValidity();
       return;
@@ -13493,16 +13913,18 @@
     button.setAttribute("aria-busy","true");
     button.textContent="Saving...";
     try{
+      var profileData={
+        name:$("teacherProfileName").value,
+        position:$("teacherProfilePosition").value,
+        email:$("teacherProfileEmail").value,
+        classroomNumber:$("teacherProfileClassroom").value,
+        sectionsHandled:sectionsToSave
+      };
+      if(sectionRename)profileData.currentPassword=$("teacherProfileSectionRenamePassword").value;
       var result=await api("/api/teacher/profile",{
         method:"PUT",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          name:$("teacherProfileName").value,
-          position:$("teacherProfilePosition").value,
-          email:$("teacherProfileEmail").value,
-          classroomNumber:$("teacherProfileClassroom").value,
-          sectionsHandled:splitHandledList($("teacherProfileSectionsHandled").value)
-        })
+        body:JSON.stringify(profileData)
       });
       currentUser.name=result.name;
       currentUser.email=result.email;
@@ -13512,11 +13934,27 @@
       sectionGrades=result.sectionGrades||{};
       sectionSubjects=result.sectionSubjects||sectionSubjects;
       handledSubjects=result.subjectsHandled||[];
+      if(sectionRename){
+        rosterStudents.forEach(function(student){
+          if(String(student.section||"").toLocaleLowerCase()===sectionRename.from.toLocaleLowerCase()){
+            student.section=sectionRename.to;
+          }
+        });
+        if(activeStudentSection.toLocaleLowerCase()===sectionRename.from.toLocaleLowerCase()){
+          activeStudentSection=sectionRename.to;
+        }
+        if(teacherSubjectSection.toLocaleLowerCase()===sectionRename.from.toLocaleLowerCase()){
+          teacherSubjectSection=sectionRename.to;
+        }
+      }
       $("teacherProfileName").value=result.name;
       $("teacherProfilePosition").value=result.position||"";
       $("teacherProfileEmail").value=result.email;
       $("teacherProfileClassroom").value=result.classroomNumber;
+      $("teacherProfileSection").value=result.section||"";
       $("teacherProfileSectionsHandled").value=handledSections.join(", ");
+      $("teacherProfileSectionRenamePassword").value="";
+      syncTeacherSectionRenamePasswordField();
       updateSavedTeacherProfileIdentity(result);
       populateTeacherSubjectSections(teacherSubjectSection||result.section);
       populateSectionControls(activeStudentSection);
@@ -13547,7 +13985,7 @@
     $("teacherProfileSchoolError").textContent="";
     $("teacherProfileSchoolNotice").textContent="";
     var invalidField=firstInvalidTeacherProfileField([
-      "teacherProfileSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId",
+      "teacherProfileSchoolYear","teacherProfileFirstDayOfSchool","teacherProfileEndOfSchoolYear","teacherProfileSchoolName","teacherProfileSchoolId",
       "teacherProfileRegion","teacherProfileDivision","teacherProfileDistrict",
       "teacherProfileSchoolHead","teacherProfileSchoolHeadPosition"
     ]);
@@ -13571,6 +14009,8 @@
           email:teacherProfileSavedIdentity.email,
           classroomNumber:teacherProfileSavedIdentity.classroomNumber,
           schoolYear:$("teacherProfileSchoolYear").value,
+          firstDayOfSchool:$("teacherProfileFirstDayOfSchool").value,
+          endOfSchoolYear:$("teacherProfileEndOfSchoolYear").value,
           schoolName:$("teacherProfileSchoolName").value,
           schoolId:$("teacherProfileSchoolId").value,
           region:$("teacherProfileRegion").value,
@@ -13582,6 +14022,9 @@
       });
       updateSavedTeacherProfileIdentity(result);
       $("teacherProfileSchoolYear").value=result.schoolYear||"";
+      $("teacherProfileFirstDayOfSchool").value=result.firstDayOfSchool||"";
+      $("teacherProfileEndOfSchoolYear").value=result.endOfSchoolYear||"";
+      refreshAttendanceYears();
       $("teacherProfileSchoolName").value=result.schoolName||"";
       $("teacherProfileSchoolId").value=result.schoolId||"";
       $("teacherProfileRegion").value=result.region||"";
@@ -13593,6 +14036,7 @@
       teacherProfileSchoolDirty=false;
       updateTeacherProfileDirtyState();
       $("teacherProfileSchoolNotice").textContent="School Info saved successfully.";
+      if(!$("attendancePage").hidden)await loadAttendance();
     }catch(error){
       $("teacherProfileSchoolError").textContent=error.message;
     }finally{
@@ -14361,14 +14805,44 @@
   $("studentBirthdate").max=localISODate();
   function refreshAttendanceYears(){
     var yearSelect=$("attendanceYear");
-    var currentYear=new Date().getFullYear();
+    var monthSelect=$("attendanceMonth");
+    var range=attendanceSchoolYearRange();
+    if(!range){
+      yearSelect.replaceChildren();
+      yearSelect.disabled=true;
+      monthSelect.disabled=true;
+      $("attendancePrevMonth").disabled=true;
+      $("attendanceNextMonth").disabled=true;
+      $("attendanceToday").disabled=true;
+      return;
+    }
+    var startYear=Number(range.startDate.slice(0,4));
+    var endYear=Number(range.endDate.slice(0,4));
     var selectedYear=Number(yearSelect.value);
-    yearSelect.replaceChildren(
-      new Option(String(currentYear-1),String(currentYear-1)),
-      new Option(String(currentYear),String(currentYear)),
-      new Option(String(currentYear+1),String(currentYear+1))
-    );
-    yearSelect.value=String(selectedYear>=currentYear-1&&selectedYear<=currentYear+1?selectedYear:currentYear);
+    var selectedMonth=Number(monthSelect.value);
+    yearSelect.replaceChildren();
+    for(var year=startYear;year<=endYear;year++)yearSelect.add(new Option(String(year),String(year)));
+    var now=new Date();
+    var currentMonth=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    var selected=String(selectedYear).padStart(4,"0")+"-"+String(selectedMonth).padStart(2,"0");
+    if(!isAttendanceMonthAllowed(selected,range)){
+      if(selectedYear>=startYear&&selectedYear<=endYear){
+        selected=selectedYear===startYear
+          ?range.startDate.slice(0,7)
+          :selectedYear===endYear?range.endDate.slice(0,7):String(selectedYear)+"-01";
+      }else{
+        selected=isAttendanceMonthAllowed(currentMonth,range)?currentMonth:range.startDate.slice(0,7);
+      }
+    }
+    yearSelect.value=selected.slice(0,4);
+    Array.from(monthSelect.options).forEach(function(option){
+      var month=yearSelect.value+"-"+String(Number(option.value)).padStart(2,"0");
+      option.disabled=!isAttendanceMonthAllowed(month,range);
+    });
+    monthSelect.value=String(Number(selected.slice(5,7)));
+    yearSelect.disabled=false;
+    monthSelect.disabled=false;
+    updateAttendanceNav();
   }
   [
     "January","February","March","April","May","June",
