@@ -17,11 +17,20 @@
       <span><b>G</b>rade</span><span><b>R</b>ecords,</span><span><b>A</b>ssessment</span><span class="amp">&amp;</span><span><b>C</b>lassroom</span><span><b>E</b>ssentials</span>
     </div>
     <span class="brand-version">__APP_VERSION__</span>
-    <p class="brand-contact" aria-label="Contact information">
-      <a href="mailto:lugatimanbonn@gmail.com">Email: lugatimanbonn@gmail.com</a>
-      <a href="https://www.facebook.com/bonnervin.lugatiman.1" target="_blank" rel="noopener noreferrer">Facebook</a>
-      <a href="tel:09561209923">Mobile No.: 09561209923</a>
-    </p>
+    <div class="gd-contact-section" aria-label="Contact information">
+      <p class="gd-contact-desc">Reach out with any concerns, bug reports, or suggestions for future improvements.</p>
+      <div class="gd-contact-links">
+        <a href="mailto:lugatimanbonn@gmail.com" class="gd-contact-item">
+          <span class="gd-icon" aria-hidden="true">✉</span> lugatimanbonn@gmail.com
+        </a>
+        <a href="tel:09561209923" class="gd-contact-item">
+          <span class="gd-icon" aria-hidden="true">☎</span> 09561209923
+        </a>
+        <a href="https://www.facebook.com/bonnervin.lugatiman.1" class="gd-contact-item" target="_blank" rel="noopener noreferrer">
+          <span class="gd-icon" aria-hidden="true">f</span> Facebook
+        </a>
+      </div>
+    </div>
     <p id="tagline">Welcome back. Sign in to your classroom.</p>
   </header>
 
@@ -114,7 +123,7 @@
             <span class="nav-icon" aria-hidden="true">⌂</span>Dashboard
           </button>
           <button class="nav-link" id="navStudents" type="button" aria-current="page">
-            <span class="nav-icon" aria-hidden="true">▤</span>List of Students
+            <span class="nav-icon" aria-hidden="true">▤</span>Students' Roster
           </button>
           <button class="nav-link" id="navAttendance" type="button">
             <span class="nav-icon" aria-hidden="true">✓</span>Attendance
@@ -166,9 +175,6 @@
           </div>
           <button class="nav-link" id="navNutritionalStatus" type="button">
             <span class="nav-icon" aria-hidden="true">◉</span>Nutritional Status
-          </button>
-          <button class="nav-link" id="navInventory" type="button" disabled aria-label="Inventory, temporarily unavailable" title="Inventory is temporarily unavailable">
-            <span class="nav-icon" aria-hidden="true">▣</span>Inventory
           </button>
           <button class="nav-link" id="navTeacherProfile" type="button">
             <span class="nav-icon" aria-hidden="true">◉</span>Teacher Profile
@@ -281,7 +287,6 @@
                     <option value="literacy">Literacy</option>
                     <option value="numeracy">Numeracy</option>
                     <option value="wellbeing">Well-being</option>
-                    <option value="supplies">Classroom supplies</option>
                     <option value="deadlines">Deadlines</option>
                   </select>
                 </div>
@@ -366,19 +371,18 @@
               </section>
               <section class="data-card dashboard-card dashboard-span-half" data-dashboard-category="wellbeing" aria-labelledby="dashboardNutritionHeading">
                 <div class="dashboard-card-heading"><span class="dashboard-section-label">Well-being</span><h2 id="dashboardNutritionHeading">Nutritional status</h2></div>
-                <h3 class="dashboard-chart-heading">BMI-for-age</h3>
+                <div class="rma-period-tabs dashboard-nutrition-tabs" id="dashboardNutritionCycleTabs" role="tablist" aria-label="Nutritional assessment cycle">
+                  <button class="rma-period-tab" id="dashboardNutritionBosyTab" type="button" role="tab" aria-controls="dashboardBmiBar dashboardHeightBar" aria-selected="true" tabindex="0">BOSY</button>
+                  <button class="rma-period-tab" id="dashboardNutritionEosyTab" type="button" role="tab" aria-controls="dashboardBmiBar dashboardHeightBar" aria-selected="false" tabindex="-1">EOSY</button>
+                </div>
+                <p class="dashboard-latest-result" id="dashboardNutritionCycleSummary">BOSY · No measurements recorded.</p>
+                <h3 class="dashboard-chart-heading" id="dashboardBmiHeading">BOSY BMI-for-age</h3>
                 <div class="dashboard-chart-slot dashboard-stack-slot" id="dashboardBmiBar" aria-busy="true"></div>
                 <ul class="dashboard-legend dashboard-legend-compact" id="dashboardBmiLegend"></ul>
-                <h3 class="dashboard-chart-heading dashboard-secondary-heading">Height-for-age</h3>
+                <h3 class="dashboard-chart-heading dashboard-secondary-heading" id="dashboardHeightHeading">BOSY height-for-age</h3>
                 <div class="dashboard-chart-slot dashboard-stack-slot" id="dashboardHeightBar" aria-busy="true"></div>
                 <ul class="dashboard-legend dashboard-legend-compact" id="dashboardHeightLegend"></ul>
                 <button class="btn ghost dashboard-inline-action" id="dashboardOpenNutrition" type="button">Enter measurements</button>
-              </section>
-              <section class="data-card dashboard-card dashboard-span-half" data-dashboard-category="supplies" aria-labelledby="dashboardInventoryHeading">
-                <div class="dashboard-card-heading"><span class="dashboard-section-label">Classroom supplies</span><h2 id="dashboardInventoryHeading">Low stock alerts</h2></div>
-                <ul class="dashboard-alert-list" id="dashboardLowStockList" aria-busy="true"></ul>
-                <p class="dashboard-empty-inline" id="dashboardLowStockEmpty" hidden></p>
-                <button class="btn ghost dashboard-inline-action" id="dashboardOpenInventory" type="button">Open inventory</button>
               </section>
               <div class="dashboard-mps-deadline-row" id="dashboardMpsDeadlineRow">
                 <section class="data-card dashboard-card dashboard-mps-card" data-dashboard-category="academic" aria-labelledby="dashboardMpsYearHeading">
@@ -435,16 +439,21 @@
           </section>
           <section id="nutritionalStatusPage" aria-labelledby="nutritionalStatusTitle" hidden>
             <div class="page-heading">
-              <div><h1 id="nutritionalStatusTitle">Nutritional Status</h1><p>Student roster for your class.</p></div>
+              <div><h1 id="nutritionalStatusTitle">Nutritional Status</h1><p>Record beginning- and end-of-year learner measurements.</p></div>
               <div class="heading-actions">
-                <label class="nutritional-measurement-date-control" for="nutritionalMeasurementDate">Date of weighing and measurement
+                <label class="nutritional-measurement-date-control" for="nutritionalMeasurementDate"><span id="nutritionalMeasurementDateLabelText">Date of BOSY weighing and measurement</span>
                   <input id="nutritionalMeasurementDate" type="date">
                 </label>
                 <button class="btn ghost" id="refreshNutritionalRoster" type="button">Refresh roster</button>
               </div>
             </div>
+            <div class="rma-period-tabs nutritional-cycle-tabs" id="nutritionalCycleTabs" role="tablist" aria-label="Nutritional assessment cycle">
+              <button class="rma-period-tab" id="nutritionalBosyTab" type="button" role="tab" aria-controls="nutritionalAssessmentPanel" aria-selected="true" tabindex="0">BOSY (Beginning of Year)</button>
+              <button class="rma-period-tab" id="nutritionalEosyTab" type="button" role="tab" aria-controls="nutritionalAssessmentPanel" aria-selected="false" tabindex="-1">EOSY (End of Year)</button>
+            </div>
+            <section id="nutritionalAssessmentPanel" role="tabpanel" aria-labelledby="nutritionalBosyTab">
             <div class="data-card">
-              <div class="data-card-header"><h2>Students</h2><span class="student-count" id="nutritionalRosterCount">Loading students...</span></div>
+              <div class="data-card-header"><h2 id="nutritionalRosterHeading">BOSY students</h2><span class="student-count" id="nutritionalRosterCount">Loading students...</span></div>
               <p class="drag-scroll-hint">Drag the table left or right to view all nutritional measurements.</p>
               <div class="table-wrap drag-scroll-wrap">
                 <table class="student-table nutritional-status-table" id="nutritionalRosterTable" hidden>
@@ -459,39 +468,8 @@
                 <button class="btn nutritional-save-button" id="saveNutritionalMeasurements" type="button" disabled>Save and Lock</button>
               </div>
             </div>
+            </section>
             <p class="notice" id="nutritionalRosterNotice" role="status" aria-live="polite"></p>
-          </section>
-          <section id="inventoryPage" aria-labelledby="inventoryTitle" hidden>
-            <div class="page-heading">
-              <div><h1 id="inventoryTitle">Inventory</h1><p>Track classroom supplies and monitor items that need replenishment.</p></div>
-              <div class="heading-actions"><button class="btn ghost" id="refreshInventory" type="button">Refresh</button></div>
-            </div>
-            <form class="data-card" id="inventoryForm">
-              <div class="data-card-header"><h2 id="inventoryFormTitle">Add classroom item</h2></div>
-              <div class="form-grid">
-                <div class="form-field"><label for="inventoryItem">Item</label><input id="inventoryItem" maxlength="120" required placeholder="e.g. Bond paper"></div>
-                <div class="form-field"><label for="inventoryCategory">Category</label><input id="inventoryCategory" maxlength="80" placeholder="e.g. Supplies"></div>
-                <div class="form-field"><label for="inventoryQuantity">Quantity</label><input id="inventoryQuantity" type="number" min="0" max="1000000" step="0.01" required value="0"></div>
-                <div class="form-field"><label for="inventoryUnit">Unit</label><input id="inventoryUnit" maxlength="40" placeholder="e.g. reams, pieces"></div>
-                <div class="form-field"><label for="inventoryReorderLevel">Reorder level</label><input id="inventoryReorderLevel" type="number" min="0" max="1000000" step="0.01" required value="0"></div>
-                <div class="form-field"><label for="inventoryNotes">Notes</label><input id="inventoryNotes" maxlength="500" placeholder="Optional notes"></div>
-              </div>
-              <div class="heading-actions">
-                <button class="btn" id="saveInventory" type="submit">Add item</button>
-                <button class="btn ghost" id="cancelInventoryEdit" type="button" hidden>Cancel edit</button>
-              </div>
-              <p class="notice" id="inventoryNotice" role="status" aria-live="polite"></p>
-            </form>
-            <div class="data-card">
-              <div class="data-card-header"><h2>Classroom supplies</h2><span class="student-count" id="inventoryCount">Loading items...</span></div>
-              <div class="table-wrap">
-                <table class="student-table" id="inventoryTable" hidden>
-                  <thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Reorder level</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
-                  <tbody id="inventoryRows"></tbody>
-                </table>
-                <div class="empty-state" id="inventoryEmpty" hidden><h3>No inventory items yet</h3><p>Add classroom supplies to start tracking stock.</p></div>
-              </div>
-            </div>
           </section>
           <section id="attendancePage" aria-labelledby="attendanceTitle" hidden>
             <div class="page-heading">
@@ -584,9 +562,9 @@
               <div class="data-card">
                 <div class="data-card-header"><h2>Summary Of Attendance</h2><button class="attendance-refresh" id="refreshAttendanceSummary" type="button">Refresh</button></div>
                 <p class="attendance-summary-range" id="attendanceSummaryRange">Totals are calculated from saved attendance records.</p>
-                <p class="drag-scroll-hint">Workbook view: pick a sheet tab at the bottom to see one month, or <b>All Months</b> for the full-year totals.</p>
+                <p class="drag-scroll-hint">The full-year table includes every month from the first school day through the end of the school year. Select a month below to focus its totals.</p>
                 <div class="attendance-workbook">
-                  <div class="attendance-formula-bar"><span class="attendance-formula-name" id="attendanceSheetName">All Months</span><span class="attendance-formula-text" id="attendanceSheetNote"></span></div>
+                  <div class="attendance-formula-bar"><span class="attendance-formula-name" id="attendanceSheetName">Full School Year</span><span class="attendance-formula-text" id="attendanceSheetNote"></span></div>
                   <div class="table-wrap drag-scroll-wrap attendance-summary-scroll" role="region" aria-label="Attendance totals by month" tabindex="0">
                     <table class="student-table attendance-summary-table">
                       <thead id="attendanceSummaryHead"></thead>
@@ -599,7 +577,7 @@
                 </div>
                 <div class="attendance-summary-guidance">
                   <strong>How totals are counted</strong>
-                  <p>Present and Tardy each count as one present day; Absent counts as one absent day. Each recorded month shows separate Present and Absent totals, followed by overall totals.</p>
+                  <p>Present and Tardy each count as one present day; Absent counts as one absent day. Each month shows separate Present and Absent totals, followed by school-year totals.</p>
                   <p>Excused, unmarked days, Holiday/No Class dates, and locked status dates are not counted.</p>
                 </div>
               </div>
@@ -1549,7 +1527,7 @@
                       <input id="teacherSchoolLogoFile" type="file" accept="image/jpeg,image/png,image/webp" hidden>
                       <button class="btn ghost" id="chooseSchoolLogo" type="button">Upload / Change Logo</button>
                       <button class="btn ghost" id="removeSchoolLogo" type="button" hidden>Remove Logo</button>
-                      <p class="field-hint">JPEG, PNG, or WebP. Maximum file size: 2 MB.</p>
+                      <p class="field-hint">JPEG, PNG, or WebP. Maximum file size: 2 MB. The circular preview removes a similar-colored background at the image edges; your original logo is preserved for reports.</p>
                     </div>
                   </div></div>
                 </div>
@@ -1608,6 +1586,8 @@
                       <option value="slate">Modern Slate</option>
                       <option value="nord">Nord Frost</option>
                       <option value="cherry">Cherry Noir</option>
+                      <option value="electric">Electric Bloom</option>
+                      <option value="navy-gold">Navy &amp; Gold</option>
                     </select>
                     <p class="field-hint">This preference is saved on this device and restored when you return.</p>
                   </div>
@@ -1664,13 +1644,13 @@
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.65</p>
+                  <p class="developer-update-meta">Version 1.0.66</p>
                   <ul class="developer-update-list">
-                    <li>EPP imports accept EPP/TLE workbooks when EPP is selected.</li>
-                    <li>Section renames require the current password and keep assigned students and saved records linked.</li>
-                    <li>Attendance respects the configured school-year dates and uses the DepEd 2026-2027 school calendar.</li>
-                    <li>SF10 uploads import prior-grade details without changing unrelated term grades.</li>
-                    <li>Removed the unused PDS endpoint so profiles no longer depend on a missing workbook.</li>
+                    <li>Nutritional status supports separate BOSY and EOSY assessments.</li>
+                    <li>Improved the dashboard, page spacing, profile tabs, and theme options.</li>
+                    <li>Made tarpaulin controls collapsible and streamlined sidebar navigation.</li>
+                    <li>Improved circular school-logo previews without changing the original upload.</li>
+                    <li>Reduced unnecessary work during rapid PHIL-IRI input for a more responsive experience.</li>
                   </ul>
                 </div>
               </section>
@@ -1690,7 +1670,7 @@
             </div>
             <section class="tools-panel" id="tarpaulinPanel" aria-labelledby="tarpaulinMakerTitle">
               <div class="tarpaulin-editor">
-                <section class="data-card tarpaulin-controls-card" aria-labelledby="tarpaulinMakerTitle">
+                <section class="data-card tarpaulin-controls-card" id="tarpaulinControlsCard" aria-labelledby="tarpaulinMakerTitle">
                   <div class="tarpaulin-editor-heading"><h2 id="tarpaulinMakerTitle">Design your banner</h2><p>Upload a picture, set the banner size, and adjust how it fits.</p></div>
                   <div class="settings-card-body tool-controls" id="tarpaulinControls">
                     <section class="tarpaulin-control-section" aria-labelledby="tarpaulinPictureHeading">
@@ -1736,7 +1716,7 @@
                 </section>
                 <div class="tarpaulin-resize-handle" id="tarpaulinResizeHandle" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize tarpaulin controls and live preview" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="320" aria-valuetext="320 pixels for controls" title="Drag to resize, or use the arrow keys"><span aria-hidden="true">⋮</span></div>
                 <section class="data-card tarpaulin-preview-card" aria-labelledby="tarpaulinPreviewHeading">
-                  <div class="tarpaulin-preview-toolbar"><h2 id="tarpaulinPreviewHeading">Live preview</h2><span class="tarpaulin-preview-size" id="tarpaulinDimensions">300 cm × 100 cm</span><span class="tarpaulin-preview-size" id="tarpaulinSheetCount" aria-live="polite">Calculating sheets</span><div class="tarpaulin-zoom-controls" role="group" aria-label="Live preview zoom"><button id="tarpaulinZoomOut" type="button" aria-label="Zoom out" title="Zoom out">−</button><output class="tarpaulin-zoom-level" id="tarpaulinZoomLevel" aria-live="polite">100%</output><button id="tarpaulinZoomIn" type="button" aria-label="Zoom in" title="Zoom in">+</button></div></div>
+                  <div class="tarpaulin-preview-toolbar"><h2 id="tarpaulinPreviewHeading">Live preview</h2><button class="tarpaulin-controls-toggle" id="tarpaulinControlsToggle" type="button" aria-controls="tarpaulinControlsCard" aria-expanded="true">Hide controls</button><span class="tarpaulin-preview-size" id="tarpaulinDimensions">300 cm × 100 cm</span><span class="tarpaulin-preview-size" id="tarpaulinSheetCount" aria-live="polite">Calculating sheets</span><div class="tarpaulin-zoom-controls" role="group" aria-label="Live preview zoom"><button id="tarpaulinZoomOut" type="button" aria-label="Zoom out" title="Zoom out">−</button><output class="tarpaulin-zoom-level" id="tarpaulinZoomLevel" aria-live="polite">100%</output><button id="tarpaulinZoomIn" type="button" aria-label="Zoom in" title="Zoom in">+</button></div></div>
                   <div class="settings-card-body">
                     <div class="tarpaulin-preview-wrap"><div class="tarpaulin-preview" id="tarpaulinPreview"><img class="tarpaulin-preview-image" id="tarpaulinPreviewImage" alt="" hidden><div class="tarpaulin-preview-empty" id="tarpaulinPreviewEmpty"><span aria-hidden="true">▧</span><strong>Upload a picture to begin</strong><span>Your banner will appear here</span></div><div class="tarpaulin-sheet-guides" id="tarpaulinSheetGuides" aria-hidden="true"></div></div></div>
                     <p class="tarpaulin-size-label" id="tarpaulinPrintHint">Margins: 1 in at the top and left, 0.5 in at the right and bottom. Each page prints a unique banner segment; align the scissor-marked printable edges and tape from the back.</p>
@@ -2073,17 +2053,23 @@
                   <span><i class="calendar-legend-task"></i>Your task</span>
                 </div>
                 <section class="data-card teacher-calendar-school-year" aria-labelledby="teacherCalendarSchoolYearHeading">
-                  <div class="teacher-calendar-school-year-heading">
-                    <div>
-                      <h3 id="teacherCalendarSchoolYearHeading">DepEd School Calendar · SY 2026–2027</h3>
-                      <p id="teacherCalendarSchoolYearSummary" role="status" aria-live="polite">Loading official term dates…</p>
+                  <details class="teacher-calendar-school-year-details" open>
+                    <summary class="teacher-calendar-school-year-heading">
+                      <div>
+                        <h3 id="teacherCalendarSchoolYearHeading">DepEd School Calendar · SY 2026–2027</h3>
+                        <p id="teacherCalendarSchoolYearSummary" role="status" aria-live="polite">Loading official term dates…</p>
+                      </div>
+                      <span class="teacher-calendar-school-year-toggle" aria-hidden="true"></span>
+                    </summary>
+                    <div class="teacher-calendar-school-year-content">
+                      <ol class="teacher-calendar-term-list" id="teacherCalendarTermList"></ol>
+                      <p class="teacher-calendar-school-year-note">Term and block ranges are from Annex B. Class-day counts exclude weekends and legal holidays.</p>
                     </div>
-                  </div>
-                  <ol class="teacher-calendar-term-list" id="teacherCalendarTermList"></ol>
-                  <p class="teacher-calendar-school-year-note">Term and block ranges are from Annex B. Class-day counts exclude weekends and legal holidays.</p>
+                  </details>
                 </section>
-                <section class="data-card" aria-label="Calendar">
+                <section class="data-card" aria-labelledby="teacherCalendarGridViewLabel">
                   <div class="settings-card-body teacher-calendar-grid-wrap">
+                    <h3 class="teacher-calendar-grid-view-label" id="teacherCalendarGridViewLabel">Month</h3>
                     <div class="teacher-calendar-weekdays" aria-hidden="true">
                       <span class="teacher-calendar-weekday">Sun</span><span class="teacher-calendar-weekday">Mon</span>
                       <span class="teacher-calendar-weekday">Tue</span><span class="teacher-calendar-weekday">Wed</span>

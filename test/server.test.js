@@ -636,12 +636,49 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
 
 test("Tarpapel controls and preview can be resized with pointer or keyboard", async () => {
   const portalPage = await readPortalPageSource();
+  assert.match(portalPage, /id="tarpaulinControlsToggle"[^>]*aria-controls="tarpaulinControlsCard"[^>]*aria-expanded="true">Hide controls<\/button>/);
+  assert.match(portalPage, /class="data-card tarpaulin-controls-card"[^>]*id="tarpaulinControlsCard"/);
+  assert.match(portalPage, /tarpaulinControlsToggle\.addEventListener\("click",function\(\)\{\s*setTarpaulinControlsCollapsed\(!tarpaulinControlsCollapsed\)/);
+  assert.match(portalPage, /\.tarpaulin-editor\.controls-collapsed\{grid-template-columns:minmax\(0,1fr\)\}/);
+  assert.match(portalPage, /\.tarpaulin-editor\.controls-collapsed \.tarpaulin-controls-card,\.tarpaulin-editor\.controls-collapsed \.tarpaulin-resize-handle\{display:none\}/);
   assert.match(portalPage, /id="tarpaulinResizeHandle" role="separator" tabindex="0"/);
   assert.match(portalPage, /tarpaulinResizeHandle\.addEventListener\("pointerdown"/);
   assert.match(portalPage, /if\(event\.key==="ArrowLeft"\)nextWidth-=24/);
   assert.match(portalPage, /else if\(event\.key==="Home"\)nextWidth=limits\.min/);
   assert.match(portalPage, /else if\(event\.key==="End"\)nextWidth=limits\.max/);
   assert.match(portalPage, /@media\(max-width:760px\)\{[\s\S]*?\.tarpaulin-resize-handle\{display:none\}/);
+
+  const setControlsCollapsed = portalPage.match(/function setTarpaulinControlsCollapsed\(collapsed\)\{[\s\S]*?\n    \}/);
+  assert.ok(setControlsCollapsed, "Tarpaulin controls collapse helper exists");
+  const toggleAttributes = {};
+  const toggleButton = {
+    textContent: "",
+    setAttribute(name, value) { toggleAttributes[name] = value; },
+  };
+  const collapseClass = { value: false };
+  let resizeSyncCount = 0;
+  const collapseContext = vm.createContext({
+    tarpaulinControlsCollapsed: false,
+    tarpaulinControlsToggle: toggleButton,
+    tarpaulinEditor: {
+      classList: {
+        toggle(name, value) {
+          assert.equal(name, "controls-collapsed");
+          collapseClass.value = value;
+        },
+      },
+    },
+    syncTarpaulinResizeHandle() { resizeSyncCount += 1; },
+  });
+  vm.runInContext(`${setControlsCollapsed[0]}\nsetTarpaulinControlsCollapsed(true)`, collapseContext);
+  assert.equal(collapseClass.value, true);
+  assert.equal(toggleButton.textContent, "Show controls");
+  assert.equal(toggleAttributes["aria-expanded"], "false");
+  vm.runInContext("setTarpaulinControlsCollapsed(false)", collapseContext);
+  assert.equal(collapseClass.value, false);
+  assert.equal(toggleButton.textContent, "Hide controls");
+  assert.equal(toggleAttributes["aria-expanded"], "true");
+  assert.equal(resizeSyncCount, 1);
 
   const resizeLimits = portalPage.match(/function tarpaulinResizeLimits\(\)\{[\s\S]*?\n    \}/);
   const setControlsWidth = portalPage.match(/function setTarpaulinControlsWidth\(width\)\{[\s\S]*?\n    \}/);
@@ -1427,6 +1464,43 @@ test("Phil-Iri and RMA are nested under Assessment Dashboard", async () => {
   assert.equal((portalPage.match(/id="navRma"/g) || []).length, 1);
 });
 
+test("PHIL-IRI class search coalesces rapid input before rendering", async () => {
+  const portalPage = await readPortalPageSource();
+  const searchScheduler = portalPage.match(
+    /function schedulePhilIriClassReport\(\)\{[\s\S]*?\n  \}/,
+  );
+  assert.ok(searchScheduler, "PHIL-IRI class search scheduler exists");
+  assert.match(portalPage, /\$\("philIriClassSearch"\)\.oninput=schedulePhilIriClassReport/);
+
+  const pendingTimers = new Map();
+  const renderCalls = [];
+  let nextTimerId = 0;
+  const context = {
+    philIriClassReportTimer: 0,
+    window: {
+      clearTimeout(timerId) {
+        pendingTimers.delete(timerId);
+      },
+      setTimeout(callback, delay) {
+        const timerId = ++nextTimerId;
+        pendingTimers.set(timerId, { callback, delay });
+        return timerId;
+      },
+    },
+    renderPhilIriClassReport() {
+      renderCalls.push(true);
+    },
+  };
+  vm.runInNewContext(searchScheduler[0], context);
+  vm.runInNewContext("schedulePhilIriClassReport(); schedulePhilIriClassReport();", context);
+
+  assert.equal(pendingTimers.size, 1);
+  assert.equal(renderCalls.length, 0);
+  const [timer] = pendingTimers.values();
+  timer.callback();
+  assert.equal(renderCalls.length, 1);
+});
+
 test("SF 10 term grades follow the matching Classified as Grade field", async () => {
   const portalPage = await readPortalPageSource();
   const gradeSubjects = portalPage.match(/var sf10GradeSubjects=\[[\s\S]*?\n  \];/);
@@ -1681,11 +1755,11 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
-      "EPP imports accept EPP/TLE workbooks when EPP is selected.",
-      "Section renames require the current password and keep assigned students and saved records linked.",
-      "Attendance respects the configured school-year dates and uses the DepEd 2026-2027 school calendar.",
-      "SF10 uploads import prior-grade details without changing unrelated term grades.",
-      "Removed the unused PDS endpoint so profiles no longer depend on a missing workbook.",
+      "Nutritional status supports separate BOSY and EOSY assessments.",
+      "Improved the dashboard, page spacing, profile tabs, and theme options.",
+      "Made tarpaulin controls collapsible and streamlined sidebar navigation.",
+      "Improved circular school-logo previews without changing the original upload.",
+      "Reduced unnecessary work during rapid PHIL-IRI input for a more responsive experience.",
     ],
   );
 });
@@ -3541,7 +3615,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /\.sidebar-footer-icon\{display:block;width:48px;height:48px;margin:14px auto 0/);
   assert.ok(portalPage.includes(`class="sidebar-footer-version">GraceDesk · Version ${require("../package.json").version}</span>`));
   assert.ok(portalPage.includes(`class="brand-version">${require("../package.json").version}</span>`));
-  assert.match(portalPage, /class="brand-contact" aria-label="Contact information"/);
+  assert.match(portalPage, /class="gd-contact-section" aria-label="Contact information"/);
   assert.match(portalPage, /mailto:lugatimanbonn@gmail\.com/);
   assert.match(portalPage, /09561209923/);
   assert.doesNotMatch(portalPage, /checklistPanel|checklistRefreshRoster|checklistAddColumn|checklistTable|renderChecklist/);
@@ -3872,6 +3946,11 @@ test("registrations persist in the workbook and can sign in after a restart", as
   }
   assert.doesNotMatch(nutritionalRosterTable, /<th>Measurement Date<\/th>/);
   assert.match(portalPage, /id="nutritionalMeasurementDate" type="date"/);
+  assert.match(portalPage, /id="nutritionalBosyTab"[^>]*>BOSY \(Beginning of Year\)<\/button>/);
+  assert.match(portalPage, /id="nutritionalEosyTab"[^>]*>EOSY \(End of Year\)<\/button>/);
+  assert.match(portalPage, /id="dashboardNutritionCycleTabs"[^>]*role="tablist"/);
+  assert.match(portalPage, /id="dashboardNutritionCycleSummary"/);
+  assert.match(portalPage, /body:JSON\.stringify\(\{\s*cycle:row\.dataset\.assessmentCycle/);
   assert.match(portalPage, /id="exportSF8"[^>]*disabled>Generate SF8<\/button>/);
   assert.match(portalPage, /var hasStudents=rows\.querySelectorAll\("tr"\)\.length>0/);
   assert.match(portalPage, /async function exportNutritionalStatusSF8/);
@@ -3963,8 +4042,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /saveButton\.removeAttribute\("aria-busy"\)/);
   assert.match(portalPage, /async function saveAllNutritionalMeasurements/);
   assert.match(portalPage, /\$\("saveNutritionalMeasurements"\)\.onclick=saveAllNutritionalMeasurements/);
-  assert.match(portalPage, /student\.bmiCategory\|\|"Restart server"/);
-  assert.match(portalPage, /student\.heightForAgeStatus\|\|"Restart server"/);
+  assert.match(portalPage, /assessment\.bmiCategory\|\|"Restart server"/);
+  assert.match(portalPage, /assessment\.heightForAgeStatus\|\|"Restart server"/);
   assert.match(portalPage, /result\.bmiCategory/);
   assert.match(portalPage, /result\.heightForAgeStatus/);
   assert.match(portalPage, /hasWhoResults\?result\.bmiCategory:"Restart server"/);
@@ -4074,7 +4153,9 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /percentage score = total score ÷ the selected grade-level maximum/i);
   assert.match(portalPage, /if\(rmaDirty&&!window\.confirm\("Discard unsaved RMA assessment changes\?"\)\)return;/);
   assert.match(portalPage, /Print \/ Save PDF/);
-  assert.match(portalPage, /\.attendance-summary-table th:nth-child\(2\),\.attendance-summary-table td:nth-child\(2\)\{position:sticky;left:48px/);
+  assert.match(portalPage, /\.attendance-summary-table th\.attendance-summary-corner:nth-child\(2\),\.attendance-summary-table tbody td:nth-child\(2\)\{position:sticky;left:var\(--attendance-index-width\)/);
+  assert.match(portalPage, /attendance-summary-head-group/);
+  assert.match(portalPage, /top\.colSpan=2/);
   assert.match(portalPage, /api\("\/api\/attendance\/summary"\)/);
   assert.doesNotMatch(portalPage, /attendance-quick-check|attendanceQuickDate|attendanceReasonStudent|attendanceReasonEntry|attendanceMarkAllPresent|attendanceQuickProgress/);
   assert.match(portalPage, /class="attendance-guidance" aria-label="Attendance recording guidance"[\s\S]*?Daily attendance marks[\s\S]*?Blank means Present[\s\S]*?CC\/X for Absent/);
@@ -4091,6 +4172,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /link\.download=filename;[\s\S]*?link\.click\(\);/);
   assert.ok(portalPage.indexOf('id="navSettings"') > portalPage.indexOf('id="navTeacherProfile"'));
   assert.ok(portalPage.indexOf('id="navTools"') > portalPage.indexOf('id="navSettings"'));
+  assert.match(portalPage, /id="navSettings"[^>]*>[\s\S]*?Settings[\s\S]*?id="navTools"/);
   assert.match(portalPage, /id="navTools"[^>]*>[\s\S]*?Tools/);
   assert.match(portalPage, /id="settingsPage"/);
   assert.match(portalPage, /id="toolsPage"[^>]*hidden>[\s\S]*?label for="toolsSelector">Choose a tool[\s\S]*?id="toolsSelector"[^>]*aria-controls="tarpaulinPanel"[\s\S]*?value="tarpaulinPanel" selected>Tarpapel Maker[\s\S]*?value="calendarPanel">Calendar[\s\S]*?value="moreToolsPanel">More tools/);
@@ -4360,8 +4442,12 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /id="calendarPanel" aria-labelledby="teacherCalendarHeading" hidden>[\s\S]*?id="teacherCalendarGrid"/);
   assert.match(portalPage, /id="teacherCalendarMunicipality"/);
   assert.match(portalPage, /id="teacherCalendarMonthView"[\s\S]*?id="teacherCalendarWeekView"/);
+  assert.match(portalPage, /aria-labelledby="teacherCalendarGridViewLabel"[\s\S]*?id="teacherCalendarGridViewLabel">Month<\/h3>[\s\S]*?class="teacher-calendar-weekdays"/);
+  assert.match(portalPage, /\$\("teacherCalendarGridViewLabel"\)\.textContent=calendarState\.view==="week"\?"Week":"Month"/);
   assert.match(portalPage, /id="teacherCalendarSchoolYearHeading">DepEd School Calendar · SY 2026–2027/);
+  assert.match(portalPage, /<details class="teacher-calendar-school-year-details" open>[\s\S]*?<summary class="teacher-calendar-school-year-heading">[\s\S]*?id="teacherCalendarSchoolYearHeading"[\s\S]*?<\/summary>[\s\S]*?<ol class="teacher-calendar-term-list"/);
   assert.match(portalPage, /id="teacherCalendarTermList"/);
+  assert.match(portalPage, /teacher-calendar-school-year-details\[open\] \.teacher-calendar-school-year-toggle/);
   assert.match(portalPage, /function renderTeacherCalendarSchoolYear\(schedule\)/);
   assert.match(portalPage, /function calendarSchoolActivityDates\(activity\)/);
   assert.match(portalPage, /function calendarSchoolActivityIndicatorLabel\(kind\)/);
@@ -4396,14 +4482,14 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.ok(portalPage.indexOf('id="navDashboard"') < portalPage.indexOf('id="navStudents"'));
   assert.match(portalPage, /<title>GraceDesk · Teach, Track, Thrive\.<\/title>/);
   assert.match(portalPage, /document\.title=portalName\+" · "\+\(isParentsEntry\?"GraceDesk":"Teach, Track, Thrive\."\)/);
-  assert.match(portalPage, /id="navInventory" type="button" disabled aria-label="Inventory, temporarily unavailable" title="Inventory is temporarily unavailable"/);
+  assert.doesNotMatch(portalPage, /navInventory|inventoryPage|dashboardOpenInventory|inventoryForm|\/api\/inventory/);
   assert.match(portalPage, /id="dashboardPage" aria-labelledby="dashboardTitle" hidden>[\s\S]*?id="dashboardActiveCount"[\s\S]*?id="dashboardOpenCalendar"/);
   assert.match(portalPage, /async function enter\(user\)\{[\s\S]*?if\(user\.role==="teacher"\)\{[\s\S]*?showDashboardPage\("dashboard"\);[\s\S]*?\}else\{/);
   assert.match(portalPage, /function loadDashboardOverview\(\)\{\s*initializeDashboard\(\);\s*\}/);
   assert.match(portalPage, /var initializeDashboard=\(function\(\)\{[\s\S]*?function dashboardSvgEl\(name,attrs,text\)/);
   assert.match(portalPage, /function refreshDashboardData\(\)[\s\S]*?\/api\/attendance\/summary[\s\S]*?\/api\/grades\/summary[\s\S]*?\/api\/math-assessments/);
   assert.match(portalPage, /dashboardErrors\[key\]=error&&error\.message/);
-  assert.match(portalPage, /id="dashboardReadingLevels"[\s\S]*?id="dashboardRmaTrend"[\s\S]*?id="dashboardLowStockList"/);
+  assert.match(portalPage, /id="dashboardReadingLevels"[\s\S]*?id="dashboardRmaTrend"/);
   assert.match(portalPage, /id="dashboardMpsYearHeading">Whole-year MPS by subject[\s\S]*?id="dashboardMpsYearChart"[\s\S]*?id="dashboardDeadlinesHeading">Upcoming deadlines/);
   assert.match(portalPage, /async function dashboardLoadYearMps\(version\)[\s\S]*?getTeacherSubjectsForSection\(reportSection\)[\s\S]*?\/api\/e-class\/record"\+query/);
   assert.match(portalPage, /Term 1–3 · "\+typeLabel\+" · Mean Percentage Score/);
@@ -4479,7 +4565,9 @@ test("registrations persist in the workbook and can sign in after a restart", as
   const appearanceOptions = portalPage.match(/id="appearanceSetting">([\s\S]*?)<\/select>/)[1];
   const appearanceValues = Array.from(appearanceOptions.matchAll(/<option value="([^"]+)"/g), (match) => match[1]);
   assert.deepEqual(appearanceValues.slice(0, 3), ["system", "light", "dark"]);
-  assert.equal(appearanceValues.length - 3, 20, "Appearance includes 20 custom themes in addition to the standard choices");
+  assert.equal(appearanceValues.length - 3, 22, "Appearance includes 22 custom themes in addition to the standard choices");
+  assert.ok(appearanceValues.includes("navy-gold"));
+  assert.ok(portalPage.includes('var appTheme="navy-gold"'), "Navy & Gold is the default appearance");
   for (const theme of appearanceValues.slice(3)) {
     assert.ok(portalPage.includes(`:root[data-theme="${theme}"]`), `${theme} has a theme palette`);
   }
@@ -4791,6 +4879,21 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(getSchoolLogoResponse.status, 200);
   assert.equal(getSchoolLogoResponse.headers.get("content-type"), "image/png");
   assert.deepEqual(Buffer.from(await getSchoolLogoResponse.arrayBuffer()), profilePng);
+  const schoolLogoPreviewResponse = await fetch(`${baseUrl}/api/teacher/profile/school-logo/preview`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(schoolLogoPreviewResponse.status, 200);
+  assert.equal(schoolLogoPreviewResponse.headers.get("content-type"), "image/png");
+  const schoolLogoPreview = Buffer.from(await schoolLogoPreviewResponse.arrayBuffer());
+  const schoolLogoPreviewImage = await sharp(schoolLogoPreview).raw().toBuffer({ resolveWithObject: true });
+  assert.equal(schoolLogoPreviewImage.info.width, 512);
+  assert.equal(schoolLogoPreviewImage.info.height, 512);
+  assert.equal(schoolLogoPreviewImage.info.channels, 4);
+  assert.equal(schoolLogoPreviewImage.data[3], 0, "the circular preview has transparent corners");
+  const schoolLogoCenterOffset = (256 * schoolLogoPreviewImage.info.width + 256) * 4;
+  assert.ok(schoolLogoPreviewImage.data[schoolLogoCenterOffset + 3] > 0, "the school logo remains visible");
+  const schoolLogoBackgroundOffset = (120 * schoolLogoPreviewImage.info.width + 256) * 4;
+  assert.equal(schoolLogoPreviewImage.data[schoolLogoBackgroundOffset + 3], 0, "the edge-connected background is transparent");
   const profileWithSchoolLogo = await fetch(`${baseUrl}/api/teacher/profile`, {
     headers: { Cookie: teacherCookie },
   });
@@ -5030,6 +5133,33 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(savedRosterStudent.heightM, 1.4);
   assert.equal(savedRosterStudent.heightSquaredM2, 1.96);
   assert.equal(savedRosterStudent.bmi, 21.43);
+  const savedEosyNutritionalMeasurement = await fetch(
+    `${baseUrl}/api/students/${encodeURIComponent(addedStudent.student.id)}/nutritional-status`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+      body: JSON.stringify({
+        cycle: "EOSY",
+        measurementDate: "2025-04-22",
+        weightKg: 50,
+        heightM: 1.5,
+      }),
+    },
+  );
+  assert.equal(savedEosyNutritionalMeasurement.status, 200);
+  assert.equal((await savedEosyNutritionalMeasurement.json()).cycle, "EOSY");
+  const rosterWithBothNutritionalCyclesResponse = await fetch(`${baseUrl}/api/students`, {
+    headers: { Cookie: teacherCookie },
+  });
+  assert.equal(rosterWithBothNutritionalCyclesResponse.status, 200);
+  const rosterWithBothNutritionalCycles = (await rosterWithBothNutritionalCyclesResponse.json()).students;
+  const studentWithBothNutritionalCycles = rosterWithBothNutritionalCycles
+    .find(({ id }) => id === addedStudent.student.id);
+  assert.equal(studentWithBothNutritionalCycles.nutritionalAssessments.BOSY.measurementDate, "2025-04-21");
+  assert.equal(studentWithBothNutritionalCycles.nutritionalAssessments.BOSY.weightKg, 42);
+  assert.equal(studentWithBothNutritionalCycles.nutritionalAssessments.EOSY.measurementDate, "2025-04-22");
+  assert.equal(studentWithBothNutritionalCycles.nutritionalAssessments.EOSY.weightKg, 50);
+  assert.equal(studentWithBothNutritionalCycles.weightKg, 42, "legacy student fields continue to represent BOSY");
   const invalidSF8AssessmentDate = await fetch(
     `${baseUrl}/api/students/nutritional-status/sf8?assessmentDate=2025-02-31`,
     { headers: { Cookie: teacherCookie } },
@@ -5049,6 +5179,25 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(path.dirname(sf8ReportPath), generatedReportsDirectory);
   const sf8ReportBuffer = Buffer.from(await sf8Export.arrayBuffer());
   assert.deepEqual(await fs.readFile(sf8ReportPath), sf8ReportBuffer);
+  const sf8Archive = await JSZip.loadAsync(sf8ReportBuffer);
+  const sourceSF8Archive = await JSZip.loadAsync(await fs.readFile(path.join(__dirname, "..", "SF8.xlsx")));
+  const sf8WorkbookXml = await sf8Archive.file("xl/workbook.xml").async("string");
+  assert.doesNotMatch(sf8WorkbookXml, /<definedName name="(?:BMI|HEIGHT)">/);
+  assert.match(sf8WorkbookXml, /<definedName name="HFAFEMALE">/);
+  for (const partName of [
+    "xl/drawings/drawing1.xml",
+    "xl/drawings/_rels/drawing1.xml.rels",
+    "xl/media/image1.jpg",
+    "xl/media/image2.jpg",
+  ]) {
+    assert.deepEqual(
+      await sf8Archive.file(partName).async("nodebuffer"),
+      await sourceSF8Archive.file(partName).async("nodebuffer"),
+      `SF8 export preserves the template part ${partName}`,
+    );
+  }
+  const sf8ContentTypes = await sf8Archive.file("[Content_Types].xml").async("string");
+  assert.match(sf8ContentTypes, /<Default Extension="jpg" ContentType="image\/jpeg"\/>/);
   const sf8Workbook = new ExcelJS.Workbook();
   await sf8Workbook.xlsx.load(sf8ReportBuffer);
   const sf8Sheet = sf8Workbook.getWorksheet("Nutritional Status");
@@ -5095,6 +5244,19 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(sf8Sheet.getCell(`L${sf8FemaleStudentRow}`).value, 21.43);
   assert.equal(sf8Sheet.getCell(`M${sf8FemaleStudentRow}`).value, "Overweight");
   assert.equal(sf8Sheet.getCell(`N${sf8FemaleStudentRow}`).value, "Normal");
+  const eosySf8Export = await fetch(
+    `${baseUrl}/api/students/nutritional-status/sf8?assessmentDate=2025-04-22&cycle=EOSY`,
+    { headers: { Cookie: teacherCookie } },
+  );
+  assert.equal(eosySf8Export.status, 200);
+  const eosySf8Workbook = new ExcelJS.Workbook();
+  await eosySf8Workbook.xlsx.load(Buffer.from(await eosySf8Export.arrayBuffer()));
+  const eosySf8Sheet = eosySf8Workbook.getWorksheet("Nutritional Status");
+  const eosyStudentRow = Array.from({ length: eosySf8Sheet.rowCount }, (_, index) => index + 1)
+    .find((row) => eosySf8Sheet.getCell(`C${row}`).value === "Santos, Alex Reyes");
+  assert.ok(eosyStudentRow);
+  assert.equal(eosySf8Sheet.getCell(`I${eosyStudentRow}`).value, 50);
+  assert.equal(eosySf8Sheet.getCell(`J${eosyStudentRow}`).value, 1.5);
   assert.equal(sf8Sheet.getCell(32 + sf8FooterDelta, 5).value, "Conducted/Assessed By:");
   assert.equal(sf8Sheet.getCell(32 + sf8FooterDelta, 13).value, "Checked and Reviewed By:");
   assert.equal(sf8Sheet.getCell(34 + sf8FooterDelta, 5).value, teacherCredentials.name);
@@ -7696,10 +7858,11 @@ test("registrations persist in the workbook and can sign in after a restart", as
     [importedStudents[1].id, "Absent"],
     [finalStudents[2].id, "Tardy"],
   ]);
-  assert.deepEqual(attendanceSummary.months, [...new Set([
-    attendanceMonth,
-    attendanceDate.slice(0, 7),
-  ])].sort());
+  const expectedSchoolYearMonths = Array.from({ length: 28 }, (_, monthOffset) =>
+    new Date(Date.UTC(2025, monthOffset, 1)).toISOString().slice(0, 7));
+  assert.deepEqual(attendanceSummary.months, expectedSchoolYearMonths);
+  assert.equal(attendanceSummary.firstDayOfSchool, "2025-01-01");
+  assert.equal(attendanceSummary.endOfSchoolYear, "2027-04-30");
   assert.deepEqual(attendanceSummary.students.map((student, index) => {
     const monthStudent = importedSF2Month.students[index];
     const monthPresent = monthStudent.attendance.reduce((total, status) =>
@@ -7709,14 +7872,23 @@ test("registrations persist in the workbook and can sign in after a restart", as
     const dailyStatus = summaryDailyStatuses.get(student.id);
     const dailyPresent = dailyStatus === "Present" || dailyStatus === "Tardy" ? 1 : 0;
     const dailyAbsent = dailyStatus === "Absent" ? 1 : 0;
+    const months = Object.fromEntries(attendanceSummary.months.map((month) => {
+      const monthly = { present: 0, absent: 0 };
+      if (month === attendanceMonth) {
+        monthly.present += monthPresent;
+        monthly.absent += monthAbsent;
+      }
+      if (month === attendanceDate.slice(0, 7)) {
+        monthly.present += dailyPresent;
+        monthly.absent += dailyAbsent;
+      }
+      return [month, monthly];
+    }));
     return {
       id: student.id,
       present: monthPresent + (dailyStatus === "Present" || dailyStatus === "Tardy" ? 1 : 0),
       absent: monthAbsent + (dailyStatus === "Absent" ? 1 : 0),
-      months: {
-        [attendanceMonth]: { present: monthPresent, absent: monthAbsent },
-        [attendanceDate.slice(0, 7)]: { present: dailyPresent, absent: dailyAbsent },
-      },
+      months,
     };
   }), attendanceSummary.students.map(({ id, present, absent, months }) => ({ id, present, absent, months })));
   assert.match(attendanceSummary.firstDate, /^\d{4}-\d{2}-\d{2}$/);
@@ -8874,6 +9046,8 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.equal(persistedNutritionalStudent.bmiCategory, "Overweight");
   assert.equal(persistedNutritionalStudent.heightSquaredM2, 1.96);
   assert.equal(persistedNutritionalStudent.bmi, 21.43);
+  assert.equal(persistedNutritionalStudent.nutritionalAssessments.EOSY.weightKg, 50);
+  assert.equal(persistedNutritionalStudent.nutritionalAssessments.EOSY.measurementDate, "2025-04-22");
   const persistedSchoolLogoResponse = await fetch(`${restartedUrl}/api/teacher/profile/school-logo`, {
     headers: { Cookie: restartedTeacherCookie },
   });
@@ -9587,17 +9761,17 @@ test("appearance preference persists across portal server restarts", async (cont
   const savedPreference = await fetch(`${baseUrl}/api/preferences/appearance`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ theme: "mint" }),
+    body: JSON.stringify({ theme: "navy-gold" }),
   });
   assert.equal(savedPreference.status, 200);
-  assert.deepEqual(await savedPreference.json(), { theme: "mint" });
+  assert.deepEqual(await savedPreference.json(), { theme: "navy-gold" });
   await stopServer();
 
   server = createServer({ appearancePreferencesPath });
   baseUrl = await startServer();
   const restoredPreference = await fetch(`${baseUrl}/api/preferences/appearance`);
   assert.equal(restoredPreference.status, 200);
-  assert.deepEqual(await restoredPreference.json(), { theme: "mint" });
+  assert.deepEqual(await restoredPreference.json(), { theme: "navy-gold" });
 });
 
 test("teacher registration assigns unique classroom numbers without asking for one", async (context) => {

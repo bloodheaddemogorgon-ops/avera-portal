@@ -18,6 +18,8 @@
   var sf10Initialized=false;
   var sf10GradeSyncRequestId=0;
   var rosterStudents=[];
+  var nutritionalAssessmentCycle="BOSY";
+  var nutritionalAssessmentDates={};
   var rosterParents=[];
   var spinWheelRosterEntries=[];
   var spinWheelRemovedIds=new Set();
@@ -91,12 +93,12 @@
   var gradeEditUpdating=false;
   var gradeLoadRequestId=0;
   var eClassDirty=false;
-  var appTheme="system";
+  var appTheme="navy-gold";
   var performanceModeEnabled=false;
   var performanceModeStorageError="";
   var customThemes=[
     "ocean","sage","lavender","rose","sunset","amber","forest","mint","sky","indigo",
-    "berry","coral","teal","sand","midnight","amethyst","emerald","slate","nord","cherry"
+    "berry","coral","teal","sand","midnight","amethyst","emerald","slate","nord","cherry","electric","navy-gold"
   ];
   var appearanceStorageError="";
   var appearancePreferenceChanged=false;
@@ -1084,9 +1086,19 @@
     }
   }
 
+  function nutritionalAssessmentForStudent(student,cycle){
+    if(student.nutritionalAssessments&&student.nutritionalAssessments[cycle]){
+      return student.nutritionalAssessments[cycle];
+    }
+    if(cycle==="BOSY")return student;
+    return {measurementDate:"",weightKg:"",heightM:"",heightSquaredM2:null,bmi:null,
+      bmiCategory:"",heightForAgeStatus:""};
+  }
+
   async function loadNutritionalStatusRoster(){
     var measurementDateInput=$("nutritionalMeasurementDate");
     var today=localISODate();
+    var cycle=nutritionalAssessmentCycle;
     $("exportSF8").disabled=true;
     $("editNutritionalMeasurements").disabled=true;
     $("editNutritionalMeasurements").textContent="Edit Measurements";
@@ -1107,10 +1119,16 @@
       }
       result.students=filterStudentsForActiveSection(result.students);
       var missingWhoResults=result.students.some(function(student){
-        return student.measurementDate
-          &&(typeof student.bmiCategory!=="string"||!student.bmiCategory
-            ||typeof student.heightForAgeStatus!=="string"||!student.heightForAgeStatus);
+        var assessment=nutritionalAssessmentForStudent(student,cycle);
+        return assessment.measurementDate
+          &&(typeof assessment.bmiCategory!=="string"||!assessment.bmiCategory
+            ||typeof assessment.heightForAgeStatus!=="string"||!assessment.heightForAgeStatus);
       });
+      var firstMeasurementDate=result.students.map(function(student){
+        return nutritionalAssessmentForStudent(student,cycle).measurementDate;
+      }).find(Boolean);
+      measurementDateInput.value=nutritionalAssessmentDates[cycle]||firstMeasurementDate||today;
+      nutritionalAssessmentDates[cycle]=measurementDateInput.value;
       $("nutritionalRosterCount").textContent=result.students.length+" student"+(result.students.length===1?"":"s");
       if(missingWhoResults){
         $("nutritionalRosterNotice").textContent="The running portal server is outdated and did not return both WHO classifications. Restart the portal server, then refresh this roster.";
@@ -1118,6 +1136,7 @@
       $("nutritionalRosterEmpty").hidden=result.students.length!==0;
       $("nutritionalRosterTable").hidden=result.students.length===0;
       measurementDateInput.onchange=function(){
+        nutritionalAssessmentDates[cycle]=measurementDateInput.value;
         $("nutritionalRosterRows").querySelectorAll("tr").forEach(function(row){
           if(!row.dataset.measurementDate){
             row.querySelector('[data-nutritional-age="true"]').textContent=
@@ -1126,22 +1145,24 @@
         });
       };
       result.students.forEach(function(student,index){
+        var assessment=nutritionalAssessmentForStudent(student,cycle);
         var row=document.createElement("tr");
         row.dataset.studentId=student.id;
         row.dataset.studentName=student.name;
+        row.dataset.assessmentCycle=cycle;
         appendTextCell(row,String(index+1));
         appendTextCell(row,[student.lastName,student.firstName,student.middleName].filter(Boolean).join(", "));
         appendTextCell(row,student.gender);
         appendTextCell(row,student.birthdate);
         var ageCell=appendTextCell(
           row,
-          nutritionalStudentAge(student.birthdate,student.measurementDate||measurementDateInput.value),
+          nutritionalStudentAge(student.birthdate,assessment.measurementDate||measurementDateInput.value),
         );
         ageCell.dataset.nutritionalAge="true";
         row.dataset.birthdate=student.birthdate||"";
-        row.dataset.measurementDate=student.measurementDate||"";
-        row.dataset.savedWeightKg=student.weightKg?String(student.weightKg):"";
-        row.dataset.savedHeightM=student.heightM?String(student.heightM):"";
+        row.dataset.measurementDate=assessment.measurementDate||"";
+        row.dataset.savedWeightKg=assessment.weightKg?String(assessment.weightKg):"";
+        row.dataset.savedHeightM=assessment.heightM?String(assessment.heightM):"";
         var weightCell=appendTextCell(row,"");
         var weightInput=document.createElement("input");
         weightInput.className="nutritional-measurement-input";
@@ -1152,7 +1173,7 @@
         weightInput.inputMode="decimal";
         weightInput.setAttribute("aria-label","Weight in kilograms for "+student.name);
         weightInput.dataset.measurement="weightKg";
-        weightInput.value=student.weightKg||"";
+        weightInput.value=assessment.weightKg||"";
         weightInput.disabled=false;
         weightCell.replaceChildren(weightInput);
         var heightCell=appendTextCell(row,"");
@@ -1165,27 +1186,27 @@
         heightInput.inputMode="decimal";
         heightInput.setAttribute("aria-label","Height in meters for "+student.name);
         heightInput.dataset.measurement="heightM";
-        heightInput.value=student.heightM||"";
+        heightInput.value=assessment.heightM||"";
         heightInput.disabled=false;
         heightCell.replaceChildren(heightInput);
         var heightSquaredCell=appendTextCell(row,formatNutritionalValue(student.heightSquaredM2,4));
         heightSquaredCell.dataset.calculation="heightSquared";
         var bmiCell=appendTextCell(row,formatNutritionalValue(student.bmi,2));
         bmiCell.dataset.calculation="bmi";
-        var hasMeasurements=student.weightKg&&student.heightM;
-        var bmiCategory=student.measurementDate
-          ?student.bmiCategory||"Restart server"
+        var hasMeasurements=assessment.weightKg&&assessment.heightM;
+        var bmiCategory=assessment.measurementDate
+          ?assessment.bmiCategory||"Restart server"
           :hasMeasurements?"Save to calculate":"Enter measurements";
         var bmiCategoryCell=appendTextCell(row,bmiCategory);
         bmiCategoryCell.dataset.calculation="bmiCategory";
         var heightForAgeCell=appendTextCell(
           row,
-          student.measurementDate?student.heightForAgeStatus||"Restart server"
+          assessment.measurementDate?assessment.heightForAgeStatus||"Restart server"
             :hasMeasurements?"Save to calculate":"Enter measurements",
         );
         heightForAgeCell.dataset.calculation="heightForAge";
-        row.dataset.measurementsLocked=student.measurementDate?"true":"false";
-        if(student.measurementDate){
+        row.dataset.measurementsLocked=assessment.measurementDate?"true":"false";
+        if(assessment.measurementDate){
           weightInput.disabled=true;
           heightInput.disabled=true;
         }
@@ -1207,6 +1228,29 @@
       $("nutritionalRosterNotice").textContent=error.message;
       $("nutritionalRosterNotice").classList.add("error");
     }
+  }
+
+  function selectNutritionalCycle(cycle,focusTab){
+    if((cycle!=="BOSY"&&cycle!=="EOSY")||cycle===nutritionalAssessmentCycle
+      ||nutritionalMeasurementsSaving||nutritionalStatusExporting)return;
+    var rows=Array.from($("nutritionalRosterRows").querySelectorAll("tr"));
+    var editButton=$("editNutritionalMeasurements");
+    var hasEdits=editButton.dataset.editing==="true"||rows.some(hasNutritionalMeasurementsChanged);
+    if(hasEdits&&!window.confirm("Discard unsaved nutritional measurements for "+nutritionalAssessmentCycle+"?"))return;
+    if(editButton.dataset.editing==="true")toggleNutritionalMeasurementsEditing();
+    nutritionalAssessmentCycle=cycle;
+    var isBosy=cycle==="BOSY";
+    var tab=isBosy?$("nutritionalBosyTab"):$("nutritionalEosyTab");
+    $("nutritionalBosyTab").setAttribute("aria-selected",String(isBosy));
+    $("nutritionalEosyTab").setAttribute("aria-selected",String(!isBosy));
+    $("nutritionalBosyTab").tabIndex=isBosy?0:-1;
+    $("nutritionalEosyTab").tabIndex=isBosy?-1:0;
+    $("nutritionalAssessmentPanel").setAttribute("aria-labelledby",tab.id);
+    $("nutritionalMeasurementDateLabelText").textContent=
+      "Date of "+cycle+" weighing and measurement";
+    $("nutritionalRosterHeading").textContent=cycle+" students";
+    if(focusTab)tab.focus();
+    loadNutritionalStatusRoster();
   }
 
   function setNutritionalMeasurementsLocked(row,locked){
@@ -1318,13 +1362,19 @@
       var result=await api("/api/students/"+encodeURIComponent(row.dataset.studentId)+"/nutritional-status",{
         method:"PUT",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({measurementDate:measurementDate,weightKg:weightKg,heightM:heightM})
+        body:JSON.stringify({
+          cycle:row.dataset.assessmentCycle,
+          measurementDate:measurementDate,
+          weightKg:weightKg,
+          heightM:heightM
+        })
       });
       weightInput.value=String(result.weightKg);
       heightInput.value=String(result.heightM);
       row.dataset.savedWeightKg=weightInput.value;
       row.dataset.savedHeightM=heightInput.value;
       row.dataset.measurementDate=result.measurementDate;
+      nutritionalAssessmentDates[row.dataset.assessmentCycle]=result.measurementDate;
       row.dataset.measurementsChanged="false";
       delete row.dataset.editSnapshot;
       var hasWhoResults=typeof result.bmiCategory==="string"&&result.bmiCategory
@@ -1458,6 +1508,7 @@
     try{
       var assessmentDate=$("nutritionalMeasurementDate").value;
       var assessmentParams=new URLSearchParams();
+      assessmentParams.set("cycle",nutritionalAssessmentCycle);
       if(assessmentDate)assessmentParams.set("assessmentDate",assessmentDate);
       if(activeStudentSection!=="__all__")assessmentParams.set("section",activeStudentSection);
       var assessmentQuery=assessmentParams.toString()?"?"+assessmentParams.toString():"";
@@ -2255,14 +2306,34 @@
       ?result.months.map(function(month){return{key:month,label:new Date(month+"-01T00:00:00.000Z").toLocaleDateString(undefined,{month:"short",timeZone:"UTC"})}})
       :[];
     var headerRow=document.createElement("tr");
-    headerRow.append(cell("th","#","attendance-summary-corner"),cell("th","Learner","attendance-summary-corner"));
+    var detailRow=document.createElement("tr");
+    headerRow.className="attendance-summary-head-group";
+    detailRow.className="attendance-summary-head-columns";
+    var numberHeader=cell("th","#","attendance-summary-corner");
+    var learnerHeader=cell("th","Learner","attendance-summary-corner");
+    numberHeader.rowSpan=2;
+    learnerHeader.rowSpan=2;
+    headerRow.append(numberHeader,learnerHeader);
     columns.forEach(function(column){
-      var top=cell("th",column.label+" P / A","attendance-summary-month");
-      top.title=monthLabel(column.key)+": Present / Absent";
+      var top=cell("th",column.label,"attendance-summary-month");
+      top.colSpan=2;
+      top.title=monthLabel(column.key);
       headerRow.appendChild(top);
+      detailRow.append(
+        cell("th","Present","attendance-summary-month-detail"),
+        cell("th","Absent","attendance-summary-month-detail")
+      );
     });
-    headerRow.append(cell("th","Present","attendance-summary-key"),cell("th","Absent","attendance-summary-key"),cell("th","Days","attendance-summary-key"),cell("th","Attendance %","attendance-summary-key"));
-    head.appendChild(headerRow);
+    var totalHeading=cell("th",isAll?"School-year total":monthLabel(attendanceSummarySheet),"attendance-summary-key attendance-summary-group-total");
+    totalHeading.colSpan=4;
+    headerRow.appendChild(totalHeading);
+    detailRow.append(
+      cell("th","Present","attendance-summary-key"),
+      cell("th","Absent","attendance-summary-key"),
+      cell("th","Days","attendance-summary-key"),
+      cell("th","Attendance %","attendance-summary-key")
+    );
+    head.append(headerRow,detailRow);
 
     function figures(student){
       if(isAll)return{present:student.present,absent:student.absent};
@@ -2281,7 +2352,10 @@
         var entry=sums.perMonth[column.key]||(sums.perMonth[column.key]={present:0,absent:0});
         entry.present+=monthly.present;
         entry.absent+=monthly.absent;
-        row.appendChild(cell("td",monthly.present+" / "+monthly.absent,monthly.absent?"attendance-summary-has-absence":""));
+        row.append(
+          cell("td",String(monthly.present),"attendance-summary-month-value attendance-summary-month-present"),
+          cell("td",String(monthly.absent),"attendance-summary-month-value"+(monthly.absent?" attendance-summary-has-absence":""))
+        );
       });
       var value=figures(student);
       sums.present+=value.present;
@@ -2301,7 +2375,10 @@
       totalRow.appendChild(label);
       columns.forEach(function(column){
         var entry=sums.perMonth[column.key]||{present:0,absent:0};
-        totalRow.appendChild(cell("td",entry.present+" / "+entry.absent));
+        totalRow.append(
+          cell("td",String(entry.present),"attendance-summary-month-total"),
+          cell("td",String(entry.absent),"attendance-summary-month-total")
+        );
       });
       totalRow.append(
         cell("td",String(sums.present)),
@@ -2312,12 +2389,12 @@
       foot.appendChild(totalRow);
     }
     $("attendanceSummaryEmpty").hidden=result.students.length>0;
-    $("attendanceSheetName").textContent=isAll?"All Months":monthLabel(attendanceSummarySheet);
-    $("attendanceSheetNote").textContent="Present counts Present + Tardy days; Absent counts absences. Excused, unmarked, no-class and locked days are not counted.";
+    $("attendanceSheetName").textContent=isAll?"Full School Year":monthLabel(attendanceSummarySheet);
+    $("attendanceSheetNote").textContent="Present includes tardy days. Excused, unmarked, no-class and locked days are excluded.";
 
     var tabs=$("attendanceSheetTabs");
     tabs.replaceChildren();
-    [{key:"all",label:"All Months"}].concat(result.months.map(function(month){
+    [{key:"all",label:"Full School Year"}].concat(result.months.map(function(month){
       return{key:month,label:new Date(month+"-01T00:00:00.000Z").toLocaleDateString(undefined,{month:"short",year:"numeric",timeZone:"UTC"})};
     })).forEach(function(sheet){
       var tab=document.createElement("button");
@@ -2347,14 +2424,18 @@
     try{
       var result=await api("/api/attendance/summary");
       if(requestId!==attendanceSummaryRequestId)return;
-      if(!Array.isArray(result.students)||!Array.isArray(result.months))throw new Error("The server returned an invalid attendance summary.");
+      if(!Array.isArray(result.students)||!Array.isArray(result.months)||!result.firstDayOfSchool||!result.endOfSchoolYear)throw new Error("The server returned an invalid attendance summary.");
       result.students=filterStudentsForActiveSection(result.students);
       attendanceSummaryData=result;
       if(attendanceSummarySheet!=="all"&&!result.months.includes(attendanceSummarySheet))attendanceSummarySheet="all";
       renderAttendanceSummarySheet();
-      $("attendanceSummaryRange").textContent=result.firstDate&&result.lastDate
-        ?"Saved attendance from "+result.firstDate+" through "+result.lastDate
-        :"No saved attendance records yet.";
+      function dateLabel(date){
+        return new Date(date+"T00:00:00.000Z").toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric",timeZone:"UTC"});
+      }
+      var range="School year: "+dateLabel(result.firstDayOfSchool)+" to "+dateLabel(result.endOfSchoolYear)+".";
+      $("attendanceSummaryRange").textContent=range+(result.firstDate&&result.lastDate
+        ?" Saved records: "+dateLabel(result.firstDate)+" to "+dateLabel(result.lastDate)+"."
+        :" No saved attendance records yet.");
     }catch(error){
       if(requestId!==attendanceSummaryRequestId)return;
       $("attendanceSummaryRange").textContent="Unable to load attendance totals.";
@@ -2610,71 +2691,6 @@
     }finally{
       $("gradeStudent").disabled=gradeStudents.length===0;
     }
-  }
-
-  var inventoryItems=[];
-  var editingInventoryId="";
-
-  function renderInventory(items){
-    inventoryItems=Array.isArray(items)?items:[];
-    var rows=$("inventoryRows");
-    rows.replaceChildren();
-    $("inventoryCount").textContent=inventoryItems.length+" item"+(inventoryItems.length===1?"":"s");
-    $("inventoryEmpty").hidden=inventoryItems.length!==0;
-    $("inventoryTable").hidden=inventoryItems.length===0;
-    inventoryItems.forEach(function(item){
-      var row=document.createElement("tr");
-      [item.item,item.category,String(item.quantity),item.unit,String(item.reorderLevel),item.status,item.notes].forEach(function(value){appendTextCell(row,value||"—")});
-      var actions=document.createElement("td");
-      var edit=document.createElement("button"); edit.type="button"; edit.className="btn ghost"; edit.textContent="Edit";
-      edit.onclick=function(){editInventoryItem(item)};
-      var remove=document.createElement("button"); remove.type="button"; remove.className="btn ghost danger"; remove.textContent="Delete";
-      remove.onclick=function(){deleteInventoryItem(item)};
-      actions.append(edit," ",remove); row.appendChild(actions); rows.appendChild(row);
-    });
-  }
-
-  async function loadInventory(){
-    $("inventoryNotice").textContent="";
-    $("inventoryNotice").classList.remove("error");
-    try{
-      var result=await api("/api/inventory");
-      renderInventory(result.items);
-    }catch(error){
-      $("inventoryCount").textContent="Unable to load";
-      $("inventoryNotice").textContent=error.message;
-      $("inventoryNotice").classList.add("error");
-    }
-  }
-
-  function resetInventoryForm(){
-    editingInventoryId="";
-    $("inventoryForm").reset();
-    $("inventoryQuantity").value="0";
-    $("inventoryReorderLevel").value="0";
-    $("inventoryFormTitle").textContent="Add classroom item";
-    $("saveInventory").textContent="Add item";
-    $("cancelInventoryEdit").hidden=true;
-  }
-
-  function editInventoryItem(item){
-    editingInventoryId=item.id;
-    $("inventoryItem").value=item.item;
-    $("inventoryCategory").value=item.category||"";
-    $("inventoryQuantity").value=item.quantity;
-    $("inventoryUnit").value=item.unit||"";
-    $("inventoryReorderLevel").value=item.reorderLevel;
-    $("inventoryNotes").value=item.notes||"";
-    $("inventoryFormTitle").textContent="Edit classroom item";
-    $("saveInventory").textContent="Save changes";
-    $("cancelInventoryEdit").hidden=false;
-    $("inventoryItem").focus();
-  }
-
-  async function deleteInventoryItem(item){
-    if(!window.confirm("Delete "+item.item+" from inventory?"))return;
-    try{await api("/api/inventory/"+encodeURIComponent(item.id),{method:"DELETE"}); await loadInventory();}
-    catch(error){$("inventoryNotice").textContent=error.message;$("inventoryNotice").classList.add("error")}
   }
 
   var eClassTransmutationRanges=[
@@ -4189,6 +4205,7 @@
   var initializeDashboard=(function(){
     var initialized=false;
     var requestVersion=0;
+    var dashboardNutritionCycle="BOSY";
     var dashboardData={};
     var dashboardErrors={};
     var dashboardPeriods=["BOSY","MOSY","EOSY"];
@@ -4202,7 +4219,6 @@
       readingEosy:"EOSY reading levels",
       philIri:"Phil-IRI results",
       math:"math assessments",
-      inventory:"inventory",
       profile:"teacher profile",
       calendar:"calendar deadlines",
       mpsYear:"whole-year MPS chart"
@@ -4285,7 +4301,6 @@
         ||key==="readingEosy"||key==="philIri"||key==="math"){
         return Boolean(result&&Array.isArray(result.students));
       }
-      if(key==="inventory")return Boolean(result&&Array.isArray(result.items));
       if(key==="calendar"){
         return Array.isArray(result)||Boolean(result&&(
           Array.isArray(result.events)||Array.isArray(result.tasks)
@@ -4970,89 +4985,60 @@
       if(dashboardData.roster===undefined){
         dashboardSetLoading($("dashboardBmiBar"));
         dashboardSetLoading($("dashboardHeightBar"));
+        dashboardSetText("dashboardNutritionCycleSummary","Loading nutritional assessments…");
         return;
       }
       if(dashboardData.roster===null){
         dashboardSetMessage($("dashboardBmiBar"),dashboardUnavailableMessage("roster"));
         dashboardSetMessage($("dashboardHeightBar"),dashboardUnavailableMessage("roster"));
+        dashboardSetText("dashboardNutritionCycleSummary",dashboardUnavailableMessage("roster"));
         return;
       }
+      var measured=roster.map(function(student){
+        return nutritionalAssessmentForStudent(student,dashboardNutritionCycle);
+      }).filter(function(assessment){
+        return Boolean(assessment.measurementDate);
+      });
+      var assessedCount=measured.length;
+      dashboardSetText("dashboardNutritionCycleSummary",
+        dashboardNutritionCycle+" · "+assessedCount+" of "+roster.length+" learners assessed.");
+      dashboardSetText("dashboardBmiHeading",dashboardNutritionCycle+" BMI-for-age");
+      dashboardSetText("dashboardHeightHeading",dashboardNutritionCycle+" height-for-age");
       var bmiCategories=["Normal","Wasted","Severely Wasted","Overweight","Obese"];
       var bmiColors=["var(--accent)","color-mix(in srgb,var(--accent) 68%,var(--muted))","var(--err)",
         "color-mix(in srgb,var(--muted) 55%,var(--field))","color-mix(in srgb,var(--err) 55%,var(--muted))"];
       var bmiValues=bmiCategories.map(function(category){
         return {key:category.toLowerCase().replace(/\s+/g,"-"),label:category,
-          value:roster.filter(function(student){return String(student.bmiCategory||"").toLowerCase()===category.toLowerCase()}).length};
+          value:measured.filter(function(assessment){
+            return String(assessment.bmiCategory||"").toLowerCase()===category.toLowerCase();
+          }).length,color:bmiColors[bmiCategories.indexOf(category)]};
       });
-      var measuredBmi=roster.some(function(student){return Boolean(student.bmiCategory)});
-      if(measuredBmi){
-        bmiValues.forEach(function(item,index){item.color=bmiColors[index]});
+      if(assessedCount){
         dashboardRenderStackedChart("dashboardBmiBar",bmiValues,"BMI-for-age distribution");
         dashboardRenderLegend("dashboardBmiLegend",bmiValues.map(function(item){
           return {key:item.key,label:item.label,value:item.value};
         }));
       }else{
-        dashboardSetMessage($("dashboardBmiBar"),"Enter measurements on the Nutritional Status page.");
+        dashboardSetMessage($("dashboardBmiBar"),"No "+dashboardNutritionCycle+" measurements recorded yet.");
         dashboardRenderLegend("dashboardBmiLegend",[]);
       }
       var heightCategories=["Normal","Stunted","Severely Stunted"];
       var heightColors=["var(--accent)","color-mix(in srgb,var(--accent) 58%,var(--muted))","var(--err)"];
       var heightValues=heightCategories.map(function(category){
         return {key:category.toLowerCase().replace(/\s+/g,"-"),label:category,
-          value:roster.filter(function(student){
-            return String(student.heightForAgeStatus||student.hfaCategory||"").toLowerCase()===category.toLowerCase();
+          value:measured.filter(function(assessment){
+            return String(assessment.heightForAgeStatus||assessment.hfaCategory||"").toLowerCase()===category.toLowerCase();
           }).length,color:heightColors[heightCategories.indexOf(category)]};
       });
-      var measuredHeight=roster.some(function(student){return Boolean(student.heightForAgeStatus||student.hfaCategory)});
-      if(measuredHeight){
+      if(assessedCount){
         dashboardRenderStackedChart("dashboardHeightBar",heightValues,"Height-for-age distribution");
         dashboardRenderLegend("dashboardHeightLegend",heightValues.map(function(item){
           return {key:item.key,label:item.label,value:item.value};
         }));
       }else{
-        dashboardSetMessage($("dashboardHeightBar"),"Enter measurements on the Nutritional Status page.");
+        dashboardSetMessage($("dashboardHeightBar"),"No "+dashboardNutritionCycle+" measurements recorded yet.");
         dashboardRenderLegend("dashboardHeightLegend",[]);
       }
-    }
-
-    function dashboardRenderInventory(){
-      var list=$("dashboardLowStockList");
-      var empty=$("dashboardLowStockEmpty");
-      list.replaceChildren();
-      empty.hidden=true;
-      if(dashboardData.inventory===undefined){
-        dashboardSetLoading(list);
-        empty.hidden=false;
-        empty.textContent="Loading inventory…";
-        return;
-      }
-      if(dashboardData.inventory===null){
-        list.setAttribute("aria-busy","false");
-        empty.hidden=false;
-        empty.textContent=dashboardUnavailableMessage("inventory");
-        return;
-      }
-      list.setAttribute("aria-busy","false");
-      var lowStock=dashboardData.inventory.items.filter(function(item){
-        var quantity=dashboardNumber(item.quantity);
-        var reorder=dashboardNumber(item.reorderLevel);
-        return quantity!==null&&reorder!==null&&quantity<=reorder;
-      }).slice(0,3);
-      if(!lowStock.length){
-        empty.hidden=false;
-        empty.textContent="All tracked supplies are above their reorder levels.";
-        return;
-      }
-      lowStock.forEach(function(item){
-        var entry=document.createElement("li");
-        entry.className="dashboard-alert-item";
-        var heading=document.createElement("strong");
-        heading.textContent="Restock: "+String(item.item||"Supply");
-        var detail=document.createElement("span");
-        detail.textContent=(Number(item.quantity)||0)+" left · reorder at "+(Number(item.reorderLevel)||0);
-        entry.append(heading,detail);
-        list.appendChild(entry);
-      });
     }
 
     function dashboardTaskList(){
@@ -5365,7 +5351,6 @@
       dashboardRenderReadingGrid();
       dashboardRenderRma();
       dashboardRenderNutrition();
-      dashboardRenderInventory();
       dashboardRenderDeadlines();
       dashboardRenderYearMps();
       var hasMpsError=Object.prototype.hasOwnProperty.call(dashboardErrors,"mpsYear");
@@ -5384,7 +5369,7 @@
         "dashboardGenderChart","dashboardAttendanceStack","dashboardAttendanceTrend",
         "dashboardGradeDistribution","dashboardReadingLevels","dashboardRmaTrend",
         "dashboardBmiBar","dashboardHeightBar","dashboardSubjectAverages",
-        "dashboardLowStockList","dashboardDeadlineList","dashboardMpsYearChart"
+        "dashboardDeadlineList","dashboardMpsYearChart"
       ].forEach(function(id){dashboardSetLoading($(id))});
       ["dashboardActiveCount","dashboardAttendancePercent","dashboardAverageGrade",
         "dashboardReadingProficiency","dashboardMathMastery","dashboardDeadlineCount"]
@@ -5395,6 +5380,7 @@
       dashboardSetText("dashboardReadingSubline","Loading reading results…");
       dashboardSetText("dashboardMathSubline","Loading RMA results…");
       dashboardSetText("dashboardDeadlineSubline","Loading calendar…");
+      dashboardSetText("dashboardNutritionCycleSummary","Loading nutritional assessments…");
       dashboardSetText("dashboardMpsYearSubtitle","Loading Term 1–3 E-Class results…");
       dashboardSetText("dashboardMpsYearNotice","");
       $("dashboardMpsYearNotice").classList.remove("error");
@@ -5419,7 +5405,6 @@
         readingEosy:"/api/reading-assessments?period=EOSY",
         philIri:"/api/phil-iri/assessments?period=BOSY&assessmentType=Posttest",
         math:"/api/math-assessments",
-        inventory:"/api/inventory",
         profile:"/api/teacher/profile",
         calendar:"/api/teacher-calendar/events?from="+encodeURIComponent(dashboardDateKey(from))
           +"&to="+encodeURIComponent(dashboardDateKey(to))
@@ -5449,10 +5434,39 @@
     function initializeDashboard(){
       if(!initialized){
         $("dashboardDisplayFilter").addEventListener("change",applyDashboardDisplayFilter);
+        $("dashboardNutritionBosyTab").addEventListener("click",function(){
+          dashboardNutritionCycle="BOSY";
+          $("dashboardNutritionBosyTab").setAttribute("aria-selected","true");
+          $("dashboardNutritionEosyTab").setAttribute("aria-selected","false");
+          $("dashboardNutritionBosyTab").tabIndex=0;
+          $("dashboardNutritionEosyTab").tabIndex=-1;
+          dashboardRenderNutrition();
+        });
+        $("dashboardNutritionEosyTab").addEventListener("click",function(){
+          dashboardNutritionCycle="EOSY";
+          $("dashboardNutritionBosyTab").setAttribute("aria-selected","false");
+          $("dashboardNutritionEosyTab").setAttribute("aria-selected","true");
+          $("dashboardNutritionBosyTab").tabIndex=-1;
+          $("dashboardNutritionEosyTab").tabIndex=0;
+          dashboardRenderNutrition();
+        });
+        $("dashboardNutritionBosyTab").addEventListener("keydown",function(event){
+          if(event.key==="ArrowRight"){
+            event.preventDefault();
+            $("dashboardNutritionEosyTab").focus();
+            $("dashboardNutritionEosyTab").click();
+          }
+        });
+        $("dashboardNutritionEosyTab").addEventListener("keydown",function(event){
+          if(event.key==="ArrowLeft"){
+            event.preventDefault();
+            $("dashboardNutritionBosyTab").focus();
+            $("dashboardNutritionBosyTab").click();
+          }
+        });
         applyDashboardDisplayFilter();
         $("dashboardRefresh").addEventListener("click",refreshDashboardData);
         $("dashboardPendingMetric").addEventListener("click",function(){showDashboardPage("tools");setActiveToolPanel("calendarPanel")});
-        $("dashboardOpenInventory").addEventListener("click",function(){showDashboardPage("inventory")});
         $("dashboardOpenNutrition").addEventListener("click",function(){showDashboardPage("nutritionalStatus")});
         $("dashboardOpenMpsSummary").addEventListener("click",function(){showDashboardPage("assessmentMpsSummary")});
         initialized=true;
@@ -5487,7 +5501,6 @@
     var showAssessmentLeastMastered=page==="assessmentLeastMastered";
     var showRma=page==="rma";
     var showNutritionalStatus=page==="nutritionalStatus";
-    var showInventory=page==="inventory";
     var showEClass=page==="eClass";
     var showSf10=page==="sf10";
     if(showReading&&(!currentUser||!currentUser.isAdmin))return;
@@ -5510,7 +5523,6 @@
       ||(showAssessmentMps&&!$("assessmentMpsPage").hidden)
       ||(showAssessmentMpsSummary&&!$("assessmentMpsSummaryPage").hidden)
       ||(showNutritionalStatus&&!$("nutritionalStatusPage").hidden)
-      ||(showInventory&&!$("inventoryPage").hidden)
       ||(showAttendance&&!$("attendancePage").hidden)
       ||(showEClass&&!$("eClassPage").hidden)
       ||(showSf10&&!$("sf10Page").hidden)
@@ -5533,9 +5545,8 @@
       $("teacherPasswordForm").reset();
     }
     $("dashboardPage").hidden=!showDashboard;
-    $("studentsPage").hidden=showDashboard||showAttendance||showEClass||showGrades||showSf10||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||showInventory||page==="profile"||showSettings||showTools;
+    $("studentsPage").hidden=showDashboard||showAttendance||showEClass||showGrades||showSf10||showSummary||showReading||showPhilIri||showAssessmentMps||showAssessmentMpsSummary||showAssessmentDifficultyIndex||showAssessmentItemAnalysis||showAssessmentLeastMastered||showRma||showNutritionalStatus||page==="profile"||showSettings||showTools;
     $("nutritionalStatusPage").hidden=!showNutritionalStatus;
-    $("inventoryPage").hidden=!showInventory;
     $("attendancePage").hidden=!showAttendance;
     $("eClassPage").hidden=!showEClass;
     $("termGradesPage").hidden=!showGrades;
@@ -5553,7 +5564,7 @@
     $("teacherProfilePage").hidden=!showProfile;
     $("settingsPage").hidden=!showSettings;
     $("toolsPage").hidden=!showTools;
-    [["navDashboard",showDashboard],["navStudents",!showDashboard&&!showAttendance&&!showEClass&&!showGrades&&!showSf10&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showInventory&&!showProfile&&!showSettings&&!showTools],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navSf10",showSf10],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navInventory",showInventory],["navTeacherProfile",showProfile],["navSettings",showSettings],["navTools",showTools]]
+    [["navDashboard",showDashboard],["navStudents",!showDashboard&&!showAttendance&&!showEClass&&!showGrades&&!showSf10&&!showSummary&&!showReading&&!showPhilIri&&!showAssessmentMps&&!showAssessmentMpsSummary&&!showAssessmentDifficultyIndex&&!showAssessmentItemAnalysis&&!showAssessmentLeastMastered&&!showRma&&!showNutritionalStatus&&!showProfile&&!showSettings&&!showTools],["navAttendance",showAttendance],["navEClass",showEClass],["navTermGrades",showGrades],["navSf10",showSf10],["navGradeSummary",showSummary],["navAssessmentMps",showAssessmentMps],["navAssessmentMpsSummary",showAssessmentMpsSummary],["navAssessmentDifficultyIndex",showAssessmentDifficultyIndex],["navAssessmentItemAnalysis",showAssessmentItemAnalysis],["navAssessmentLeastMastered",showAssessmentLeastMastered],["navPhilIri",showPhilIri],["navRma",showRma],["navNutritionalStatus",showNutritionalStatus],["navTeacherProfile",showProfile],["navSettings",showSettings],["navTools",showTools]]
       .forEach(function(entry){
         if(entry[1])$(entry[0]).setAttribute("aria-current","page");
         else $(entry[0]).removeAttribute("aria-current");
@@ -5578,7 +5589,6 @@
       philIri:["GraceDesk","Phil-IRI"],
       rma:["GraceDesk","RMA"],
       nutritionalStatus:["GraceDesk","Nutritional Status"],
-      inventory:["GraceDesk","Inventory"],
       profile:["GraceDesk","Teacher Profile"],
       settings:["GraceDesk","Settings"],
       tools:["GraceDesk","Tools"],
@@ -5612,7 +5622,6 @@
       return loadMpsSummaryFromEClass(rosterLoaded);
     });
     else if(showNutritionalStatus)loadNutritionalStatusRoster();
-    else if(showInventory)loadInventory();
     else if(showSf10)loadSf10Roster();
     else if(showEClass)renderEClassTable();
     else if(showProfile){
@@ -7207,7 +7216,18 @@
     return individual.readingLevel||"Not assessed";
   }
 
+  var philIriClassReportTimer=0;
+  function schedulePhilIriClassReport(){
+    window.clearTimeout(philIriClassReportTimer);
+    philIriClassReportTimer=window.setTimeout(function(){
+      philIriClassReportTimer=0;
+      renderPhilIriClassReport();
+    },180);
+  }
+
   function renderPhilIriClassReport(){
+    window.clearTimeout(philIriClassReportTimer);
+    philIriClassReportTimer=0;
     if(!philIriData)return;
     var search=$("philIriClassSearch").value.trim().toLowerCase();
     var gradeFilter=$("philIriGradeFilter").value;
@@ -7846,7 +7866,7 @@
       $("teacherSchoolLogoPlaceholder").hidden=false;
       $("removeSchoolLogo").hidden=true;
     };
-    $("teacherSchoolLogo").src="/api/teacher/profile/school-logo?version="+Date.now();
+    $("teacherSchoolLogo").src="/api/teacher/profile/school-logo/preview?version="+Date.now();
   }
 
   async function loadTeacherProfile(){
@@ -8456,7 +8476,6 @@
     $("navPhilIri").hidden=false;
     $("navRma").hidden=false;
     $("navNutritionalStatus").hidden=false;
-    $("navInventory").hidden=false;
     $("navRma").disabled=false;
     $("navRma").removeAttribute("aria-disabled");
     $("navRma").title="Open RMA";
@@ -8481,7 +8500,6 @@
     $("readingProgressPage").hidden=true;
     $("rmaPage").hidden=true;
     $("nutritionalStatusPage").hidden=true;
-    $("inventoryPage").hidden=true;
     $("teacherProfilePage").hidden=true;
     $("settingsPage").hidden=true;
     $("toolsPage").hidden=true;
@@ -9004,29 +9022,18 @@
   $("savePhilIriAutoScore").onclick=persistSelectedPhilIriScores;
   $("navRma").onclick=function(){showDashboardPage("rma")};
   $("navNutritionalStatus").onclick=function(){showDashboardPage("nutritionalStatus")};
-  $("navInventory").onclick=function(){showDashboardPage("inventory")};
+  $("nutritionalBosyTab").onclick=function(){selectNutritionalCycle("BOSY",false)};
+  $("nutritionalEosyTab").onclick=function(){selectNutritionalCycle("EOSY",false)};
+  $("nutritionalBosyTab").addEventListener("keydown",function(event){
+    if(event.key==="ArrowRight"){event.preventDefault();selectNutritionalCycle("EOSY",true)}
+  });
+  $("nutritionalEosyTab").addEventListener("keydown",function(event){
+    if(event.key==="ArrowLeft"){event.preventDefault();selectNutritionalCycle("BOSY",true)}
+  });
   $("refreshNutritionalRoster").onclick=loadNutritionalStatusRoster;
   $("editNutritionalMeasurements").onclick=toggleNutritionalMeasurementsEditing;
   $("saveNutritionalMeasurements").onclick=saveAllNutritionalMeasurements;
   $("exportSF8").onclick=exportNutritionalStatusSF8;
-  $("refreshInventory").onclick=loadInventory;
-  $("cancelInventoryEdit").onclick=resetInventoryForm;
-  $("inventoryForm").onsubmit=async function(event){
-    event.preventDefault();
-    var payload={
-      item:$("inventoryItem").value.trim(), category:$("inventoryCategory").value.trim(),
-      quantity:Number($("inventoryQuantity").value), unit:$("inventoryUnit").value.trim(),
-      reorderLevel:Number($("inventoryReorderLevel").value), notes:$("inventoryNotes").value.trim(),
-    };
-    var saveButton=$("saveInventory"); saveButton.disabled=true;
-    try{
-      await api(editingInventoryId?"/api/inventory/"+encodeURIComponent(editingInventoryId):"/api/inventory",{
-        method:editingInventoryId?"PUT":"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload),
-      });
-      resetInventoryForm(); await loadInventory();
-    }catch(error){$("inventoryNotice").textContent=error.message;$("inventoryNotice").classList.add("error")}
-    finally{saveButton.disabled=false}
-  };
   $("navTeacherProfile").onclick=function(){showDashboardPage("profile")};
   $("navSettings").onclick=function(){showDashboardPage("settings")};
   $("navTools").onclick=function(){showDashboardPage("tools")};
@@ -10811,6 +10818,7 @@
     }
     function loadTeacherCalendar(){
       calendarState.loading=true;
+      $("teacherCalendarGridViewLabel").textContent=calendarState.view==="week"?"Week":"Month";
       var requestSequence=++calendarState.loadSequence;
       var startUpMessages=[];
       var initializeProfile=calendarState.initialized?Promise.resolve():api("/api/teacher/profile").then(function(profile){
@@ -11260,6 +11268,7 @@
     var previewImage=$("tarpaulinPreviewImage"),bannerImageFile=null,bannerImageUrl="";
     var tarpaulinEditor=document.querySelector(".tarpaulin-editor");
     var tarpaulinControlsCard=document.querySelector(".tarpaulin-controls-card");
+    var tarpaulinControlsToggle=$("tarpaulinControlsToggle"),tarpaulinControlsCollapsed=false;
     var tarpaulinResizeHandle=$("tarpaulinResizeHandle");
     var tarpaulinResizeStartX=0,tarpaulinResizeStartWidth=0,tarpaulinIsResizing=false;
     var tarpaulinZoom=1;
@@ -11305,6 +11314,16 @@
       tarpaulinResizeHandle.setAttribute("aria-valuenow",String(Math.round(value)));
       tarpaulinResizeHandle.setAttribute("aria-valuetext",Math.round(value)+" pixels for controls");
     }
+    function setTarpaulinControlsCollapsed(collapsed){
+      tarpaulinControlsCollapsed=collapsed;
+      tarpaulinEditor.classList.toggle("controls-collapsed",collapsed);
+      tarpaulinControlsToggle.textContent=collapsed?"Show controls":"Hide controls";
+      tarpaulinControlsToggle.setAttribute("aria-expanded",String(!collapsed));
+      if(!collapsed)syncTarpaulinResizeHandle();
+    }
+    tarpaulinControlsToggle.addEventListener("click",function(){
+      setTarpaulinControlsCollapsed(!tarpaulinControlsCollapsed);
+    });
     function stopTarpaulinResize(){
       tarpaulinIsResizing=false;
       document.body.classList.remove("tarpaulin-resizing");
@@ -13637,7 +13656,7 @@
   $("philIriSaveGst").onclick=function(){savePhilIriAssessment("GST",false)};
   $("philIriSaveIndividual").onclick=function(){savePhilIriAssessment("Individualized",false)};
   $("philIriSaveCutoffs").onclick=savePhilIriCutoffs;
-  $("philIriClassSearch").oninput=renderPhilIriClassReport;
+  $("philIriClassSearch").oninput=schedulePhilIriClassReport;
   $("philIriGradeFilter").onchange=renderPhilIriClassReport;
   $("philIriSectionFilter").onchange=renderPhilIriClassReport;
   $("philIriLevelFilter").onchange=renderPhilIriClassReport;

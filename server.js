@@ -83,7 +83,7 @@ const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 const APPEARANCE_THEMES = new Set([
   "system", "light", "dark", "ocean", "sage", "lavender", "rose", "sunset", "amber",
   "forest", "mint", "sky", "indigo", "berry", "coral", "teal", "sand", "midnight",
-  "amethyst", "emerald", "slate", "nord", "cherry",
+  "amethyst", "emerald", "slate", "nord", "cherry", "electric", "navy-gold",
 ]);
 const SF2_TEMPLATE_PATH = path.join(__dirname, "SF2.xlsx");
 const SF8_TEMPLATE_PATH = path.join(__dirname, "SF8.xlsx");
@@ -220,7 +220,7 @@ async function createMpsTemplateWordDocument(data) {
   zip.file("word/document.xml", documentXml);
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 }
-async function createCircularTransparentLogo(sourceBuffer, size) {
+async function createCircularTransparentLogo(sourceBuffer, size, includeBorder = true) {
   const { data, info } = await sharp(sourceBuffer)
     .rotate()
     .resize(size, size, {
@@ -308,17 +308,19 @@ async function createCircularTransparentLogo(sourceBuffer, size) {
   const transparentLogo = await sharp(data, { raw: info }).png().toBuffer();
   const borderWidth = size * SF9_LOGO_BORDER_POINTS / (SF9_LOGO_INCHES * 72);
   const radius = size / 2 - borderWidth / 2;
-  return sharp(transparentLogo)
-    .composite([{
-      input: Buffer.from(
-        `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="white"/></svg>`,
-      ),
-      blend: "dest-in",
-    }, {
+  const composites = [{
+    input: Buffer.from(
+      `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="white"/></svg>`,
+    ),
+    blend: "dest-in",
+  }];
+  if (includeBorder) composites.push({
       input: Buffer.from(
         `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="black" stroke-width="${borderWidth}"/></svg>`,
       ),
-    }])
+    });
+  return sharp(transparentLogo)
+    .composite(composites)
     .png()
     .toBuffer();
 }
@@ -1168,6 +1170,9 @@ function getStudentSheet(workbook) {
   columns.nutritionWeightKg = ensureColumn(sheet, headers, "Nutritional Status Weight (kg)");
   columns.nutritionHeightM = ensureColumn(sheet, headers, "Nutritional Status Height (m)");
   columns.nutritionMeasurementDate = ensureColumn(sheet, headers, "Nutritional Status Measurement Date");
+  columns.nutritionEosyWeightKg = ensureColumn(sheet, headers, "Nutritional Status EOSY Weight (kg)");
+  columns.nutritionEosyHeightM = ensureColumn(sheet, headers, "Nutritional Status EOSY Height (m)");
+  columns.nutritionEosyMeasurementDate = ensureColumn(sheet, headers, "Nutritional Status EOSY Measurement Date");
   columns.section = ensureColumn(sheet, headers, "Section");
 
   return { sheet, columns };
@@ -1220,6 +1225,41 @@ function getTeacherClassStrand(workbook, session) {
   return cellText(classRow.getCell(columns.strand).value);
 }
 
+function getNutritionalAssessment(row, columns, cycle, student) {
+  const isEosy = cycle === "EOSY";
+  const weightColumn = isEosy ? columns.nutritionEosyWeightKg : columns.nutritionWeightKg;
+  const heightColumn = isEosy ? columns.nutritionEosyHeightM : columns.nutritionHeightM;
+  const dateColumn = isEosy ? columns.nutritionEosyMeasurementDate : columns.nutritionMeasurementDate;
+  const weightValue = row.getCell(weightColumn).value;
+  const heightValue = row.getCell(heightColumn).value;
+  const dateValue = row.getCell(dateColumn).value;
+  const weightKg = Number(weightValue);
+  const heightM = Number(heightValue);
+  const measurementDate = dateValue instanceof Date
+    ? dateValue.toISOString().slice(0, 10)
+    : cellText(dateValue);
+  const savedWeightKg = Number.isFinite(weightKg) && weightKg > 0 ? weightKg : "";
+  const savedHeightM = Number.isFinite(heightM) && heightM > 0 ? heightM : "";
+  const heightSquaredM2 = savedHeightM ? savedHeightM ** 2 : null;
+  return {
+    cycle,
+    measurementDate,
+    weightKg: savedWeightKg,
+    heightM: savedHeightM,
+    heightSquaredM2: heightSquaredM2 === null ? null : Math.round(heightSquaredM2 * 10000) / 10000,
+    bmi: savedWeightKg && heightSquaredM2
+      ? Math.round((savedWeightKg / heightSquaredM2) * 100) / 100
+      : null,
+    ...calculateBmiForAge({
+      birthdate: student.birthdate,
+      gender: student.gender,
+      measurementDate,
+      weightKg: savedWeightKg,
+      heightM: savedHeightM,
+    }),
+  };
+}
+
 function getOwnedStudents(sheet, columns, session) {
   const students = [];
   for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
@@ -1242,28 +1282,11 @@ function getOwnedStudents(sheet, columns, session) {
         : cellText(value);
     }
     student.section = cellText(row.getCell(columns.section).value);
-    const weightKg = Number(row.getCell(columns.nutritionWeightKg).value);
-    const heightM = Number(row.getCell(columns.nutritionHeightM).value);
-    const measurementDate = row.getCell(columns.nutritionMeasurementDate).value;
-    student.weightKg = Number.isFinite(weightKg) && weightKg > 0 ? weightKg : "";
-    student.heightM = Number.isFinite(heightM) && heightM > 0 ? heightM : "";
-    student.measurementDate = measurementDate instanceof Date
-      ? measurementDate.toISOString().slice(0, 10)
-      : cellText(measurementDate);
-    const heightSquaredM2 = student.heightM ? student.heightM ** 2 : null;
-    student.heightSquaredM2 = heightSquaredM2 === null
-      ? null
-      : Math.round(heightSquaredM2 * 10000) / 10000;
-    student.bmi = student.weightKg && heightSquaredM2
-      ? Math.round((student.weightKg / heightSquaredM2) * 100) / 100
-      : null;
-    Object.assign(student, calculateBmiForAge({
-      birthdate: student.birthdate,
-      gender: student.gender,
-      measurementDate: student.measurementDate,
-      weightKg: student.weightKg,
-      heightM: student.heightM,
-    }));
+    student.nutritionalAssessments = {
+      BOSY: getNutritionalAssessment(row, columns, "BOSY", student),
+      EOSY: getNutritionalAssessment(row, columns, "EOSY", student),
+    };
+    Object.assign(student, student.nutritionalAssessments.BOSY);
     students.push(student);
   }
   return students;
@@ -3415,175 +3438,7 @@ function createServer(options = {}) {
       "UPDATE portal_state SET workbook_state = ?, updated_at = ? WHERE id = 1",
     ).run(encodeWorkbookState(workbook), new Date().toISOString());
     if (result.changes !== 1) throw new Error("The SQLite portal database has no saved state.");
-  }function getInventorySheet(workbook) {
-  let sheet = workbook.getWorksheet("Inventory");
-  if (!sheet) {
-    sheet = workbook.addWorksheet("Inventory");
-    sheet.addRow([
-      "Inventory ID",
-      "Class ID",
-      "Teacher User ID",
-      "Item",
-      "Category",
-      "Quantity",
-      "Unit",
-      "Reorder Level",
-      "Status",
-      "Notes",
-      "Updated",
-    ]);
-    sheet.getRow(1).font = { bold: true };
   }
-  const headers = headerColumns(sheet);
-  return {
-    sheet,
-    columns: {
-      id: getColumn(headers, "Inventory ID"),
-      classId: getColumn(headers, "Class ID"),
-      teacherUserId: getColumn(headers, "Teacher User ID"),
-      item: getColumn(headers, "Item"),
-      category: ensureColumn(sheet, headers, "Category"),
-      quantity: getColumn(headers, "Quantity"),
-      unit: ensureColumn(sheet, headers, "Unit"),
-      reorderLevel: ensureColumn(sheet, headers, "Reorder Level"),
-      status: ensureColumn(sheet, headers, "Status"),
-      notes: ensureColumn(sheet, headers, "Notes"),
-      updated: getColumn(headers, "Updated", ["Updated At"]),
-    },
-  };
-}
-
-function getOwnedInventory(sheet, columns, session) {
-  const items = [];
-  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-    const row = sheet.getRow(rowNumber);
-    if (cellText(row.getCell(columns.classId).value) !== session.classId
-      || cellText(row.getCell(columns.teacherUserId).value) !== session.userId) continue;
-    const id = cellText(row.getCell(columns.id).value);
-    const item = cellText(row.getCell(columns.item).value);
-    if (!id || !item) continue;
-    const quantity = Number(row.getCell(columns.quantity).value);
-    const reorderLevel = Number(row.getCell(columns.reorderLevel).value);
-    items.push({
-      id,
-      item,
-      category: cellText(row.getCell(columns.category).value),
-      quantity: Number.isFinite(quantity) ? quantity : 0,
-      unit: cellText(row.getCell(columns.unit).value),
-      reorderLevel: Number.isFinite(reorderLevel) ? reorderLevel : 0,
-      status: cellText(row.getCell(columns.status).value),
-      notes: cellText(row.getCell(columns.notes).value),
-      updated: cellText(row.getCell(columns.updated).value),
-    });
-  }
-  return items;
-}
-
-function nextInventoryId(sheet, idColumn) {
-  let highest = 0;
-  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-    const match = cellText(sheet.getRow(rowNumber).getCell(idColumn).value).match(/^I(\d+)$/i);
-    if (match) highest = Math.max(highest, Number(match[1]));
-  }
-  return `I${String(highest + 1).padStart(5, "0")}`;
-}
-
-function validateInventoryItem(data) {
-  const item = typeof data.item === "string" ? data.item.trim() : "";
-  const category = typeof data.category === "string" ? data.category.trim() : "";
-  const unit = typeof data.unit === "string" ? data.unit.trim() : "";
-  const notes = typeof data.notes === "string" ? data.notes.trim() : "";
-  const quantity = Number(data.quantity);
-  const reorderLevel = Number(data.reorderLevel);
-  if (!item || item.length > 120) throw new HttpError(400, "Enter an item name up to 120 characters.");
-  if (category.length > 80 || unit.length > 40 || notes.length > 500) {
-    throw new HttpError(400, "Inventory fields exceed their allowed length.");
-  }
-  if (!Number.isFinite(quantity) || quantity < 0 || quantity > 1000000) {
-    throw new HttpError(400, "Enter a quantity from 0 to 1,000,000.");
-  }
-  if (!Number.isFinite(reorderLevel) || reorderLevel < 0 || reorderLevel > 1000000) {
-    throw new HttpError(400, "Enter a reorder level from 0 to 1,000,000.");
-  }
-  return { item, category, quantity, unit, reorderLevel, notes };
-}
-
-async function listInventory(session) {
-  return serializeWorkbook(async () => {
-    const workbook = await readDatabaseWorkbook();
-    const { sheet, columns } = getInventorySheet(workbook);
-    return { items: getOwnedInventory(sheet, columns, session) };
-  });
-}
-
-async function saveInventoryItem(session, data) {
-  const values = validateInventoryItem(data);
-  return serializeWorkbook(async () => {
-    const workbook = await readDatabaseWorkbook();
-    const { sheet, columns } = getInventorySheet(workbook);
-    const id = typeof data.id === "string" ? data.id.trim() : "";
-    let row = null;
-    if (id) {
-      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-        const candidate = sheet.getRow(rowNumber);
-        if (cellText(candidate.getCell(columns.id).value) === id
-          && cellText(candidate.getCell(columns.classId).value) === session.classId
-          && cellText(candidate.getCell(columns.teacherUserId).value) === session.userId) {
-          row = candidate;
-          break;
-        }
-      }
-      if (!row) throw new HttpError(404, "The inventory item was not found.");
-    }
-    if (!row) {
-      row = firstAvailableRow(sheet, [columns.id, columns.classId, columns.item]);
-      row.getCell(columns.id).value = nextInventoryId(sheet, columns.id);
-    }
-    row.getCell(columns.id).value = row.getCell(columns.id).value || nextInventoryId(sheet, columns.id);
-    row.getCell(columns.classId).value = session.classId;
-    row.getCell(columns.teacherUserId).value = session.userId;
-    row.getCell(columns.item).value = values.item;
-    row.getCell(columns.category).value = values.category;
-    row.getCell(columns.quantity).value = values.quantity;
-    row.getCell(columns.unit).value = values.unit;
-    row.getCell(columns.reorderLevel).value = values.reorderLevel;
-    row.getCell(columns.status).value = values.quantity <= values.reorderLevel ? "Low stock" : "In stock";
-    row.getCell(columns.notes).value = values.notes;
-    row.getCell(columns.updated).value = new Date();
-    await saveDatabaseWorkbook(workbook);
-    return { item: getOwnedInventory(sheet, columns, session).find((entry) => entry.id === cellText(row.getCell(columns.id).value)) };
-  });
-}
-
-async function deleteInventoryItem(session, id) {
-  if (!/^I\d+$/i.test(id)) throw new HttpError(404, "The inventory item was not found.");
-  return serializeWorkbook(async () => {
-    const workbook = await readDatabaseWorkbook();
-    const { sheet, columns } = getInventorySheet(workbook);
-    for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-      const row = sheet.getRow(rowNumber);
-      if (cellText(row.getCell(columns.id).value) !== id
-        || cellText(row.getCell(columns.classId).value) !== session.classId
-        || cellText(row.getCell(columns.teacherUserId).value) !== session.userId) continue;
-      row.getCell(columns.id).value = null;
-      row.getCell(columns.classId).value = null;
-      row.getCell(columns.teacherUserId).value = null;
-      row.getCell(columns.item).value = null;
-      row.getCell(columns.category).value = null;
-      row.getCell(columns.quantity).value = null;
-      row.getCell(columns.unit).value = null;
-      row.getCell(columns.reorderLevel).value = null;
-      row.getCell(columns.status).value = null;
-      row.getCell(columns.notes).value = null;
-      row.getCell(columns.updated).value = null;
-      await saveDatabaseWorkbook(workbook);
-      return { removed: true };
-    }
-    throw new HttpError(404, "The inventory item was not found.");
-  });
-}
-
-
   function serializeWorkbook(operation) {
     const result = workbookQueue.then(() => operation());
     workbookQueue = result.then(() => undefined, () => undefined);
@@ -4347,6 +4202,10 @@ async function deleteInventoryItem(session, id) {
     if (!data || typeof data !== "object" || Array.isArray(data)) {
       throw new HttpError(400, "Enter the measurement date, weight, and height.");
     }
+    const cycle = data.cycle === undefined ? "BOSY" : data.cycle;
+    if (cycle !== "BOSY" && cycle !== "EOSY") {
+      throw new HttpError(400, "Choose BOSY or EOSY for the assessment cycle.");
+    }
     const weightKg = typeof data.weightKg === "number" && Number.isFinite(data.weightKg)
       ? data.weightKg
       : Number.NaN;
@@ -4389,13 +4248,25 @@ async function deleteInventoryItem(session, id) {
         weightKg: savedWeightKg,
         heightM: savedHeightM,
       });
-      row.getCell(columns.nutritionWeightKg).value = savedWeightKg;
-      row.getCell(columns.nutritionHeightM).value = savedHeightM;
-      row.getCell(columns.nutritionMeasurementDate).value = measurementDate;
+      const measurementColumns = cycle === "EOSY"
+        ? {
+          weight: columns.nutritionEosyWeightKg,
+          height: columns.nutritionEosyHeightM,
+          date: columns.nutritionEosyMeasurementDate,
+        }
+        : {
+          weight: columns.nutritionWeightKg,
+          height: columns.nutritionHeightM,
+          date: columns.nutritionMeasurementDate,
+        };
+      row.getCell(measurementColumns.weight).value = savedWeightKg;
+      row.getCell(measurementColumns.height).value = savedHeightM;
+      row.getCell(measurementColumns.date).value = measurementDate;
       await saveDatabaseWorkbook(workbook);
       const heightSquaredM2 = savedHeightM ** 2;
       return {
         studentId,
+        cycle,
         measurementDate,
         weightKg: savedWeightKg,
         heightM: savedHeightM,
@@ -4406,9 +4277,67 @@ async function deleteInventoryItem(session, id) {
     });
   }
 
-  async function exportNutritionalStatusSF8(session, requestedAssessmentDate, sectionFilter) {
+  async function preserveSF8TemplateParts(buffer) {
+    const archive = await JSZip.loadAsync(buffer);
+    const template = await JSZip.loadAsync(await fs.readFile(SF8_TEMPLATE_PATH));
+    const preservedParts = [
+      "xl/drawings/drawing1.xml",
+      "xl/drawings/_rels/drawing1.xml.rels",
+      "xl/media/image1.jpg",
+      "xl/media/image2.jpg",
+    ];
+    for (const partName of preservedParts) {
+      const templatePart = template.file(partName);
+      if (!templatePart || !archive.file(partName)) {
+        throw new Error(`The SF8 workbook is missing the expected template part: ${partName}`);
+      }
+      archive.file(partName, await templatePart.async("nodebuffer"));
+    }
+
+    const workbookXmlPart = archive.file("xl/workbook.xml");
+    if (!workbookXmlPart) throw new Error("The generated SF8 workbook has no workbook metadata.");
+    const workbookXml = await workbookXmlPart.async("string");
+    let removedExternalNames = 0;
+    const workbookXmlWithoutExternalNames = workbookXml.replace(
+      /<definedName\b(?=[^>]*\bname="(?:BMI|HEIGHT)")[^>]*>[\s\S]*?<\/definedName>/g,
+      () => {
+        removedExternalNames += 1;
+        return "";
+      },
+    );
+    if (removedExternalNames !== 2) {
+      throw new Error("The SF8 workbook has unexpected external BMI/HEIGHT named ranges.");
+    }
+    archive.file("xl/workbook.xml", workbookXmlWithoutExternalNames);
+
+    const contentTypesPart = archive.file("[Content_Types].xml");
+    if (!contentTypesPart) throw new Error("The generated SF8 workbook has no content-type metadata.");
+    const contentTypesXml = await contentTypesPart.async("string");
+    const correctedContentTypes = contentTypesXml.replace(
+      'ContentType="image/jpg"',
+      'ContentType="image/jpeg"',
+    );
+    if (correctedContentTypes === contentTypesXml
+      && !contentTypesXml.includes('ContentType="image/jpeg"')) {
+      throw new Error("The generated SF8 workbook has no JPEG content type.");
+    }
+    archive.file("[Content_Types].xml", correctedContentTypes);
+    return archive.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+  }
+
+  async function exportNutritionalStatusSF8(session, requestedAssessmentDate, sectionFilter, cycle = "BOSY") {
+    if (cycle !== "BOSY" && cycle !== "EOSY") {
+      throw new HttpError(400, "Choose BOSY or EOSY for the SF8 assessment cycle.");
+    }
     const roster = await listStudents(session);
-    const students = roster.students.filter((student) => matchesStudentSection(student, sectionFilter));
+    const students = roster.students
+      .filter((student) => matchesStudentSection(student, sectionFilter))
+      .map((student) => ({
+        ...student,
+        ...(student.nutritionalAssessments && student.nutritionalAssessments[cycle]
+          ? student.nutritionalAssessments[cycle]
+          : cycle === "BOSY" ? student : {}),
+      }));
     if (!students.length) {
       throw new HttpError(400, "Add learners to the selected section before generating the SF8.");
     }
@@ -4704,7 +4633,7 @@ async function deleteInventoryItem(session, id) {
       .replace(/^_+|_+$/g, "") || "Class";
     const generatedAt = new Date().toISOString().replace(/[-:.]/g, "");
     const filename = `SF8_${filenamePart(teacherProfile.grade)}_${filenamePart(teacherProfile.section)}_${filenamePart(teacherProfile.schoolYear)}_${assessmentDate}_${generatedAt}.xlsx`;
-    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const buffer = await preserveSF8TemplateParts(Buffer.from(await workbook.xlsx.writeBuffer()));
     await fs.mkdir(generatedReportsDirectory, { recursive: true });
     const outputPath = path.join(generatedReportsDirectory, filename);
     const temporaryPath = `${outputPath}.${crypto.randomUUID()}.tmp`;
@@ -9603,6 +9532,23 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
     return `${month}-${String(new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()).padStart(2, "0")}`;
   }
 
+  function attendanceMonthsBetween(startDate, endDate) {
+    const months = [];
+    const [startYear, startMonth] = startDate.slice(0, 7).split("-").map(Number);
+    const [endYear, endMonth] = endDate.slice(0, 7).split("-").map(Number);
+    let year = startYear;
+    let month = startMonth;
+    while (year < endYear || (year === endYear && month <= endMonth)) {
+      months.push(`${year}-${String(month).padStart(2, "0")}`);
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+    }
+    return months;
+  }
+
   function monthlyAttendanceStatusEvents(workbook, session, studentIds) {
     const eventsByStudent = new Map([...studentIds].map((studentId) => [studentId, []]));
     const notes = workbook.getWorksheet("Attendance Monthly Notes");
@@ -9827,10 +9773,9 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       }
       let firstDate = "";
       let lastDate = "";
-      const months = new Set();
+      const months = attendanceMonthsBetween(schoolYear.startDate, schoolYear.endDate);
       for (const record of recordsByLearnerDate.values()) {
         const month = record.date.slice(0, 7);
-        months.add(month);
         const student = studentsById.get(record.studentId);
         const monthSummary = student.months[month] || { present: 0, absent: 0 };
         if (noClassDates.has(record.date)
@@ -9852,13 +9797,19 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
           if (!lastDate || record.date > lastDate) lastDate = record.date;
         }
       }
-      const recordedMonths = [...months].sort();
       for (const student of students) {
-        for (const month of recordedMonths) {
+        for (const month of months) {
           if (!student.months[month]) student.months[month] = { present: 0, absent: 0 };
         }
       }
-      return { students, months: recordedMonths, firstDate, lastDate };
+      return {
+        students,
+        months,
+        firstDate,
+        lastDate,
+        firstDayOfSchool: schoolYear.startDate,
+        endOfSchoolYear: schoolYear.endDate,
+      };
     });
   }
 
@@ -12129,6 +12080,20 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/api/teacher/profile/school-logo/preview") {
+        const session = requireTeacherSession(request);
+        const logo = await findTeacherSchoolLogo(session.userId);
+        const preview = await createCircularTransparentLogo(logo.buffer, 512, false);
+        response.writeHead(200, {
+          "Content-Type": "image/png",
+          "Content-Length": preview.length,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        });
+        response.end(preview);
+        return;
+      }
+
       if (request.method === "PUT" && url.pathname === "/api/teacher/profile/school-logo") {
         const session = requireTeacherSession(request);
         await saveTeacherSchoolLogo(session, request);
@@ -12146,37 +12111,6 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "GET" && url.pathname === "/api/students") {
         const session = requireTeacherSession(request);
         sendJson(response, 200, await listStudents(session));
-        return;
-      }
-
-      if (request.method === "GET" && url.pathname === "/api/inventory") {
-        const session = requireTeacherSession(request);
-        sendJson(response, 200, await listInventory(session));
-        return;
-      }
-
-      if (request.method === "POST" && url.pathname === "/api/inventory") {
-        const session = requireTeacherSession(request);
-        sendJson(response, 201, await saveInventoryItem(session, await readJson(request)));
-        return;
-      }
-
-      const inventoryMatch = url.pathname.match(/^\/api\/inventory\/([^/]+)$/);
-      if (request.method === "PUT" && inventoryMatch) {
-        const session = requireTeacherSession(request);
-        sendJson(response, 200, await saveInventoryItem(
-          session,
-          { ...(await readJson(request)), id: decodeURIComponent(inventoryMatch[1]) },
-        ));
-        return;
-      }
-
-      if (request.method === "DELETE" && inventoryMatch) {
-        const session = requireTeacherSession(request);
-        sendJson(response, 200, await deleteInventoryItem(
-          session,
-          decodeURIComponent(inventoryMatch[1]),
-        ));
         return;
       }
 
@@ -12198,6 +12132,7 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
             session,
             url.searchParams.get("assessmentDate") || "",
             url.searchParams.get("section") || "__all__",
+            url.searchParams.get("cycle") || "BOSY",
           );
         response.writeHead(200, {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
