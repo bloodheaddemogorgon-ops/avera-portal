@@ -436,7 +436,7 @@ html[data-theme="navy-gold"] .sidebar .nav-link[aria-current="page"]{border-colo
 .data-card-header h2{margin:0;font-size:1rem}
 .student-count{color:var(--muted);font-size:.85rem}
 .eclass-table-wrap{max-height:70vh;overflow:auto;border:1px solid #c8d1df;border-radius:10px;background:#fff;overscroll-behavior:contain}
-.eclass-table{width:100%;min-width:1440px;border-collapse:separate;border-spacing:0;table-layout:fixed;color:#111;font-family:Arial,sans-serif;font-size:.74rem}
+.eclass-table{width:100%;min-width:1900px;border-collapse:separate;border-spacing:0;table-layout:fixed;color:#111;font-family:Arial,sans-serif;font-size:.74rem}
 .eclass-table th,.eclass-table td{height:29px;padding:4px 5px;border:1px solid #e6e6e6;text-align:center;vertical-align:middle}
 .eclass-table thead th{position:sticky;z-index:3;background:#f5f5f5;font-weight:700;line-height:1.2}
 .eclass-table thead tr:first-child th{top:0;height:42px}
@@ -456,8 +456,8 @@ html[data-theme="navy-gold"] .sidebar .nav-link[aria-current="page"]{border-colo
 .eclass-table .eclass-highest-score-label{text-align:left}
 .eclass-table .eclass-editable-score{cursor:text;background:#fff}
 .eclass-table .eclass-editable-score:focus{outline:2px solid #2563eb;outline-offset:-2px;background:#fff}
-.eclass-table .eclass-input-cell{background:#fff}
-.eclass-score-input{width:100%;min-width:42px;height:22px;padding:1px 3px;border:1px solid transparent;border-radius:3px;background:transparent;color:inherit;font:inherit;text-align:center}
+.eclass-table .eclass-input-cell{padding:1px 2px;background:#fff}
+.eclass-score-input{display:block;width:100%;min-width:0;max-width:100%;height:24px;margin:0;padding:1px 2px;border:1px solid transparent;border-radius:3px;background:transparent;color:inherit;font:inherit;text-align:center}
 .eclass-score-input:focus{outline:2px solid #2563eb;outline-offset:-1px;background:#fff}
 .eclass-score-input::-webkit-inner-spin-button,.eclass-score-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .eclass-calculated-cell{background:#f8fafc}
@@ -846,10 +846,14 @@ html[data-theme="navy-gold"] .sidebar .nav-link[aria-current="page"]{border-colo
 .teacher-calendar-status{min-height:1.3em;margin:0;color:var(--muted);font-size:.8rem}
 .teacher-calendar-status.error{color:var(--danger,#b42318)}
 .teacher-calendar-grid-wrap{overflow-x:auto}
-.teacher-calendar-grid-view-label{margin:0 0 8px;padding:0 0 8px;border-bottom:1px solid var(--line);color:var(--muted);font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-.teacher-calendar-weekdays,.teacher-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
-.teacher-calendar-weekday{padding:9px 6px;color:var(--muted);font-size:.72rem;font-weight:800;text-align:center;text-transform:uppercase}
-.teacher-calendar-day{display:flex;min-width:0;min-height:128px;flex-direction:column;gap:5px;padding:8px;border:1px solid var(--line);background:var(--card)}
+.teacher-calendar-grid-view-label{margin:0 0 12px;padding:0 0 10px;border-bottom:1px solid var(--line);color:var(--muted);font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.teacher-calendar-weekdays,.teacher-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));column-gap:6px}
+.teacher-calendar-weekdays{margin-bottom:6px}
+.teacher-calendar-grid{row-gap:6px}
+.teacher-calendar-weekday{padding:9px 6px;border-radius:7px;background:var(--soft);color:var(--muted);font-size:.68rem;font-weight:800;letter-spacing:.08em;text-align:center;text-transform:uppercase}
+.teacher-calendar-day{position:relative;display:flex;min-width:0;min-height:138px;flex-direction:column;gap:7px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);transition:border-color .15s,background-color .15s}
+.teacher-calendar-day.has-deped-day-indicators{padding-bottom:38px}
+.teacher-calendar-day:not(.is-today):hover{border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
 .teacher-calendar-day.is-outside-month{background:color-mix(in srgb,var(--soft) 55%,var(--card));color:var(--muted)}
 .teacher-calendar-day.is-today{position:relative;z-index:1;border:2px solid var(--accent)}
 .teacher-calendar-day.is-holiday{background:color-mix(in srgb,#b91c1c 5%,var(--card))}
@@ -860,16 +864,19 @@ html[data-theme="navy-gold"] .sidebar .nav-link[aria-current="page"]{border-colo
 .teacher-calendar-day.has-deped-highlight-examination,.teacher-calendar-day.has-deped-highlight-assessment,.teacher-calendar-day.has-deped-highlight-break,.teacher-calendar-day.has-deped-highlight-training{background:color-mix(in srgb,#0f766e 18%,var(--card))}
 .teacher-calendar-day.has-deped-highlight-school-event{background:color-mix(in srgb,#0f766e 16%,var(--card))}
 .teacher-calendar-day.has-deped-highlight-term{background:color-mix(in srgb,#0f766e 16%,var(--card))}
-.teacher-calendar-day-indicators{display:flex;flex-wrap:wrap;gap:3px;min-width:0}
+.teacher-calendar-day-indicators{position:absolute;right:10px;bottom:8px;left:10px;display:flex;flex-wrap:wrap;gap:3px;min-width:0;align-items:flex-end}
 .teacher-calendar-day-indicator{display:block;max-width:100%;overflow:hidden;padding:2px 4px;border-radius:3px;color:#fff;font-size:.57rem;font-weight:800;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
 .teacher-calendar-day-indicator--opening-block{background:#a16207}
-.teacher-calendar-day-indicator--instructional-block{background:#15803d}
+.teacher-calendar-day-indicator--instructional-block,.teacher-calendar-day-indicator--assessment{padding:0 2px;background:transparent;color:color-mix(in srgb,#15803d 48%,var(--muted));font-weight:600}
 .teacher-calendar-day-indicator--end-of-term-block{background:#c2410c}
-.teacher-calendar-day-indicator--examination,.teacher-calendar-day-indicator--assessment,.teacher-calendar-day-indicator--break,.teacher-calendar-day-indicator--training,.teacher-calendar-day-indicator--school-event,.teacher-calendar-day-indicator--term{background:#0f766e}
-.teacher-calendar-date{display:flex;width:100%;align-items:center;justify-content:space-between;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:.78rem;font-weight:800;text-align:left;cursor:pointer}
+.teacher-calendar-day-indicator--examination,.teacher-calendar-day-indicator--break,.teacher-calendar-day-indicator--training,.teacher-calendar-day-indicator--school-event,.teacher-calendar-day-indicator--term{background:#0f766e}
+.teacher-calendar-date{display:flex;width:calc(100% - 32px);align-items:center;justify-content:space-between;padding:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:.78rem;font-weight:800;text-align:left;cursor:pointer}
+.teacher-calendar-date-number{display:grid;flex:none;width:28px;height:28px;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--accent) 10%,var(--card));color:var(--ink);font-size:.88rem;font-weight:900;line-height:1}
+.teacher-calendar-day.is-today .teacher-calendar-date-number{background:var(--accent);color:var(--accent-ink)}
+.teacher-calendar-day.is-outside-month .teacher-calendar-date-number{background:color-mix(in srgb,var(--muted) 8%,var(--card));color:var(--muted)}
 .teacher-calendar-today-label{color:var(--accent);font-size:.62rem;font-weight:800}
-.teacher-calendar-items{display:grid;align-content:start;gap:4px}
-.teacher-calendar-item{display:block;min-width:0;overflow:hidden;padding:4px 6px;border:0;border-left:3px solid #2563eb;border-radius:4px;background:color-mix(in srgb,#2563eb 10%,var(--card));color:var(--ink);font:inherit;font-size:.68rem;line-height:1.3;text-align:left;text-overflow:ellipsis;cursor:pointer}
+.teacher-calendar-items{display:grid;align-content:start;gap:5px}
+.teacher-calendar-item{display:block;min-width:0;overflow:hidden;padding:5px 7px;border:0;border-left:3px solid #2563eb;border-radius:6px;background:color-mix(in srgb,#2563eb 10%,var(--card));color:var(--ink);font:inherit;font-size:.66rem;line-height:1.3;text-align:left;text-overflow:ellipsis;cursor:pointer}
 .teacher-calendar-item--official{border-left-color:#b91c1c;background:color-mix(in srgb,#b91c1c 10%,var(--card));cursor:default}
 .teacher-calendar-item--local{border-left-color:#7c3aed;background:color-mix(in srgb,#7c3aed 10%,var(--card));cursor:default}
 .teacher-calendar-item--deped{border-left-color:#0f766e;background:color-mix(in srgb,#0f766e 10%,var(--card));cursor:default}
@@ -882,7 +889,7 @@ html[data-theme="navy-gold"] .sidebar .nav-link[aria-current="page"]{border-colo
 .teacher-calendar-item--deped-training{border-left-color:#0891b2;background:color-mix(in srgb,#0891b2 10%,var(--card))}
 .teacher-calendar-item time{display:block;font-size:.62rem;font-weight:700}
 .teacher-calendar-item.is-done{opacity:.62;text-decoration:line-through}
-.teacher-calendar-day-add{align-self:flex-start;margin-top:auto;padding:2px 4px;border:0;background:transparent;color:var(--accent);font-size:.68rem;font-weight:700;cursor:pointer}
+.teacher-calendar-day-add{position:absolute;top:6px;right:6px;display:grid;width:24px;height:24px;place-items:center;margin:0;padding:0;border:1px solid color-mix(in srgb,var(--accent) 25%,var(--line));border-radius:50%;background:color-mix(in srgb,var(--accent) 8%,var(--card));color:var(--accent);font:inherit;font-size:1rem;font-weight:800;line-height:1;cursor:pointer}
 .teacher-calendar-source-note{margin:0;color:var(--muted);font-size:.75rem;line-height:1.5}
 .teacher-calendar-source-note a{color:var(--accent)}
 .teacher-calendar-dialog{width:min(480px,calc(100% - 24px));max-width:none;padding:0;border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);box-shadow:0 24px 70px #0004}
@@ -910,6 +917,10 @@ body.tarpaulin-resizing,body.tarpaulin-resizing *{cursor:col-resize!important;us
 .tool-field textarea{min-height:110px;resize:vertical}
 .tool-actions{display:flex;flex-wrap:wrap;gap:9px}
 .tool-actions .btn{width:auto;min-width:130px;margin:0;padding:10px 14px;font-size:.86rem}
+.tool-actions #downloadTarpaulinPdf{min-width:168px;min-height:48px;padding:11px 18px;border:1px solid var(--accent);border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.9rem;font-weight:800;box-shadow:0 5px 14px color-mix(in srgb,var(--accent) 28%,transparent);transition:transform .15s,box-shadow .15s,filter .15s}
+.tool-actions #downloadTarpaulinPdf:hover{filter:brightness(.92);box-shadow:0 7px 18px color-mix(in srgb,var(--accent) 36%,transparent);transform:translateY(-1px)}
+.tool-actions #downloadTarpaulinPdf:active{transform:translateY(0)}
+.tool-actions #downloadTarpaulinPdf:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .tarpaulin-controls-card{overflow:hidden}
 .tarpaulin-editor-heading{padding:18px 20px 15px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,color-mix(in srgb,var(--soft) 54%,var(--card)),var(--card) 74%)}
 .tarpaulin-editor-heading h2{margin:0;font-size:1rem}
@@ -932,9 +943,12 @@ body.tarpaulin-resizing,body.tarpaulin-resizing *{cursor:col-resize!important;us
 .tarpaulin-preview-card{overflow:hidden}
 .tarpaulin-preview-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line)}
 .tarpaulin-preview-toolbar h2{margin:0;font-size:.9rem}
-.tarpaulin-controls-toggle{min-height:34px;margin:0;padding:6px 11px;border:1px solid var(--line);border-radius:9px;background:var(--field);color:var(--ink);font:inherit;font-size:.76rem;font-weight:700;cursor:pointer}
-.tarpaulin-controls-toggle:hover{border-color:var(--accent);background:var(--soft);color:var(--accent)}
-.tarpaulin-controls-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tarpaulin-controls-toggle{display:inline-flex;min-height:42px;align-items:center;justify-content:center;gap:9px;margin:0;padding:9px 16px;border:1px solid var(--accent);border-radius:999px;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:.84rem;font-weight:800;box-shadow:0 5px 14px color-mix(in srgb,var(--accent) 28%,transparent);cursor:pointer;white-space:nowrap;transition:transform .15s,box-shadow .15s,filter .15s}
+.tarpaulin-controls-toggle::before{width:8px;height:8px;flex:none;border-right:2px solid currentColor;border-bottom:2px solid currentColor;content:"";transform:rotate(225deg);transition:transform .15s}
+.tarpaulin-controls-toggle[aria-expanded="false"]::before{transform:rotate(45deg)}
+.tarpaulin-controls-toggle:hover{filter:brightness(.92);box-shadow:0 7px 18px color-mix(in srgb,var(--accent) 36%,transparent);transform:translateY(-1px)}
+.tarpaulin-controls-toggle:active{transform:translateY(0)}
+.tarpaulin-controls-toggle:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 .tarpaulin-preview-size{flex:none;padding:5px 9px;border-radius:999px;background:var(--soft);color:var(--accent);font-size:.7rem;font-weight:800}
 .tarpaulin-zoom-controls{display:inline-flex;align-items:center;gap:6px}
 .tarpaulin-zoom-controls button{min-width:32px;min-height:32px;margin:0;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:.9rem;font-weight:800;cursor:pointer}
@@ -1261,6 +1275,7 @@ html[data-performance-mode="on"] *,html[data-performance-mode="on"] *::before,ht
 .nutritional-measurement-date-control{display:grid;gap:5px;color:var(--muted);font-size:.75rem;font-weight:650}
 .nutritional-measurement-date-control input{min-height:38px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);font:inherit}
 .nutritional-cycle-tabs{margin-bottom:14px}
+.nutritional-cycle-tabs .rma-period-tab:disabled{opacity:.58;cursor:progress}
 .dashboard-nutrition-tabs{margin:0 0 12px}
 .nutritional-save-button{width:auto;margin:0;padding:8px 12px;font-size:.8rem;white-space:nowrap}
 .nutritional-save-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--line)}

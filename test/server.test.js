@@ -637,6 +637,8 @@ test("Tarpapel preview renders full paper sheets with margins and unique banner 
 test("Tarpapel controls and preview can be resized with pointer or keyboard", async () => {
   const portalPage = await readPortalPageSource();
   assert.match(portalPage, /id="tarpaulinControlsToggle"[^>]*aria-controls="tarpaulinControlsCard"[^>]*aria-expanded="true">Hide controls<\/button>/);
+  assert.match(portalPage, /\.tarpaulin-controls-toggle\{[^}]*min-height:42px;[^}]*background:var\(--accent\);[^}]*font-size:\.84rem/);
+  assert.match(portalPage, /\.tarpaulin-controls-toggle\[aria-expanded="false"\]::before\{transform:rotate\(45deg\)\}/);
   assert.match(portalPage, /class="data-card tarpaulin-controls-card"[^>]*id="tarpaulinControlsCard"/);
   assert.match(portalPage, /tarpaulinControlsToggle\.addEventListener\("click",function\(\)\{\s*setTarpaulinControlsCollapsed\(!tarpaulinControlsCollapsed\)/);
   assert.match(portalPage, /\.tarpaulin-editor\.controls-collapsed\{grid-template-columns:minmax\(0,1fr\)\}/);
@@ -872,6 +874,8 @@ test("Tarpapel cut marks show joins and blank-tail cuts without outer-edge marks
 test("Tarpapel PDF download preserves the selected image fit and tiled page layout", async () => {
   const portalPage = await readPortalPageSource();
   assert.match(portalPage, /id="downloadTarpaulinPdf"[^>]*>Download PDF<\/button>/);
+  assert.match(portalPage, /\.tool-actions #downloadTarpaulinPdf\{[^}]*min-height:48px;[^}]*background:var\(--accent\);[^}]*color:var\(--accent-ink\);[^}]*font-weight:800/);
+  assert.match(portalPage, /\.tool-actions #downloadTarpaulinPdf:focus-visible\{outline:3px solid var\(--accent\);outline-offset:3px\}/);
   assert.match(portalPage, /script\.src="\/assets\/jspdf\.umd\.min\.js"/);
   assert.match(portalPage, /doc\.addPage\(\[layout\.paperWidthMm,layout\.paperHeightMm\],pageOrientation\)/);
   assert.match(portalPage, /doc\.save\("tarpaulin-banner\.pdf"\)/);
@@ -1755,11 +1759,10 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
-      "Nutritional status supports separate BOSY and EOSY assessments.",
-      "Improved the dashboard, page spacing, profile tabs, and theme options.",
-      "Made tarpaulin controls collapsible and streamlined sidebar navigation.",
-      "Improved circular school-logo previews without changing the original upload.",
-      "Reduced unnecessary work during rapid PHIL-IRI input for a more responsive experience.",
+      "Faster whole-year MPS dashboard loading through batched E-Class requests.",
+      "Nutritional Status saves separate BOSY and EOSY assessment dates.",
+      "DepEd calendar activities now skip weekends and non-working holidays.",
+      "Improved calendar layout, E-Class score entry, and tarpaulin controls.",
     ],
   );
 });
@@ -1901,8 +1904,11 @@ test("E-Class uses every DO 015 s. 2026 transmutation band before saving all sub
   assert.match(portalPage, /Unlock to Edit/);
   assert.doesNotMatch(portalPage, /syncCalculatedTermGrade\(row,grade\.termGrade\)/);
   assert.match(portalPage, /DepEd Order No\. 015, s\. 2026 transmutation table to every completed subject grade, for all grade levels/);
+  assert.match(portalPage, /\.eclass-table\{width:100%;min-width:1900px;[^}]*table-layout:fixed/);
   assert.match(portalPage, /eclass-table th,\.eclass-table td\{[^}]*border:1px solid #e6e6e6/);
   assert.match(portalPage, /\.eclass-table tbody td\{background:#e6e6e6;border-color:#aab2bd\}/);
+  assert.match(portalPage, /\.eclass-table \.eclass-input-cell\{padding:1px 2px;background:#fff\}/);
+  assert.match(portalPage, /\.eclass-score-input\{display:block;width:100%;min-width:0;max-width:100%;height:24px/);
   assert.match(portalPage, /\.eclass-table thead th\{[^}]*background:#f5f5f5/);
 });
 
@@ -2159,6 +2165,34 @@ test("E-Class export fills the project workbook template with current app record
   assert.equal(savedEClassRecord.locked, true);
   assert.deepEqual(savedEClassRecord.highestScores, ["10", "15", "15", "10", "15", "100", "100", "100", "20", "20", "40"]);
   assert.deepEqual(savedEClassRecord.scores[students[0].id], ["8", "15", "15", "10", "15", "100", "100", "100", "20", "20", "40"]);
+  const batchRecordsResponse = await fetch(`${baseUrl}/api/e-class/records/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({
+      records: [
+        { term: "Term 2", subject: "MAPEH", mapehGroup: "Music and Arts", section: "Mabini" },
+        { term: "Term 2", subject: "MAPEH", mapehGroup: "PE and Health", section: "Mabini" },
+      ],
+    }),
+  });
+  assert.equal(batchRecordsResponse.status, 200);
+  const batchRecords = (await batchRecordsResponse.json()).records;
+  assert.equal(batchRecords.length, 2);
+  assert.deepEqual(batchRecords[0], savedEClassRecord);
+  assert.equal(batchRecords[1].saved, false);
+  assert.equal(batchRecords[1].mapehGroup, "PE and Health");
+  const unauthenticatedBatchResponse = await fetch(`${baseUrl}/api/e-class/records/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ records: [] }),
+  });
+  assert.equal(unauthenticatedBatchResponse.status, 401);
+  const invalidBatchResponse = await fetch(`${baseUrl}/api/e-class/records/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ records: [] }),
+  });
+  assert.equal(invalidBatchResponse.status, 400);
   const firstSavedGrade = await fetch(
     `${baseUrl}/api/grades?studentId=${encodeURIComponent(students[0].id)}&term=Term%202`,
     { headers: { Cookie: cookie } },
@@ -3948,6 +3982,13 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /id="nutritionalMeasurementDate" type="date"/);
   assert.match(portalPage, /id="nutritionalBosyTab"[^>]*>BOSY \(Beginning of Year\)<\/button>/);
   assert.match(portalPage, /id="nutritionalEosyTab"[^>]*>EOSY \(End of Year\)<\/button>/);
+  assert.match(portalPage, /nutritionalAssessmentDates=result\.nutritionalAssessmentDates\|\|\{\}/);
+  assert.match(portalPage, /api\("\/api\/nutritional-status\/assessment-date"/);
+  assert.match(portalPage, /body:JSON\.stringify\(\{cycle:cycle,measurementDate:selectedDate\}\)/);
+  assert.match(portalPage, /var hasEdits=rows\.some\(hasNutritionalMeasurementsChanged\)/);
+  assert.match(portalPage, /\$\("nutritionalBosyTab"\)\.disabled=cycleTabsBusy/);
+  assert.match(portalPage, /\$\("nutritionalEosyTab"\)\.disabled=cycleTabsBusy/);
+  assert.match(portalPage, /\$\("nutritionalCycleTabs"\)\.setAttribute\("aria-busy",String\(cycleTabsBusy\)\)/);
   assert.match(portalPage, /id="dashboardNutritionCycleTabs"[^>]*role="tablist"/);
   assert.match(portalPage, /id="dashboardNutritionCycleSummary"/);
   assert.match(portalPage, /body:JSON\.stringify\(\{\s*cycle:row\.dataset\.assessmentCycle/);
@@ -4077,7 +4118,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /activeEClassGradeSubjects\.has\(field\[0\]\)/);
   assert.match(portalPage, /\.eclass-table tbody td\{background:#e6e6e6;border-color:#aab2bd\}/);
   assert.match(portalPage, /\.eclass-table \.eclass-editable-score\{cursor:text;background:#fff\}/);
-  assert.match(portalPage, /\.eclass-table \.eclass-input-cell\{background:#fff\}/);
+  assert.match(portalPage, /\.eclass-table \.eclass-input-cell\{padding:1px 2px;background:#fff\}/);
   assert.match(portalPage, /eclass-input-cell/);
   assert.doesNotMatch(portalPage, /class="eclass-record-badge eclass-record-term"/);
   assert.doesNotMatch(portalPage, /class="eclass-record-badge eclass-record-subject"/);
@@ -4449,11 +4490,22 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /id="teacherCalendarTermList"/);
   assert.match(portalPage, /teacher-calendar-school-year-details\[open\] \.teacher-calendar-school-year-toggle/);
   assert.match(portalPage, /function renderTeacherCalendarSchoolYear\(schedule\)/);
-  assert.match(portalPage, /function calendarSchoolActivityDates\(activity\)/);
+  assert.match(portalPage, /function calendarSchoolActivityDates\(activity,nonWorkingHolidayDates\)/);
   assert.match(portalPage, /function calendarSchoolActivityIndicatorLabel\(kind\)/);
+  assert.match(portalPage, /calendarSchoolActivityIndicators\(schoolActivities\.map\(function\(entry\)\{\s*return entry\.activity;\s*\}\)\)/);
   assert.match(portalPage, /cell\.classList\.add\("has-deped-activity"\)/);
   assert.match(portalPage, /has-deped-highlight-/);
   assert.match(portalPage, /teacher-calendar-day-indicator/);
+  assert.match(portalPage, /\.teacher-calendar-day-indicator--instructional-block,\.teacher-calendar-day-indicator--assessment\{[^}]*background:transparent;[^}]*color:color-mix\(in srgb,#15803d 48%,var\(--muted\)\)/);
+  assert.match(portalPage, /dateNumber\.className="teacher-calendar-date-number"/);
+  assert.match(portalPage, /\.teacher-calendar-date-number\{[^}]*width:28px;[^}]*height:28px;[^}]*font-weight:900/);
+  assert.match(portalPage, /\.teacher-calendar-day\.is-today \.teacher-calendar-date-number\{background:var\(--accent\);color:var\(--accent-ink\)\}/);
+  assert.match(portalPage, /cell\.classList\.add\("has-deped-day-indicators"\)/);
+  assert.match(portalPage, /\.teacher-calendar-day-add\{[^}]*position:absolute;top:6px;right:6px;[^}]*width:24px;[^}]*height:24px/);
+  assert.match(portalPage, /\.teacher-calendar-day-indicators\{[^}]*position:absolute;[^}]*bottom:8px;[^}]*left:10px/);
+  assert.match(portalPage, /\.teacher-calendar-grid\{row-gap:6px\}/);
+  assert.match(portalPage, /\.teacher-calendar-weekday\{[^}]*background:var\(--soft\)/);
+  assert.match(portalPage, /\.teacher-calendar-day\{[^}]*min-height:138px;[^}]*border-radius:10px/);
   assert.match(portalPage, /teacher-calendar-item--deped/);
   assert.match(portalPage, /id="spinWheelPanel" hidden/);
   assert.match(portalPage, /id="topbarCalendarToggle"[^>]*aria-controls="topbarCalendarPopover"[^>]*aria-expanded="false"/);
@@ -4491,7 +4543,7 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /dashboardErrors\[key\]=error&&error\.message/);
   assert.match(portalPage, /id="dashboardReadingLevels"[\s\S]*?id="dashboardRmaTrend"/);
   assert.match(portalPage, /id="dashboardMpsYearHeading">Whole-year MPS by subject[\s\S]*?id="dashboardMpsYearChart"[\s\S]*?id="dashboardDeadlinesHeading">Upcoming deadlines/);
-  assert.match(portalPage, /async function dashboardLoadYearMps\(version\)[\s\S]*?getTeacherSubjectsForSection\(reportSection\)[\s\S]*?\/api\/e-class\/record"\+query/);
+  assert.match(portalPage, /async function dashboardLoadYearMps\(version\)[\s\S]*?getTeacherSubjectsForSection\(reportSection\)[\s\S]*?api\("\/api\/e-class\/records\/batch"/);
   assert.match(portalPage, /Term 1–3 · "\+typeLabel\+" · Mean Percentage Score/);
   assert.match(portalPage, /svg\.setAttribute\("role","img"\)[\s\S]*?svg\.setAttribute\("aria-label",label\)/);
   assert.match(portalPage, /\/\* ==== DASHBOARD v2 ==== \*\//);
@@ -4509,18 +4561,17 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /input===bannerImageFit&&input\.value==="stretch"&&bannerSheetLayout\.value!=="custom"[\s\S]*?bannerSheetLayout\.value="custom"[\s\S]*?bannerSheetLayout\.dispatchEvent\(new Event\("change"\)\)/);
   assert.match(portalPage, /bannerSheetsAcross,bannerSheetsDown[\s\S]*?fitBannerToSheetGrid\(\)/);
   assert.match(portalPage, /bannerImageFit\.value==="stretch"\?"fill":bannerImageFit\.value/);
-  assert.match(portalPage, /bannerImageFit\.value==="stretch"\?"none":bannerImageFit\.value==="cover"/);
   assert.match(portalPage, /id="tarpaulinZoomOut"[^>]*aria-label="Zoom out"/);
   assert.match(portalPage, /id="tarpaulinZoomIn"[^>]*aria-label="Zoom in"/);
   assert.match(portalPage, /tarpaulinZoom=Math\.max\(0\.5/);
   assert.match(portalPage, /tarpaulinZoom=Math\.min\(2/);
   assert.match(portalPage, /id="tarpaulinSheetCount"/);
   assert.match(portalPage, /id="tarpaulinSheetGuides"/);
-  assert.match(portalPage, /createTarpaulinPrintPages\(dimensions,layout\)/);
-  assert.match(portalPage, /tarpaulinPrintPageStyle\.textContent="@page\{size:"\+tarpaulinPaperSizes\[bannerPaperSize\.value\]\[bannerOrientation\.value\]\+";margin:0\}"/);
   assert.doesNotMatch(portalPage, /id="tarpaulinTitle"/);
   assert.doesNotMatch(portalPage, /id="tarpaulinSubtitle"/);
-  assert.match(portalPage, /id="downloadTarpaulinSvg"/);
+  assert.doesNotMatch(portalPage, /id="printTarpaulin"|id="downloadTarpaulinSvg"/);
+  assert.match(portalPage, /id="downloadTarpaulinPdf"/);
+  assert.doesNotMatch(portalPage, /\$\("(?:printTarpaulin|downloadTarpaulinSvg)"\)\.onclick/);
   assert.match(portalPage, /id="spinWheelButton"/);
   assert.match(portalPage, /id="appearanceSetting"/);
   assert.match(portalPage, /<nav id="parentSidebarNav" aria-label="Learner information navigation" hidden>[\s\S]*?data-parent-target="parentStudentInfo" aria-current="page"[\s\S]*?data-parent-target="parentAttendanceSection"[\s\S]*?data-parent-target="parentReadingSection"[\s\S]*?data-parent-target="parentGradesSection"[\s\S]*?<\/nav>/);
@@ -5148,11 +5199,48 @@ test("registrations persist in the workbook and can sign in after a restart", as
   );
   assert.equal(savedEosyNutritionalMeasurement.status, 200);
   assert.equal((await savedEosyNutritionalMeasurement.json()).cycle, "EOSY");
+  const savedBosyAssessmentDate = await fetch(`${baseUrl}/api/nutritional-status/assessment-date`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({ cycle: "BOSY", measurementDate: "2025-04-20" }),
+  });
+  assert.equal(savedBosyAssessmentDate.status, 200);
+  assert.deepEqual(await savedBosyAssessmentDate.json(), {
+    cycle: "BOSY",
+    measurementDate: "2025-04-20",
+  });
+  const savedEosyAssessmentDate = await fetch(`${baseUrl}/api/nutritional-status/assessment-date`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({ cycle: "EOSY", measurementDate: "2025-04-25" }),
+  });
+  assert.equal(savedEosyAssessmentDate.status, 200);
+  assert.deepEqual(await savedEosyAssessmentDate.json(), {
+    cycle: "EOSY",
+    measurementDate: "2025-04-25",
+  });
+  const unauthenticatedAssessmentDate = await fetch(`${baseUrl}/api/nutritional-status/assessment-date`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cycle: "BOSY", measurementDate: "2025-04-20" }),
+  });
+  assert.equal(unauthenticatedAssessmentDate.status, 401);
+  const invalidAssessmentDate = await fetch(`${baseUrl}/api/nutritional-status/assessment-date`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: teacherCookie },
+    body: JSON.stringify({ cycle: "EOSY", measurementDate: "2025-02-31" }),
+  });
+  assert.equal(invalidAssessmentDate.status, 400);
   const rosterWithBothNutritionalCyclesResponse = await fetch(`${baseUrl}/api/students`, {
     headers: { Cookie: teacherCookie },
   });
   assert.equal(rosterWithBothNutritionalCyclesResponse.status, 200);
-  const rosterWithBothNutritionalCycles = (await rosterWithBothNutritionalCyclesResponse.json()).students;
+  const rosterWithBothNutritionalCyclesResult = await rosterWithBothNutritionalCyclesResponse.json();
+  const rosterWithBothNutritionalCycles = rosterWithBothNutritionalCyclesResult.students;
+  assert.deepEqual(rosterWithBothNutritionalCyclesResult.nutritionalAssessmentDates, {
+    BOSY: "2025-04-20",
+    EOSY: "2025-04-25",
+  });
   const studentWithBothNutritionalCycles = rosterWithBothNutritionalCycles
     .find(({ id }) => id === addedStudent.student.id);
   assert.equal(studentWithBothNutritionalCycles.nutritionalAssessments.BOSY.measurementDate, "2025-04-21");
@@ -9038,7 +9126,12 @@ test("registrations persist in the workbook and can sign in after a restart", as
     headers: { Cookie: restartedTeacherCookie },
   });
   assert.equal(persistedNutritionalRosterResponse.status, 200);
-  const persistedNutritionalStudent = (await persistedNutritionalRosterResponse.json()).students
+  const persistedNutritionalRoster = await persistedNutritionalRosterResponse.json();
+  assert.deepEqual(persistedNutritionalRoster.nutritionalAssessmentDates, {
+    BOSY: "2025-04-20",
+    EOSY: "2025-04-25",
+  });
+  const persistedNutritionalStudent = persistedNutritionalRoster.students
     .find(({ id }) => id === addedStudent.student.id);
   assert.equal(persistedNutritionalStudent.weightKg, 42);
   assert.equal(persistedNutritionalStudent.heightM, 1.4);
@@ -9935,6 +10028,48 @@ test("classroom API scopes every operation to the calling owner", async (context
 
   assert.equal((await call(`/api/classrooms/${classroom.id}`, "dev-user-123", "DELETE")).status, 200);
   assert.equal((await call(`/api/classrooms/${classroom.id}`, "dev-user-123")).status, 403);
+});
+
+test("DepEd calendar activities exclude weekends and non-working holidays", async () => {
+  const portalPage = await readPortalPageSource();
+  const helperSources = [
+    portalPage.match(/function calendarDateIso\(date\)\{[\s\S]*?\n    \}/),
+    portalPage.match(/function calendarDateFromIso\(value\)\{[\s\S]*?\n    \}/),
+    portalPage.match(/function calendarSchoolActivityDates\(activity,nonWorkingHolidayDates\)\{[\s\S]*?\n    \}/),
+  ];
+  assert.ok(helperSources.every(Boolean), "calendar date helpers exist");
+  const calendarSchoolActivityDates = new Function(
+    `${helperSources.map((match) => match[0]).join("\n")}; return calendarSchoolActivityDates;`,
+  )();
+  assert.match(portalPage, /calendarSchoolActivityDates\(activity,nonWorkingHolidayDates\)/);
+  const range = { date: "2026-09-18", endDate: "2026-09-21" };
+  const weekdays = ["2026-09-18", "2026-09-21"];
+  const allDays = ["2026-09-18", "2026-09-19", "2026-09-20", "2026-09-21"];
+  const noHolidays = new Set();
+  const mondayHoliday = new Set(["2026-09-21"]);
+
+  for (const kind of ["opening-block", "instructional-block", "end-of-term-block"]) {
+    assert.deepEqual(calendarSchoolActivityDates({ ...range, kind }, noHolidays), weekdays, kind);
+  }
+  assert.deepEqual(
+    calendarSchoolActivityDates({
+      kind: "instructional-block",
+      dates: allDays,
+    }, noHolidays),
+    weekdays,
+  );
+  assert.deepEqual(
+    calendarSchoolActivityDates({ ...range, kind: "school-event" }, noHolidays),
+    weekdays,
+  );
+  assert.deepEqual(
+    calendarSchoolActivityDates({ ...range, kind: "instructional-block" }, mondayHoliday),
+    ["2026-09-18"],
+  );
+  assert.deepEqual(
+    calendarSchoolActivityDates({ ...range, kind: "school-event" }, mondayHoliday),
+    ["2026-09-18"],
+  );
 });
 
 test("teacher calendar API serves holidays and teacher-owned task CRUD independently", async (context) => {

@@ -20,6 +20,8 @@
   var rosterStudents=[];
   var nutritionalAssessmentCycle="BOSY";
   var nutritionalAssessmentDates={};
+  var nutritionalAssessmentDateSaving=false;
+  var nutritionalStatusRosterRequestId=0;
   var rosterParents=[];
   var spinWheelRosterEntries=[];
   var spinWheelRemovedIds=new Set();
@@ -1096,6 +1098,7 @@
   }
 
   async function loadNutritionalStatusRoster(){
+    var requestId=++nutritionalStatusRosterRequestId;
     var measurementDateInput=$("nutritionalMeasurementDate");
     var today=localISODate();
     var cycle=nutritionalAssessmentCycle;
@@ -1114,6 +1117,7 @@
     $("nutritionalRosterRows").replaceChildren();
     try{
       var result=await api("/api/students");
+      if(requestId!==nutritionalStatusRosterRequestId)return;
       if(!Array.isArray(result.students)){
         throw new Error("The roster response is outdated. Restart the portal server to load the updated backend.");
       }
@@ -1127,6 +1131,7 @@
       var firstMeasurementDate=result.students.map(function(student){
         return nutritionalAssessmentForStudent(student,cycle).measurementDate;
       }).find(Boolean);
+      nutritionalAssessmentDates=result.nutritionalAssessmentDates||{};
       measurementDateInput.value=nutritionalAssessmentDates[cycle]||firstMeasurementDate||today;
       nutritionalAssessmentDates[cycle]=measurementDateInput.value;
       $("nutritionalRosterCount").textContent=result.students.length+" student"+(result.students.length===1?"":"s");
@@ -1135,14 +1140,47 @@
       }
       $("nutritionalRosterEmpty").hidden=result.students.length!==0;
       $("nutritionalRosterTable").hidden=result.students.length===0;
-      measurementDateInput.onchange=function(){
-        nutritionalAssessmentDates[cycle]=measurementDateInput.value;
-        $("nutritionalRosterRows").querySelectorAll("tr").forEach(function(row){
-          if(!row.dataset.measurementDate){
+      measurementDateInput.onchange=async function(){
+        var selectedDate=measurementDateInput.value;
+        var previousDate=nutritionalAssessmentDates[cycle]||"";
+        function updateAges(date){
+          $("nutritionalRosterRows").querySelectorAll("tr").forEach(function(row){
+            if(row.dataset.measurementDate)return;
             row.querySelector('[data-nutritional-age="true"]').textContent=
-              nutritionalStudentAge(row.dataset.birthdate,measurementDateInput.value);
-          }
-        });
+              nutritionalStudentAge(row.dataset.birthdate,date);
+          });
+        }
+        updateAges(selectedDate);
+        if(!selectedDate){
+          measurementDateInput.value=previousDate;
+          updateAges(previousDate);
+          measurementDateInput.reportValidity();
+          return;
+        }
+        nutritionalAssessmentDateSaving=true;
+        measurementDateInput.disabled=true;
+        $("refreshNutritionalRoster").disabled=true;
+        updateNutritionalSaveButton();
+        try{
+          var savedDate=await api("/api/nutritional-status/assessment-date",{
+            method:"PUT",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({cycle:cycle,measurementDate:selectedDate})
+          });
+          nutritionalAssessmentDates[cycle]=savedDate.measurementDate;
+          $("nutritionalRosterNotice").textContent=cycle+" assessment date saved.";
+          $("nutritionalRosterNotice").classList.remove("error");
+        }catch(error){
+          measurementDateInput.value=previousDate;
+          updateAges(previousDate);
+          $("nutritionalRosterNotice").textContent="Could not save "+cycle+" assessment date: "+error.message;
+          $("nutritionalRosterNotice").classList.add("error");
+        }finally{
+          nutritionalAssessmentDateSaving=false;
+          measurementDateInput.disabled=false;
+          $("refreshNutritionalRoster").disabled=false;
+          updateNutritionalSaveButton();
+        }
       };
       result.students.forEach(function(student,index){
         var assessment=nutritionalAssessmentForStudent(student,cycle);
@@ -1224,6 +1262,7 @@
       });
       updateNutritionalSaveButton();
     }catch(error){
+      if(requestId!==nutritionalStatusRosterRequestId)return;
       $("nutritionalRosterCount").textContent="Unable to load";
       $("nutritionalRosterNotice").textContent=error.message;
       $("nutritionalRosterNotice").classList.add("error");
@@ -1232,10 +1271,10 @@
 
   function selectNutritionalCycle(cycle,focusTab){
     if((cycle!=="BOSY"&&cycle!=="EOSY")||cycle===nutritionalAssessmentCycle
-      ||nutritionalMeasurementsSaving||nutritionalStatusExporting)return;
+      ||nutritionalMeasurementsSaving||nutritionalStatusExporting||nutritionalAssessmentDateSaving)return;
     var rows=Array.from($("nutritionalRosterRows").querySelectorAll("tr"));
     var editButton=$("editNutritionalMeasurements");
-    var hasEdits=editButton.dataset.editing==="true"||rows.some(hasNutritionalMeasurementsChanged);
+    var hasEdits=rows.some(hasNutritionalMeasurementsChanged);
     if(hasEdits&&!window.confirm("Discard unsaved nutritional measurements for "+nutritionalAssessmentCycle+"?"))return;
     if(editButton.dataset.editing==="true")toggleNutritionalMeasurementsEditing();
     nutritionalAssessmentCycle=cycle;
@@ -1274,6 +1313,10 @@
   var nutritionalStatusExporting=false;
 
   function updateNutritionalSaveButton(){
+    var cycleTabsBusy=nutritionalMeasurementsSaving||nutritionalStatusExporting||nutritionalAssessmentDateSaving;
+    $("nutritionalBosyTab").disabled=cycleTabsBusy;
+    $("nutritionalEosyTab").disabled=cycleTabsBusy;
+    $("nutritionalCycleTabs").setAttribute("aria-busy",String(cycleTabsBusy));
     var rows=$("nutritionalRosterRows");
     var hasUnsavedMeasurements=Array.from(rows.querySelectorAll("tr"))
       .some(hasNutritionalMeasurementsChanged);
@@ -1285,13 +1328,12 @@
       return row.dataset.editSnapshot==="true"&&row.dataset.measurementsLocked!=="true";
     });
     editButton.dataset.editing=String(editingSavedMeasurements);
-    editButton.disabled=
-      nutritionalMeasurementsSaving||nutritionalStatusExporting||(!hasSavedMeasurements&&!editingSavedMeasurements);
+    editButton.disabled=cycleTabsBusy||(!hasSavedMeasurements&&!editingSavedMeasurements);
     editButton.textContent=editingSavedMeasurements?"Cancel Edits":"Edit Measurements";
     $("saveNutritionalMeasurements").disabled=
-      nutritionalMeasurementsSaving||nutritionalStatusExporting||!hasUnsavedMeasurements;
+      cycleTabsBusy||!hasUnsavedMeasurements;
     $("exportSF8").disabled=
-      nutritionalMeasurementsSaving||nutritionalStatusExporting||!hasStudents||hasUnsavedMeasurements;
+      cycleTabsBusy||!hasStudents||hasUnsavedMeasurements;
   }
 
   function formatNutritionalValue(value,decimalPlaces){
@@ -1395,6 +1437,7 @@
   }
 
   async function saveAllNutritionalMeasurements(){
+    if(nutritionalAssessmentDateSaving)return;
     var changedRows=Array.from($("nutritionalRosterRows").querySelectorAll("tr"))
       .filter(hasNutritionalMeasurementsChanged);
     if(!changedRows.length)return;
@@ -1460,7 +1503,7 @@
 
   function toggleNutritionalMeasurementsEditing(){
     var editButton=$("editNutritionalMeasurements");
-    if(editButton.disabled||nutritionalMeasurementsSaving||nutritionalStatusExporting)return;
+    if(editButton.disabled||nutritionalMeasurementsSaving||nutritionalStatusExporting||nutritionalAssessmentDateSaving)return;
     var rows=Array.from($("nutritionalRosterRows").querySelectorAll("tr"));
     if(editButton.dataset.editing!=="true"){
       rows.forEach(function(row){
@@ -1493,7 +1536,7 @@
 
   async function exportNutritionalStatusSF8(){
     var button=$("exportSF8");
-    if(button.disabled||nutritionalMeasurementsSaving)return;
+    if(button.disabled||nutritionalMeasurementsSaving||nutritionalAssessmentDateSaving)return;
     nutritionalStatusExporting=true;
     updateNutritionalSaveButton();
     var rowControls=$("nutritionalRosterRows").querySelectorAll("input,button");
@@ -5163,12 +5206,62 @@
       var students=filterStudentsForActiveSection(rosterStudents,reportSection);
       var terms=dashboardData.mpsYear.terms;
 
-      async function getRecord(term,subject,mapehGroup){
-        var query="?term="+encodeURIComponent(term)
-          +"&subject="+encodeURIComponent(subject)
-          +"&mapehGroup="+encodeURIComponent(mapehGroup||"")
-          +"&section="+encodeURIComponent(reportSection);
-        return api("/api/e-class/record"+query);
+      function recordKey(term,subject,mapehGroup){
+        return JSON.stringify([term,subject,mapehGroup||""]);
+      }
+
+      function showMpsLoadFailure(){
+        dashboardData.mpsYear={terms:terms,subjects:uniqueSubjects.map(function(subject){
+          var values={};
+          terms.forEach(function(term){values[term]={mps:null,learnerCount:0}});
+          return {key:subject.key,label:subject.label,values:values};
+        }),assessmentType:selectedType};
+        dashboardErrors.mpsYear="Could not load whole-year MPS results.";
+        renderDashboard();
+      }
+
+      var selections=[];
+      terms.forEach(function(term){
+        uniqueSubjects.forEach(function(subject){
+          var groups=subject.key==="MAPEH"?["Music and Arts","PE and Health"]:[""];
+          groups.forEach(function(mapehGroup){
+            selections.push({
+              term:term,
+              subject:subject.key,
+              mapehGroup:mapehGroup,
+              section:reportSection
+            });
+          });
+        });
+      });
+
+      var batch;
+      try{
+        batch=await api("/api/e-class/records/batch",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({records:selections})
+        });
+        if(!batch||!Array.isArray(batch.records)||batch.records.length!==selections.length){
+          throw new Error("The whole-year MPS response was incomplete.");
+        }
+      }catch(error){
+        if(version!==requestVersion)return;
+        showMpsLoadFailure();
+        return;
+      }
+      if(version!==requestVersion)return;
+
+      var recordsByKey=new Map();
+      batch.records.forEach(function(record){
+        recordsByKey.set(recordKey(record.term,record.subject,record.mapehGroup),record);
+      });
+      var missingSelection=selections.some(function(selection){
+        return !recordsByKey.has(recordKey(selection.term,selection.subject,selection.mapehGroup));
+      });
+      if(missingSelection){
+        showMpsLoadFailure();
+        return;
       }
 
       function validScore(value,totalItems){
@@ -5176,62 +5269,58 @@
         return Number.isFinite(score)&&score>=0&&score<=totalItems?score:NaN;
       }
 
-      async function loadSubjectTerm(subject,term){
-        try{
-          var scoreTotal=0;
-          var learnerCount=0;
-          var totalItems=0;
-          if(subject.key==="MAPEH"){
-            var groupRecords=await Promise.all(["Music and Arts","PE and Health"].map(function(group){
-              return getRecord(term,subject.key,group);
-            }));
-            if(groupRecords.some(function(record){return !record.saved}))return{mps:null};
-            var groupItemTotals=groupRecords.map(function(record){
-              return record.highestScores&&Number(record.highestScores[scoreIndex]);
-            });
-            if(groupItemTotals.some(function(total){return !Number.isInteger(total)||total<=0})){
-              return{mps:null};
-            }
-            totalItems=groupItemTotals.reduce(function(total,value){return total+value},0);
-            var groupScores=groupRecords.map(function(record){
-              return record.scores&&typeof record.scores==="object"?record.scores:{};
-            });
-            students.forEach(function(student){
-              var scores=groupScores.map(function(records){return records[student.id]});
-              var rawScores=scores.map(function(values,index){
-                return validScore(Array.isArray(values)?values[scoreIndex]:"",groupItemTotals[index]);
-              });
-              if(rawScores.every(Number.isFinite)){
-                scoreTotal+=rawScores.reduce(function(total,value){return total+value},0);
-                learnerCount++;
-              }
-            });
-          }else{
-            var record=await getRecord(term,subject.key);
-            if(!record.saved)return{mps:null};
-            totalItems=record.highestScores&&Number(record.highestScores[scoreIndex]);
-            if(!Number.isInteger(totalItems)||totalItems<=0)return{mps:null};
-            var scores=record.scores&&typeof record.scores==="object"?record.scores:{};
-            students.forEach(function(student){
-              var values=scores[student.id];
-              var score=validScore(Array.isArray(values)?values[scoreIndex]:"",totalItems);
-              if(Number.isFinite(score)){
-                scoreTotal+=score;
-                learnerCount++;
-              }
-            });
+      function loadSubjectTerm(subject,term){
+        var scoreTotal=0;
+        var learnerCount=0;
+        var totalItems=0;
+        if(subject.key==="MAPEH"){
+          var groupRecords=["Music and Arts","PE and Health"].map(function(group){
+            return recordsByKey.get(recordKey(term,subject.key,group));
+          });
+          if(groupRecords.some(function(record){return !record.saved}))return{mps:null};
+          var groupItemTotals=groupRecords.map(function(record){
+            return record.highestScores&&Number(record.highestScores[scoreIndex]);
+          });
+          if(groupItemTotals.some(function(total){return !Number.isInteger(total)||total<=0})){
+            return{mps:null};
           }
-          return{mps:learnerCount?scoreTotal/learnerCount/totalItems*100:null,learnerCount:learnerCount};
-        }catch(error){
-          return{mps:null,error:error&&error.message?error.message:"Request failed."};
+          totalItems=groupItemTotals.reduce(function(total,value){return total+value},0);
+          var groupScores=groupRecords.map(function(record){
+            return record.scores&&typeof record.scores==="object"?record.scores:{};
+          });
+          students.forEach(function(student){
+            var scores=groupScores.map(function(records){return records[student.id]});
+            var rawScores=scores.map(function(values,index){
+              return validScore(Array.isArray(values)?values[scoreIndex]:"",groupItemTotals[index]);
+            });
+            if(rawScores.every(Number.isFinite)){
+              scoreTotal+=rawScores.reduce(function(total,value){return total+value},0);
+              learnerCount++;
+            }
+          });
+        }else{
+          var record=recordsByKey.get(recordKey(term,subject.key));
+          if(!record.saved)return{mps:null};
+          totalItems=record.highestScores&&Number(record.highestScores[scoreIndex]);
+          if(!Number.isInteger(totalItems)||totalItems<=0)return{mps:null};
+          var scores=record.scores&&typeof record.scores==="object"?record.scores:{};
+          students.forEach(function(student){
+            var values=scores[student.id];
+            var score=validScore(Array.isArray(values)?values[scoreIndex]:"",totalItems);
+            if(Number.isFinite(score)){
+              scoreTotal+=score;
+              learnerCount++;
+            }
+          });
         }
+        return{mps:learnerCount?scoreTotal/learnerCount/totalItems*100:null,learnerCount:learnerCount};
       }
 
-      var termResults=await Promise.all(terms.map(function(term){
-        return Promise.all(uniqueSubjects.map(function(subject){
+      var termResults=terms.map(function(term){
+        return uniqueSubjects.map(function(subject){
           return loadSubjectTerm(subject,term);
-        }));
-      }));
+        });
+      });
       if(version!==requestVersion)return;
       var failures=[];
       var subjects=uniqueSubjects.map(function(subject,subjectIndex){
@@ -10716,16 +10805,23 @@
       var end=calendarDateLabel(calendarDateFromIso(endDate),{month:"short",day:"numeric",year:"numeric"});
       return start+" – "+end;
     }
-    function calendarSchoolActivityDates(activity){
-      if(Array.isArray(activity.dates))return activity.dates;
-      var currentDate=calendarDateFromIso(activity.date);
-      var endDate=calendarDateFromIso(activity.endDate||activity.date);
-      var dates=[];
-      while(currentDate<=endDate){
-        dates.push(calendarDateIso(currentDate));
-        currentDate.setDate(currentDate.getDate()+1);
+    function calendarSchoolActivityDates(activity,nonWorkingHolidayDates){
+      var dates;
+      if(Array.isArray(activity.dates)){
+        dates=activity.dates;
+      }else{
+        var currentDate=calendarDateFromIso(activity.date);
+        var endDate=calendarDateFromIso(activity.endDate||activity.date);
+        dates=[];
+        while(currentDate<=endDate){
+          dates.push(calendarDateIso(currentDate));
+          currentDate.setDate(currentDate.getDate()+1);
+        }
       }
-      return dates;
+      return dates.filter(function(activityDate){
+        var dayOfWeek=calendarDateFromIso(activityDate).getDay();
+        return dayOfWeek!==0&&dayOfWeek!==6&&!nonWorkingHolidayDates.has(activityDate);
+      });
     }
     function calendarSchoolActivityIndicators(activities){
       var block=activities.find(function(activity){
@@ -10892,6 +10988,9 @@
       var visibleHolidays=calendarState.holidays.filter(function(holiday){
         return !holiday.municipality||!selectedMunicipality||holiday.municipality===selectedMunicipality;
       });
+      var nonWorkingHolidayDates=new Set(visibleHolidays.filter(function(holiday){
+        return holiday.isNonWorking;
+      }).map(function(holiday){return holiday.date}));
       var holidaysByDate=new Map();
       var tasksByDate=new Map();
       var schoolActivitiesByDate=new Map();
@@ -10905,7 +11004,7 @@
       });
       if(calendarState.schoolCalendar){
         calendarState.schoolCalendar.activities.forEach(function(activity){
-          calendarSchoolActivityDates(activity).forEach(function(activityDate){
+          calendarSchoolActivityDates(activity,nonWorkingHolidayDates).forEach(function(activityDate){
             if(!schoolActivitiesByDate.has(activityDate))schoolActivitiesByDate.set(activityDate,[]);
             schoolActivitiesByDate.get(activityDate).push({
               activity:activity,
@@ -10931,7 +11030,9 @@
         var isNonWorkingHoliday=holidayItems.some(function(holiday){return holiday.isNonWorking});
         if(isNonWorkingHoliday)cell.classList.add("is-holiday");
         var schoolActivities=schoolActivitiesByDate.get(isoDate)||[];
-        var schoolActivityIndicators=calendarSchoolActivityIndicators(schoolActivities);
+        var schoolActivityIndicators=calendarSchoolActivityIndicators(schoolActivities.map(function(entry){
+          return entry.activity;
+        }));
         if(schoolActivities.length){
           cell.classList.add("has-deped-activity");
           schoolActivities.forEach(function(entry){
@@ -10965,6 +11066,7 @@
         dateButton.setAttribute("aria-label","Add task on "+cell.getAttribute("aria-label"));
         dateButton.addEventListener("click",function(taskDate){return function(){openTeacherCalendarTask(taskDate)}}(isoDate));
         var dateNumber=document.createElement("span");
+        dateNumber.className="teacher-calendar-date-number";
         dateNumber.textContent=String(date.getDate());
         dateButton.appendChild(dateNumber);
         if(isoDate===calendarDateIso(new Date())){
@@ -10976,6 +11078,7 @@
         cell.appendChild(dateButton);
 
         if(schoolActivityIndicators.length){
+          cell.classList.add("has-deped-day-indicators");
           var indicatorList=document.createElement("div");
           indicatorList.className="teacher-calendar-day-indicators";
           schoolActivityIndicators.forEach(function(kind){
@@ -11035,7 +11138,8 @@
         var addButton=document.createElement("button");
         addButton.className="teacher-calendar-day-add";
         addButton.type="button";
-        addButton.textContent="+ Add";
+        addButton.textContent="+";
+        addButton.title="Add task";
         addButton.setAttribute("aria-label","Add task on "+cell.getAttribute("aria-label"));
         addButton.addEventListener("click",function(taskDate){return function(){openTeacherCalendarTask(taskDate)}}(isoDate));
         cell.appendChild(addButton);
@@ -11966,30 +12070,6 @@
         button.disabled=false;
       }
     };
-    $("downloadTarpaulinSvg").onclick=async function(){
-      var button=this;
-      var dimensions=bannerDimensions();
-      if(!dimensions){bannerWidth.reportValidity();bannerHeight.reportValidity();return}
-      button.disabled=true;
-      try{
-        var imageDataUrl=bannerImageFile?await readImageAsDataUrl(bannerImageFile):"";
-        var pictureSvg=imageDataUrl
-          ?'<image href="'+imageDataUrl+'" x="0" y="0" width="'+dimensions.widthCm+'" height="'+dimensions.heightCm+'" preserveAspectRatio="'+(bannerImageFit.value==="stretch"?"none":bannerImageFit.value==="cover"?"xMidYMid slice":"xMidYMid meet")+'"/>'
-          :"";
-        var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+dimensions.width+dimensions.unit+'" height="'+dimensions.height+dimensions.unit+'" viewBox="0 0 '+dimensions.widthCm+' '+dimensions.heightCm+'"><rect width="100%" height="100%" fill="'+bannerColor.value+'"/>'+pictureSvg+"</svg>";
-        var url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));
-        var link=document.createElement("a");
-        link.href=url;
-        link.download="tarpaulin-design.svg";
-        link.click();
-        window.setTimeout(function(){URL.revokeObjectURL(url)},1000);
-        showTarpaulinNotice("SVG design downloaded.",false);
-      }catch(error){
-        showTarpaulinNotice(error.message||"The banner design could not be exported.",true);
-      }finally{
-        button.disabled=false;
-      }
-    };
     function appendTarpaulinCutLine(page,direction,positionMm,startMm,lengthMm,isSeamTrim){
       var line=document.createElement("span");
       line.className="tarpaulin-print-cut-line "+direction+(isSeamTrim?" seam-trim":"");
@@ -12122,40 +12202,6 @@
         }
       }
     }
-    $("printTarpaulin").onclick=async function(){
-      var button=this;
-      var dimensions=bannerDimensions();
-      if(!dimensions){bannerWidth.reportValidity();bannerHeight.reportValidity();return}
-      var requestedGrid=bannerSheetLayout.value==="custom"?requestedTarpaulinSheetGrid():null;
-      if(bannerSheetLayout.value==="custom"&&(!requestedGrid||tarpaulinSheetGridError)){
-        if(!requestedGrid){
-          bannerSheetsAcross.reportValidity();
-          bannerSheetsDown.reportValidity();
-        }
-        showTarpaulinNotice(tarpaulinSheetGridError||"Enter valid sheet counts to prepare the tiled print.",true);
-        return;
-      }
-      button.disabled=true;
-      try{
-        var layout=getTarpaulinPrintLayout(dimensions,bannerPaperSize.value,bannerOrientation.value,requestedGrid);
-        createTarpaulinPrintPages(dimensions,layout);
-        var printImages=Array.from($("tarpaulinPrintPages").querySelectorAll("img"));
-        await Promise.all(printImages.map(function(image){return image.decode()}));
-        tarpaulinPrintPageStyle.textContent="@page{size:"+tarpaulinPaperSizes[bannerPaperSize.value][bannerOrientation.value]+";margin:0}";
-        document.head.appendChild(tarpaulinPrintPageStyle);
-        $("tarpaulinPrintPages").hidden=false;
-        document.body.classList.add("tools-printing");
-        window.print();
-      }catch(error){
-        document.body.classList.remove("tools-printing");
-        tarpaulinPrintPageStyle.remove();
-        $("tarpaulinPrintPages").hidden=true;
-        $("tarpaulinPrintPages").textContent="";
-        showTarpaulinNotice(error.message||"The banner print pages could not be prepared.",true);
-      }finally{
-        button.disabled=false;
-      }
-    };
     window.addEventListener("afterprint",function(){
       document.body.classList.remove("tools-printing");
       tarpaulinPrintPageStyle.remove();

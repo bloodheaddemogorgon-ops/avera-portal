@@ -956,6 +956,22 @@ function cellText(value) {
   return String(value).trim();
 }
 
+function isoDateCellText(value) {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : cellText(value);
+}
+
+function validateNutritionalMeasurementDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)
+    || !Number.isFinite(Date.parse(`${value}T00:00:00.000Z`))
+    || new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) !== value) {
+    throw new HttpError(400, "Enter a valid measurement date.");
+  }
+  if (value > new Date().toISOString().slice(0, 10)) {
+    throw new HttpError(400, "Measurement date cannot be in the future.");
+  }
+  return value;
+}
+
 function excelSafeText(value) {
   return Array.from(String(value))
     .filter((character) => {
@@ -1126,6 +1142,8 @@ function getClassSheet(workbook) {
       sectionsHandled: ensureColumn(sheet, headers, "Sections Handled"),
       sectionGrades: ensureColumn(sheet, headers, "Section Grades"),
       subjectsHandled: ensureColumn(sheet, headers, "Subjects Handled"),
+      nutritionalBosyMeasurementDate: ensureColumn(sheet, headers, "Nutritional BOSY Measurement Date"),
+      nutritionalEosyMeasurementDate: ensureColumn(sheet, headers, "Nutritional EOSY Measurement Date"),
     },
   };
 }
@@ -1235,9 +1253,7 @@ function getNutritionalAssessment(row, columns, cycle, student) {
   const dateValue = row.getCell(dateColumn).value;
   const weightKg = Number(weightValue);
   const heightM = Number(heightValue);
-  const measurementDate = dateValue instanceof Date
-    ? dateValue.toISOString().slice(0, 10)
-    : cellText(dateValue);
+  const measurementDate = isoDateCellText(dateValue);
   const savedWeightKg = Number.isFinite(weightKg) && weightKg > 0 ? weightKg : "";
   const savedHeightM = Number.isFinite(heightM) && heightM > 0 ? heightM : "";
   const heightSquaredM2 = savedHeightM ? savedHeightM ** 2 : null;
@@ -4194,7 +4210,35 @@ function createServer(options = {}) {
         parents,
         sectionsHandled,
         sectionGrades: getSectionGrades(classRow, classColumns),
+        nutritionalAssessmentDates: {
+          BOSY: isoDateCellText(classRow.getCell(classColumns.nutritionalBosyMeasurementDate).value),
+          EOSY: isoDateCellText(classRow.getCell(classColumns.nutritionalEosyMeasurementDate).value),
+        },
       };
+    });
+  }
+
+  async function saveNutritionalAssessmentDate(session, data) {
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new HttpError(400, "Choose an assessment cycle and enter its measurement date.");
+    }
+    const cycle = data.cycle;
+    if (cycle !== "BOSY" && cycle !== "EOSY") {
+      throw new HttpError(400, "Choose BOSY or EOSY for the assessment cycle.");
+    }
+    const measurementDate = validateNutritionalMeasurementDate(data.measurementDate);
+
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      const { sheet, columns } = getClassSheet(workbook);
+      const classRow = findTeacherClassRow(sheet, columns, session);
+      if (!classRow) throw new HttpError(404, "The teacher's classroom could not be found.");
+      const dateColumn = cycle === "BOSY"
+        ? columns.nutritionalBosyMeasurementDate
+        : columns.nutritionalEosyMeasurementDate;
+      classRow.getCell(dateColumn).value = measurementDate;
+      await saveDatabaseWorkbook(workbook);
+      return { cycle, measurementDate };
     });
   }
 
@@ -4212,26 +4256,20 @@ function createServer(options = {}) {
     const heightM = typeof data.heightM === "number" && Number.isFinite(data.heightM)
       ? data.heightM
       : Number.NaN;
-    const measurementDate = typeof data.measurementDate === "string" ? data.measurementDate : "";
+    const measurementDate = validateNutritionalMeasurementDate(data.measurementDate);
     if (!Number.isFinite(weightKg) || weightKg <= 0 || weightKg > 500) {
       throw new HttpError(400, "Weight must be greater than 0 and no more than 500 kg.");
     }
     if (!Number.isFinite(heightM) || heightM <= 0 || heightM > 2.5) {
       throw new HttpError(400, "Height must be greater than 0 and no more than 2.5 m.");
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(measurementDate)
-      || !Number.isFinite(Date.parse(`${measurementDate}T00:00:00.000Z`))
-      || new Date(`${measurementDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== measurementDate) {
-      throw new HttpError(400, "Enter a valid measurement date.");
-    }
-    if (measurementDate > new Date().toISOString().slice(0, 10)) {
-      throw new HttpError(400, "Measurement date cannot be in the future.");
-    }
-
     return serializeWorkbook(async () => {
       const workbook = await readDatabaseWorkbook();
       const { sheet, columns } = getStudentSheet(workbook);
       const row = findOwnedStudent(sheet, columns, session, studentId);
+      const { sheet: classSheet, columns: classColumns } = getClassSheet(workbook);
+      const classRow = findTeacherClassRow(classSheet, classColumns, session);
+      if (!classRow) throw new HttpError(404, "The teacher's classroom could not be found.");
       const savedWeightKg = Math.round(weightKg * 100) / 100;
       const savedHeightM = Math.round(heightM * 1000) / 1000;
       const birthdate = row.getCell(columns.birthdate).value;
@@ -4262,6 +4300,10 @@ function createServer(options = {}) {
       row.getCell(measurementColumns.weight).value = savedWeightKg;
       row.getCell(measurementColumns.height).value = savedHeightM;
       row.getCell(measurementColumns.date).value = measurementDate;
+      const classMeasurementDateColumn = cycle === "EOSY"
+        ? classColumns.nutritionalEosyMeasurementDate
+        : classColumns.nutritionalBosyMeasurementDate;
+      classRow.getCell(classMeasurementDateColumn).value = measurementDate;
       await saveDatabaseWorkbook(workbook);
       const heightSquaredM2 = savedHeightM ** 2;
       return {
@@ -6045,43 +6087,55 @@ function createServer(options = {}) {
     }
   }
 
-  async function getEClassRecord(session, selectionData) {
-    return serializeWorkbook(async () => {
-      const workbook = await readDatabaseWorkbook();
-      const selection = getEClassSelection(session, workbook, selectionData);
-      const { sheet, columns } = getEClassRecordSheet(workbook);
-      for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
-        const row = sheet.getRow(rowNumber);
-        if (!eClassRecordMatches(row, columns, session, selection)) continue;
-        const locked = row.getCell(columns.locked).value === true
-          || cellText(row.getCell(columns.locked).value).toLowerCase() === "true";
-        return {
-          term: selection.term,
-          subject: selection.subject,
-          mapehGroup: selection.mapehGroup,
-          section: selection.section,
-          updated: row.getCell(columns.updated).value instanceof Date
-            ? row.getCell(columns.updated).value.toISOString()
-            : cellText(row.getCell(columns.updated).value),
-          scores: readEClassJson(row.getCell(columns.scores).value, "scores"),
-          highestScores: readEClassJson(row.getCell(columns.highestScores).value, "highest possible scores", true),
-          locked,
-          saved: true,
-          gradingMethod: selection.gradingMethod,
-        };
-      }
+  function getEClassRecordFromWorkbook(session, workbook, selectionData) {
+    const selection = getEClassSelection(session, workbook, selectionData);
+    const { sheet, columns } = getEClassRecordSheet(workbook);
+    for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+      const row = sheet.getRow(rowNumber);
+      if (!eClassRecordMatches(row, columns, session, selection)) continue;
+      const locked = row.getCell(columns.locked).value === true
+        || cellText(row.getCell(columns.locked).value).toLowerCase() === "true";
       return {
-        gradingMethod: selection.gradingMethod,
         term: selection.term,
         subject: selection.subject,
         mapehGroup: selection.mapehGroup,
         section: selection.section,
-        updated: "",
-        scores: {},
-        highestScores: null,
-        locked: false,
-        saved: false,
+        updated: row.getCell(columns.updated).value instanceof Date
+          ? row.getCell(columns.updated).value.toISOString()
+          : cellText(row.getCell(columns.updated).value),
+        scores: readEClassJson(row.getCell(columns.scores).value, "scores"),
+        highestScores: readEClassJson(row.getCell(columns.highestScores).value, "highest possible scores", true),
+        locked,
+        saved: true,
+        gradingMethod: selection.gradingMethod,
       };
+    }
+    return {
+      gradingMethod: selection.gradingMethod,
+      term: selection.term,
+      subject: selection.subject,
+      mapehGroup: selection.mapehGroup,
+      section: selection.section,
+      updated: "",
+      scores: {},
+      highestScores: null,
+      locked: false,
+      saved: false,
+    };
+  }
+
+  async function getEClassRecord(session, selectionData) {
+    return serializeWorkbook(async () =>
+      getEClassRecordFromWorkbook(session, await readDatabaseWorkbook(), selectionData));
+  }
+
+  async function getEClassRecords(session, selections) {
+    if (!Array.isArray(selections) || selections.length === 0 || selections.length > 100) {
+      throw new HttpError(400, "Provide between 1 and 100 E-Class records.");
+    }
+    return serializeWorkbook(async () => {
+      const workbook = await readDatabaseWorkbook();
+      return selections.map((selection) => getEClassRecordFromWorkbook(session, workbook, selection));
     });
   }
 
@@ -12114,6 +12168,12 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
         return;
       }
 
+      if (request.method === "PUT" && url.pathname === "/api/nutritional-status/assessment-date") {
+        const session = requireTeacherSession(request);
+        sendJson(response, 200, await saveNutritionalAssessmentDate(session, await readJson(request)));
+        return;
+      }
+
       const nutritionalStatusStudentMatch = url.pathname.match(/^\/api\/students\/([^/]+)\/nutritional-status$/);
       if (request.method === "PUT" && nutritionalStatusStudentMatch) {
         const session = requireTeacherSession(request);
@@ -12248,6 +12308,13 @@ if(printAllPreview)printAllPreview.addEventListener("click",async function(){
       if (request.method === "GET" && url.pathname === "/api/grades/summary") {
         const session = requireTeacherSession(request);
         sendJson(response, 200, await getGradeSummary(session));
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/e-class/records/batch") {
+        const session = requireTeacherSession(request);
+        const data = await readJson(request, 32768);
+        sendJson(response, 200, { records: await getEClassRecords(session, data.records) });
         return;
       }
 

@@ -442,7 +442,7 @@
               <div><h1 id="nutritionalStatusTitle">Nutritional Status</h1><p>Record beginning- and end-of-year learner measurements.</p></div>
               <div class="heading-actions">
                 <label class="nutritional-measurement-date-control" for="nutritionalMeasurementDate"><span id="nutritionalMeasurementDateLabelText">Date of BOSY weighing and measurement</span>
-                  <input id="nutritionalMeasurementDate" type="date">
+                  <input id="nutritionalMeasurementDate" type="date" required>
                 </label>
                 <button class="btn ghost" id="refreshNutritionalRoster" type="button">Refresh roster</button>
               </div>
@@ -1644,13 +1644,12 @@
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.66</p>
+                  <p class="developer-update-meta">Version 1.0.67</p>
                   <ul class="developer-update-list">
-                    <li>Nutritional status supports separate BOSY and EOSY assessments.</li>
-                    <li>Improved the dashboard, page spacing, profile tabs, and theme options.</li>
-                    <li>Made tarpaulin controls collapsible and streamlined sidebar navigation.</li>
-                    <li>Improved circular school-logo previews without changing the original upload.</li>
-                    <li>Reduced unnecessary work during rapid PHIL-IRI input for a more responsive experience.</li>
+                    <li>Faster whole-year MPS dashboard loading through batched E-Class requests.</li>
+                    <li>Nutritional Status saves separate BOSY and EOSY assessment dates.</li>
+                    <li>DepEd calendar activities now skip weekends and non-working holidays.</li>
+                    <li>Improved calendar layout, E-Class score entry, and tarpaulin controls.</li>
                   </ul>
                 </div>
               </section>
@@ -1709,9 +1708,7 @@
                     </section>
                   </div>
                   <div class="settings-card-body tool-actions" id="tarpaulinActions">
-                    <button class="btn" id="printTarpaulin" type="button">Print / Save PDF</button>
                     <button class="btn ghost" id="downloadTarpaulinPdf" type="button">Download PDF</button>
-                    <button class="btn ghost" id="downloadTarpaulinSvg" type="button">Download SVG</button>
                   </div>
                 </section>
                 <div class="tarpaulin-resize-handle" id="tarpaulinResizeHandle" role="separator" tabindex="0" aria-orientation="vertical" aria-label="Resize tarpaulin controls and live preview" aria-valuemin="280" aria-valuemax="1200" aria-valuenow="320" aria-valuetext="320 pixels for controls" title="Drag to resize, or use the arrow keys"><span aria-hidden="true">⋮</span></div>

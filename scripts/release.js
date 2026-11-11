@@ -69,6 +69,11 @@ if (process.argv.includes("--prune-only")) {
   pruneOldReleases();
   process.exit(0);
 }
+const releaseTarget = capture("git", ["rev-parse", "HEAD"]);
+if (!releaseTarget.ok) {
+  console.error("Could not determine the release target commit.");
+  process.exit(1);
+}
 let releaseDraftExists = false;
 const existingRelease = capture("gh", ["release", "view", tag, "--json", "isDraft", ...repoArgs]);
 if (existingRelease.ok) {
@@ -133,7 +138,7 @@ if (missingAssets.length > 0) {
 }
 
 if (!releaseDraftExists) {
-  run("gh", ["release", "create", tag, "--draft", "--title", `GraceDesk ${version}`, "--generate-notes", ...repoArgs], { shell: false });
+  run("gh", ["release", "create", tag, "--target", releaseTarget.out, "--draft", "--title", `GraceDesk ${version}`, "--generate-notes", ...repoArgs], { shell: false });
 }
 const draftAssetsResult = capture("gh", ["release", "view", tag, "--json", "assets", ...repoArgs]);
 if (!draftAssetsResult.ok) {
