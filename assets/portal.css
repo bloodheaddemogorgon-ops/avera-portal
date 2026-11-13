@@ -137,6 +137,24 @@ html[data-theme="dark"],html[data-theme="midnight"],html[data-theme="amethyst"],
     --gd-surface-3:var(--soft);
   }
 }
+@media(prefers-reduced-motion:reduce){
+  html[data-performance-preference="system"],
+  html[data-performance-preference="system"] *,
+  html[data-performance-preference="system"] *::before,
+  html[data-performance-preference="system"] *::after{
+    animation:none!important;
+    animation-duration:0.01ms!important;
+    animation-iteration-count:1!important;
+    transition:none!important;
+    transition-duration:0.01ms!important;
+    scroll-behavior:auto!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+  }
+  html[data-performance-preference="system"] body::before,
+  html[data-performance-preference="system"] body::after{display:none!important}
+}
 html[data-performance="true"] *,html[data-performance="true"] *::before,html[data-performance="true"] *::after,
 html[data-performance-mode="on"] *,html[data-performance-mode="on"] *::before,html[data-performance-mode="on"] *::after{
   animation:none!important;
@@ -160,7 +178,7 @@ main{position:relative;z-index:1;width:100%;max-width:440px}
 .brand{text-align:center;margin-bottom:22px}
 .mark{display:grid;width:52px;height:52px;place-items:center;margin:0 auto 14px;border-radius:var(--gd-radius-xl);background:linear-gradient(135deg,var(--gd-primary),var(--gd-primary-light));color:var(--gd-text-inverse);font-size:1.6rem;font-weight:700;box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 12px 28px rgba(15,76,129,.22);transition:background var(--gd-dur) var(--gd-ease)}
 .brand .mark.has-logo{position:relative;overflow:hidden;background:linear-gradient(135deg,var(--gd-primary),var(--gd-primary-light));box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 12px 28px rgba(15,76,129,.22)}
-.brand .mark.has-logo img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.brand .mark.has-logo img{width:100%;height:100%;object-fit:contain;border-radius:inherit}
 h1{margin:0 0 4px;font-size:clamp(1.45rem,1.1rem + 1vw,1.9rem);font-weight:800;line-height:1.25;letter-spacing:-.01em}
 .brand p{margin:0;color:var(--muted);font-size:.95rem}
 .card{position:relative;background:var(--gd-surface);border:1px solid var(--gd-border);border-radius:16px;padding:32px 30px;box-shadow:var(--gd-shadow-lg)}
@@ -845,7 +863,9 @@ html[data-theme="navy-gold"] .sidebar .nav-link[aria-current="page"]{border-colo
 .teacher-calendar-term-blocks{display:grid;gap:3px;margin:8px 0 0;padding:0;list-style:none;color:var(--muted);font-size:.68rem;line-height:1.35}
 .teacher-calendar-status{min-height:1.3em;margin:0;color:var(--muted);font-size:.8rem}
 .teacher-calendar-status.error{color:var(--danger,#b42318)}
-.teacher-calendar-grid-wrap{overflow-x:auto}
+.teacher-calendar-grid-card{overflow:visible}
+.teacher-calendar-grid-heading-wrap{position:sticky;top:var(--gd-topbar-h);z-index:8;padding-bottom:0;background:var(--card)}
+.teacher-calendar-grid-wrap{overflow-x:auto;padding-top:0}
 .teacher-calendar-grid-view-label{margin:0 0 12px;padding:0 0 10px;border-bottom:1px solid var(--line);color:var(--muted);font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .teacher-calendar-weekdays,.teacher-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));column-gap:6px}
 .teacher-calendar-weekdays{margin-bottom:6px}
@@ -901,7 +921,7 @@ html[data-theme="navy-gold"] .sidebar .nav-link[aria-current="page"]{border-colo
 .teacher-calendar-dialog-actions .calendar-delete-task{margin-right:auto;color:#b42318}
 .teacher-calendar-dialog .tool-field textarea{min-height:90px}
 .teacher-calendar-dialog-error{margin:0;color:#b42318;font-size:.8rem}
-@media(max-width:720px){.teacher-calendar-heading{align-items:flex-start;flex-direction:column}.teacher-calendar-clock{text-align:left}.teacher-calendar-toolbar{align-items:flex-start;flex-direction:column}.teacher-calendar-navigation{width:100%;justify-content:space-between}.teacher-calendar-navigation h3{min-width:0}.teacher-calendar-grid-wrap{margin-right:-12px;padding-right:12px}.teacher-calendar-grid-view-label,.teacher-calendar-weekdays,.teacher-calendar-grid{min-width:720px}.teacher-calendar-day{min-height:112px;padding:6px}.teacher-calendar-view-controls{width:100%;justify-content:space-between}.teacher-calendar-term-list{grid-template-columns:1fr}}
+@media(max-width:720px){.teacher-calendar-heading{align-items:flex-start;flex-direction:column}.teacher-calendar-clock{text-align:left}.teacher-calendar-toolbar{align-items:flex-start;flex-direction:column}.teacher-calendar-navigation{width:100%;justify-content:space-between}.teacher-calendar-navigation h3{min-width:0}.teacher-calendar-grid-wrap{margin-right:-12px;padding-right:12px}.teacher-calendar-weekdays,.teacher-calendar-grid{min-width:720px}.teacher-calendar-day{min-height:112px;padding:6px}.teacher-calendar-view-controls{width:100%;justify-content:space-between}.teacher-calendar-term-list{grid-template-columns:1fr}}
 .tarpaulin-editor{display:grid;grid-template-columns:minmax(280px,var(--tarpaulin-controls-width,39%)) 18px minmax(0,1fr);align-items:start}
 .tarpaulin-editor.controls-collapsed{grid-template-columns:minmax(0,1fr)}
 .tarpaulin-editor.controls-collapsed .tarpaulin-controls-card,.tarpaulin-editor.controls-collapsed .tarpaulin-resize-handle{display:none}
@@ -1592,7 +1612,7 @@ body.portal-active{display:block;min-height:100vh;padding:0;overflow:hidden}
 body.portal-active main{width:100%;max-width:none;min-height:100vh;padding:0}
 body.portal-active .brand,body.portal-active #authCard{display:none}
 [hidden]{display:none!important}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (prefers-reduced-motion:reduce){html[data-performance-preference="system"] *{transition:none!important}}
 @media (max-width:1024px){
   .topbar{min-height:66px;gap:10px;padding:10px 14px}
   .topbar-profile-label{display:none}
@@ -2033,8 +2053,12 @@ body:not(.portal-active) #authCard .hint{line-height:1.55}
   .about-dialog{width:calc(100% - 20px);max-height:88dvh}
 }
 @media (prefers-reduced-motion:reduce){
-  body:not(.portal-active)::before,body:not(.portal-active)::after{transition:none}
-  .sidebar .nav-link,.menu-toggle,.topbar-settings,.student-table tbody tr{transition:none}
+  html[data-performance-preference="system"] body:not(.portal-active)::before,
+  html[data-performance-preference="system"] body:not(.portal-active)::after{transition:none}
+  html[data-performance-preference="system"] .sidebar .nav-link,
+  html[data-performance-preference="system"] .menu-toggle,
+  html[data-performance-preference="system"] .topbar-settings,
+  html[data-performance-preference="system"] .student-table tbody tr{transition:none}
 }
 @page mps-report{size:A4 portrait;margin:12mm}
 @page mps-summary{size:A4 portrait;margin:12mm}
@@ -2600,6 +2624,8 @@ html[data-performance-mode="on"] .dashboard-donut-segment,
 html[data-performance-mode="on"] .dashboard-skeleton-line{animation:none;transition:none}
 html[data-performance-mode="on"] .dashboard-metric-action:hover{transform:none;box-shadow:var(--shadow)}
 @media(prefers-reduced-motion:reduce){
-  .dashboard-metric-card,.dashboard-donut-segment,.dashboard-skeleton-line{animation:none;transition:none}
-  .dashboard-metric-action:hover{transform:none;box-shadow:var(--shadow)}
+  html[data-performance-preference="system"] .dashboard-metric-card,
+  html[data-performance-preference="system"] .dashboard-donut-segment,
+  html[data-performance-preference="system"] .dashboard-skeleton-line{animation:none;transition:none}
+  html[data-performance-preference="system"] .dashboard-metric-action:hover{transform:none;box-shadow:var(--shadow)}
 }

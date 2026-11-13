@@ -68,7 +68,7 @@ export default function DashboardHome() {
   return (
     <div className="portal-shell">
       <aside className="portal-sidebar">
-        <div className="brand-lockup"><span className="brand-mark">G</span><span>GraceDesk</span></div>
+        <div className="brand-lockup"><img className="brand-mark" src="/icon.png" alt="GraceDesk" /><span>GraceDesk</span></div>
         <div className="side-caption">Account</div>
         <div className="side-link" aria-current="page"><span className="side-symbol">◈</span>Overview</div>
         <div className="sidebar-bottom">Saved in the local portal database.</div>

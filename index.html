@@ -1644,12 +1644,12 @@
                   <p>Developer changes included in this version of GraceDesk.</p>
                 </div>
                 <div class="settings-card-body">
-                  <p class="developer-update-meta">Version 1.0.67</p>
+                  <p class="developer-update-meta">Version 1.0.68</p>
                   <ul class="developer-update-list">
-                    <li>Faster whole-year MPS dashboard loading through batched E-Class requests.</li>
-                    <li>Nutritional Status saves separate BOSY and EOSY assessment dates.</li>
-                    <li>DepEd calendar activities now skip weekends and non-working holidays.</li>
-                    <li>Improved calendar layout, E-Class score entry, and tarpaulin controls.</li>
+                    <li>Corrupt database recovery now preserves data when SQLite errors may be temporary.</li>
+                    <li>Reduced-motion preferences are respected unless a user overrides them.</li>
+                    <li>Improved teacher calendar period labels and sticky heading behavior.</li>
+                    <li>Refreshed GraceDesk branding and portal icons.</li>
                   </ul>
                 </div>
               </section>
@@ -2064,9 +2064,11 @@
                     </div>
                   </details>
                 </section>
-                <section class="data-card" aria-labelledby="teacherCalendarGridViewLabel">
-                  <div class="settings-card-body teacher-calendar-grid-wrap">
+                <section class="data-card teacher-calendar-grid-card" aria-labelledby="teacherCalendarGridViewLabel">
+                  <div class="settings-card-body teacher-calendar-grid-heading-wrap">
                     <h3 class="teacher-calendar-grid-view-label" id="teacherCalendarGridViewLabel">Month</h3>
+                  </div>
+                  <div class="settings-card-body teacher-calendar-grid-wrap">
                     <div class="teacher-calendar-weekdays" aria-hidden="true">
                       <span class="teacher-calendar-weekday">Sun</span><span class="teacher-calendar-weekday">Mon</span>
                       <span class="teacher-calendar-weekday">Tue</span><span class="teacher-calendar-weekday">Wed</span>

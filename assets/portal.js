@@ -209,14 +209,38 @@
   function applyPerformanceMode(enabled){
     performanceModeEnabled=enabled;
     document.documentElement.dataset.performanceMode=enabled?"on":"off";
-    $("performanceModeToggle").setAttribute("aria-checked",String(enabled));
-    $("performanceModeValue").textContent=enabled?"On":"Off";
+    document.documentElement.dataset.performancePreference=performancePreferenceStored?"user":"system";
+    if($("performanceModeToggle"))$("performanceModeToggle").setAttribute("aria-checked",String(enabled));
+    if($("performanceModeValue"))$("performanceModeValue").textContent=enabled?"On":"Off";
+  }
+
+  var reducedMotionQuery=null;
+  var performancePreferenceStored=false;
+  try{
+    if(typeof window.matchMedia==="function")reducedMotionQuery=window.matchMedia("(prefers-reduced-motion: reduce)");
+  }catch(error){
+    reducedMotionQuery=null;
   }
 
   try{
-    performanceModeEnabled=window.localStorage.getItem("gradePortalPerformanceMode")==="on";
+    var savedPerformanceMode=window.localStorage.getItem("gradePortalPerformanceMode");
+    performancePreferenceStored=savedPerformanceMode!==null;
+    performanceModeEnabled=savedPerformanceMode==="on" || (!savedPerformanceMode&&Boolean(reducedMotionQuery&&reducedMotionQuery.matches));
   }catch(error){
     performanceModeStorageError="Performance mode preference could not be loaded from this browser: "+error.message;
+    performanceModeEnabled=Boolean(reducedMotionQuery&&reducedMotionQuery.matches);
+  }
+
+  if(reducedMotionQuery&&typeof reducedMotionQuery.addEventListener==="function"){
+    reducedMotionQuery.addEventListener("change",function(event){
+      if(performancePreferenceStored)return;
+      applyPerformanceMode(Boolean(event.matches));
+    });
+  }else if(reducedMotionQuery&&typeof reducedMotionQuery.addListener==="function"){
+    reducedMotionQuery.addListener(function(event){
+      if(performancePreferenceStored)return;
+      applyPerformanceMode(Boolean(event.matches));
+    });
   }
   applyPerformanceMode(performanceModeEnabled);
 
@@ -10914,7 +10938,9 @@
     }
     function loadTeacherCalendar(){
       calendarState.loading=true;
-      $("teacherCalendarGridViewLabel").textContent=calendarState.view==="week"?"Week":"Month";
+      var range=calendarVisibleRange();
+      $("teacherCalendarGridViewLabel").textContent=
+        (calendarState.view==="week"?"Week: ":"Month: ")+calendarPeriodLabel(range);
       var requestSequence=++calendarState.loadSequence;
       var startUpMessages=[];
       var initializeProfile=calendarState.initialized?Promise.resolve():api("/api/teacher/profile").then(function(profile){
@@ -10930,7 +10956,6 @@
       }
       $("teacherCalendarPeriod").textContent="Loading calendar…";
       Promise.resolve(initializeProfile).then(async function(){
-        var range=calendarVisibleRange();
         $("teacherCalendarPeriod").textContent=calendarPeriodLabel(range);
         var errors=startUpMessages.slice();
         var holidayBundle=null;
@@ -12461,6 +12486,7 @@
     refreshBackups();
   })();
   $("performanceModeToggle").onclick=function(){
+    performancePreferenceStored=true;
     applyPerformanceMode(!performanceModeEnabled);
     $("performanceNotice").classList.remove("error");
     try{

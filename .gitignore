@@ -11,6 +11,7 @@ grade5-portal-database.sqlite-shm
 grade5-portal-database.sqlite-wal
 *.sqlite
 *.sqlite-*
+*.sqlite.corrupt-*
 *.db
 *.db-*
 *.xls

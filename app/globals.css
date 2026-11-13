@@ -39,7 +39,7 @@ a { color: inherit; }
 .portal-shell { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
 .portal-sidebar { display: flex; flex-direction: column; min-height: 100vh; padding: 24px 16px; background: var(--navy); color: #f2f7f4; }
 .brand-lockup { display: flex; align-items: center; gap: 12px; padding: 4px 8px 28px; font-weight: 750; }
-.brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 8px; background: var(--amber); color: #fff; font-family: Georgia, serif; font-size: 23px; }
+.brand-mark { display: block; width: 38px; height: 38px; border-radius: 8px; background: #fff; object-fit: contain; }
 .side-caption { padding: 14px 10px 7px; color: #a7c0b9; font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .side-link { display: flex; align-items: center; gap: 11px; min-height: 42px; margin: 2px 0; padding: 0 11px; border-radius: 5px; color: #c4d5ce; font-size: 13px; text-decoration: none; }
 .side-link[aria-current="page"] { background: #f4f7f2; color: var(--navy); font-weight: 750; }

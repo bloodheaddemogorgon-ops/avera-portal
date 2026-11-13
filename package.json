@@ -1,6 +1,6 @@
 {
   "name": "grade5-class-portal",
-  "version": "1.0.67",
+  "version": "1.0.68",
   "private": true,
   "description": "Grade 5 Class Portal desktop application",
   "main": "desktop/main.js",
@@ -74,9 +74,15 @@
     "files": [
       "**/*",
       "!test/**",
+      "!node_modules/next/dist/docs/**",
       "!release/**",
       "!release-private/**",
       "!assets/portal.backup.css",
+      "!SF1.xls",
+      "!SF10.xlsx",
+      "!EPP.xlsx",
+      "!PE and Health.xlsx",
+      "!PhilIRI_Auto_Scoring_Template.xlsx",
       "!downloads/**",
       "!.kilo/**",
       "!.qodo/**",

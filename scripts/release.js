@@ -69,6 +69,15 @@ if (process.argv.includes("--prune-only")) {
   pruneOldReleases();
   process.exit(0);
 }
+const worktree = capture("git", ["status", "--porcelain", "--untracked-files=all"]);
+if (!worktree.ok) {
+  console.error("Could not verify the Git working tree before publishing.");
+  process.exit(1);
+}
+if (worktree.out) {
+  console.error("The Git working tree is not clean. Commit or stash all changes before publishing.");
+  process.exit(1);
+}
 const releaseTarget = capture("git", ["rev-parse", "HEAD"]);
 if (!releaseTarget.ok) {
   console.error("Could not determine the release target commit.");
@@ -171,5 +180,4 @@ if (assetsToUpload.length > 0) {
 }
 console.log(`Publishing ${tag}...`);
 run("gh", ["release", "edit", tag, "--draft=false", ...repoArgs], { shell: false });
-pruneOldReleases();
 console.log(`Released ${tag}. Installed apps can now update from Settings.`);

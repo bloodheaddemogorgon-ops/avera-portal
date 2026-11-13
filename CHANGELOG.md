@@ -1,5 +1,19 @@
 # GraceDesk Changelog
 
+## v1.0.68
+
+### Highlights
+- Added recovery for SQLite files confirmed to be malformed, while preserving databases when an open or lock error may be transient.
+- Respects the device's reduced-motion preference unless a user has explicitly selected a performance-mode setting.
+- Improved the teacher calendar's sticky period heading and date-range label.
+- Refreshed GraceDesk branding and app icons across the portal.
+
+### Bug fixes and stability improvements
+- Avoids moving healthy portal data when SQLite reports an unavailable path or a temporary lock.
+- Kept a backup of a malformed database before rebuilding portal state from the migration workbook.
+
+---
+
 ## v1.0.66
 
 ### Highlights
@@ -38,7 +52,7 @@ Thank you for your feedback and suggestions. We continue improving the app to ma
 
 ---
 
-## Next update ideas for v1.0.67
+## Next update ideas for v1.0.69
 
 1. Add more detailed teacher/student analytics widgets to the dashboard.
 2. Improve report export options for printable summaries and teacher records.

@@ -1885,6 +1885,38 @@ function openPortalDatabase(databasePath) {
   }
 }
 
+async function recoverCorruptPortalDatabase(databasePath) {
+  const filesToRecover = [
+    databasePath,
+    `${databasePath}-wal`,
+    `${databasePath}-shm`,
+    `${databasePath}.journal`,
+  ].filter((candidate) => fileSystem.existsSync(candidate));
+  if (filesToRecover.length === 0) return [];
+
+  const recoveryTimestamp = Date.now();
+  const recoveredFiles = [];
+  for (const [index, filePath] of filesToRecover.entries()) {
+    const backupPath = `${filePath}.corrupt-${recoveryTimestamp}-${index}`;
+    await fs.rename(filePath, backupPath);
+    recoveredFiles.push(backupPath);
+  }
+  return recoveredFiles;
+}
+
+function isRecoverableDatabaseError(error) {
+  if (!error || typeof error !== "object") return false;
+  const errorText = [
+    error.message,
+    error.errstr,
+    error.code,
+    error.errcode,
+    error.name,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return errorText.includes("database disk image is malformed")
+    || errorText.includes("file is not a database");
+}
+
 function readPortalDatabaseWorkbook(databasePath) {
   const database = new DatabaseSync(databasePath);
   try {
@@ -3387,7 +3419,18 @@ function createServer(options = {}) {
     if (databaseInitialization) return databaseInitialization;
     const initialization = (async () => {
       await fs.mkdir(path.dirname(databasePath), { recursive: true });
-      database = openPortalDatabase(databasePath);
+      try {
+        database = openPortalDatabase(databasePath);
+      } catch (error) {
+        if (!isRecoverableDatabaseError(error)) throw error;
+        const recoveredFiles = await recoverCorruptPortalDatabase(databasePath);
+        if (recoveredFiles.length === 0) throw error;
+        console.warn(
+          `Detected a corrupt local database at ${databasePath}. ` +
+          `Moved the damaged files to ${recoveredFiles.join(", ")} and rebuilding the portal state.`,
+        );
+        database = openPortalDatabase(databasePath);
+      }
       const existingState = database.prepare(
         "SELECT workbook_state FROM portal_state WHERE id = 1",
       ).get();

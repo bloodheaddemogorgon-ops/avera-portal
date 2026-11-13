@@ -107,6 +107,54 @@ function assertNoLightGraySf2Fills(sheet) {
   });
 }
 
+test("rebuilds a corrupt local SQLite database from the migration workbook", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-db-recovery-"));
+  const databasePath = path.join(directory, "grade5-portal-database.sqlite");
+  await fs.writeFile(databasePath, Buffer.from("not a valid sqlite database"));
+
+  const server = createServer({
+    databasePath,
+    migrationWorkbookPath: sourceWorkbook,
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/health`);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { status: "ok", storage: "sqlite" });
+
+  const files = await fs.readdir(directory);
+  assert.ok(files.some((name) => name.includes("corrupt-")), "corrupt database backup was created");
+});
+
+test("does not quarantine a database when SQLite cannot open its configured path", async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "portal-db-unavailable-"));
+  const databasePath = path.join(directory, "grade5-portal-database.sqlite");
+  await fs.mkdir(databasePath);
+  const markerPath = path.join(databasePath, "keep.txt");
+  await fs.writeFile(markerPath, "keep existing data");
+
+  const server = createServer({
+    databasePath,
+    migrationWorkbookPath: sourceWorkbook,
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/health`);
+  assert.equal(response.status, 503);
+  assert.equal(await fs.readFile(markerPath, "utf8"), "keep existing data");
+  assert.deepEqual(await fs.readdir(directory), ["grade5-portal-database.sqlite"]);
+});
+
 test("WHO BMI-for-age and Height-for-Age categories use LMS z-scores and requested boundaries", () => {
   assert.equal(calculateLmsZScore(15, { l: 0, m: 15, s: 0.1 }), 0);
   assert.ok(Math.abs(calculateAgeMonths("2015-04-21", "2025-04-21") - 120.0164271) < 1e-7);
@@ -1759,10 +1807,10 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
-      "Faster whole-year MPS dashboard loading through batched E-Class requests.",
-      "Nutritional Status saves separate BOSY and EOSY assessment dates.",
-      "DepEd calendar activities now skip weekends and non-working holidays.",
-      "Improved calendar layout, E-Class score entry, and tarpaulin controls.",
+      "Corrupt database recovery now preserves data when SQLite errors may be temporary.",
+      "Reduced-motion preferences are respected unless a user overrides them.",
+      "Improved teacher calendar period labels and sticky heading behavior.",
+      "Refreshed GraceDesk branding and portal icons.",
     ],
   );
 });
@@ -3716,6 +3764,9 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /<select id="teacherGrade" aria-describedby="teacherGradeHint">[\s\S]*?<option value="Grade 1">Grade 1<\/option>[\s\S]*?<option value="Grade 12">Grade 12<\/option>[\s\S]*?<\/select>/);
   assert.match(portalPage, /id="performanceModeToggle"[^>]*role="switch"[^>]*aria-checked="false"/);
   assert.match(portalPage, /gradePortalPerformanceMode/);
+  assert.match(portalPage, /dataset\.performancePreference=performancePreferenceStored\?"user":"system"/);
+  assert.match(portalPage, /performancePreferenceStored=true;\s*applyPerformanceMode\(!performanceModeEnabled\)/);
+  assert.match(portalPage, /html\[data-performance-preference="system"\]/);
   assert.match(portalPage, /\$\("teacherGradeWrap"\)\.hidden=!up/);
   assert.match(portalPage, /Enter your grade level\./);
   assert.match(portalPage, /id="navPhilIri"[^>]*>\s*<span class="nav-icon" aria-hidden="true">▥<\/span>Phil-Iri/);
@@ -4484,7 +4535,9 @@ test("registrations persist in the workbook and can sign in after a restart", as
   assert.match(portalPage, /id="teacherCalendarMunicipality"/);
   assert.match(portalPage, /id="teacherCalendarMonthView"[\s\S]*?id="teacherCalendarWeekView"/);
   assert.match(portalPage, /aria-labelledby="teacherCalendarGridViewLabel"[\s\S]*?id="teacherCalendarGridViewLabel">Month<\/h3>[\s\S]*?class="teacher-calendar-weekdays"/);
-  assert.match(portalPage, /\$\("teacherCalendarGridViewLabel"\)\.textContent=calendarState\.view==="week"\?"Week":"Month"/);
+  assert.match(portalPage, /\.teacher-calendar-grid-card\{overflow:visible\}/);
+  assert.match(portalPage, /\.teacher-calendar-grid-heading-wrap\{position:sticky;top:var\(--gd-topbar-h\);z-index:8;[^}]*background:var\(--card\)/);
+  assert.match(portalPage, /\$\("teacherCalendarGridViewLabel"\)\.textContent=\s*\(calendarState\.view==="week"\?"Week: ":"Month: "\)\+calendarPeriodLabel\(range\)/);
   assert.match(portalPage, /id="teacherCalendarSchoolYearHeading">DepEd School Calendar · SY 2026–2027/);
   assert.match(portalPage, /<details class="teacher-calendar-school-year-details" open>[\s\S]*?<summary class="teacher-calendar-school-year-heading">[\s\S]*?id="teacherCalendarSchoolYearHeading"[\s\S]*?<\/summary>[\s\S]*?<ol class="teacher-calendar-term-list"/);
   assert.match(portalPage, /id="teacherCalendarTermList"/);
