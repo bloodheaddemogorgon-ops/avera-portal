@@ -1807,10 +1807,8 @@ test("developer updates list only changes from the current app version", async (
   assert.deepEqual(
     Array.from(updateContent[2].matchAll(/<li>([\s\S]*?)<\/li>/g), (match) => match[1].trim()),
     [
-      "Corrupt database recovery now preserves data when SQLite errors may be temporary.",
-      "Reduced-motion preferences are respected unless a user overrides them.",
-      "Improved teacher calendar period labels and sticky heading behavior.",
-      "Refreshed GraceDesk branding and portal icons.",
+      "Replaced GraceDesk app icons with the refreshed G mark across web and Windows.",
+      "Centered the logo and added soft rounded edges for compact displays.",
     ],
   );
 });

@@ -1,5 +1,13 @@
 # GraceDesk Changelog
 
+## v1.0.69
+
+### Highlights
+- Introduced the refreshed, centered GraceDesk G mark across the web and Windows app icons.
+- Added soft rounded edges and consistent cropping for compact logo displays.
+
+---
+
 ## v1.0.68
 
 ### Highlights
@@ -52,7 +60,7 @@ Thank you for your feedback and suggestions. We continue improving the app to ma
 
 ---
 
-## Next update ideas for v1.0.69
+## Next update ideas for v1.0.70
 
 1. Add more detailed teacher/student analytics widgets to the dashboard.
 2. Improve report export options for printable summaries and teacher records.
